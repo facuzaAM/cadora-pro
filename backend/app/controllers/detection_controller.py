@@ -1,8 +1,10 @@
+import os
+import tempfile
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException, UploadFile
 from sqlalchemy.ext.asyncio import AsyncSession
-from starlette.status import HTTP_400_BAD_REQUEST, HTTP_404_NOT_FOUND
+from starlette.status import HTTP_400_BAD_REQUEST, HTTP_404_NOT_FOUND, HTTP_413_CONTENT_TOO_LARGE
 
 from app.config import settings
 from app.database import get_db
@@ -20,6 +22,46 @@ detection_service = DetectionService()
 storage = StorageService()
 
 
+def _safe_temp_path(user_id: UUID, project_id: UUID, filename: str, prefix: str = "") -> str:
+    """Create a safe temp file path with sanitized filename."""
+    safe_name = os.path.basename(filename).replace("/", "").replace("\\", "")
+    suffix = f"_{prefix}" if prefix else ""
+    fd, path = tempfile.mkstemp(suffix=f"_{safe_name}", prefix=f"{user_id}_{project_id}{suffix}_")
+    os.close(fd)
+    return path
+
+
+def _validate_upload(file: UploadFile) -> str:
+    """Validate file extension and return lowercase extension."""
+    if not file.filename:
+        raise HTTPException(status_code=HTTP_400_BAD_REQUEST, detail="Archivo no proporcionado")
+
+    ext = file.filename.rsplit(".", 1)[-1].lower() if "." in file.filename else ""
+    if f".{ext}" not in settings.ALLOWED_EXTENSIONS:
+        raise HTTPException(
+            status_code=HTTP_400_BAD_REQUEST,
+            detail=f"Formato .{ext} no soportado",
+        )
+    return ext
+
+
+async def _read_upload_safe(file: UploadFile) -> bytes:
+    """Read upload file with size limit enforcement."""
+    max_bytes = settings.MAX_FILE_SIZE_MB * 1024 * 1024
+    content = b""
+    while True:
+        chunk = await file.read(1024 * 1024)
+        if not chunk:
+            break
+        content += chunk
+        if len(content) > max_bytes:
+            raise HTTPException(
+                status_code=HTTP_413_CONTENT_TOO_LARGE,
+                detail=f"Archivo excede el limite de {settings.MAX_FILE_SIZE_MB}MB",
+            )
+    return content
+
+
 @router.post("/ocr/{project_id}", response_model=OcrResult)
 async def ocr_document(
     project_id: UUID,
@@ -34,28 +76,20 @@ async def ocr_document(
     if not project or project.user_id != user.id:
         raise HTTPException(status_code=HTTP_404_NOT_FOUND, detail="Proyecto no encontrado")
 
-    if not file.filename:
-        raise HTTPException(status_code=HTTP_400_BAD_REQUEST, detail="Archivo no proporcionado")
-
-    ext = file.filename.rsplit(".", 1)[-1].lower() if "." in file.filename else ""
-    if f".{ext}" not in settings.ALLOWED_EXTENSIONS:
-        raise HTTPException(
-            status_code=HTTP_400_BAD_REQUEST,
-            detail=f"Formato .{ext} no soportado",
-        )
-
-    content = await file.read()
-    temp_path = f"/tmp/{user.id}_{project_id}_{file.filename}"
-    with open(temp_path, "wb") as f:
-        f.write(content)
-
-    request = OcrRequest(language=language)
+    _validate_upload(file)
+    content = await _read_upload_safe(file)
+    temp_path = _safe_temp_path(user.id, project_id, file.filename)
     try:
+        with open(temp_path, "wb") as f:
+            f.write(content)
+
+        request = OcrRequest(language=language)
         result = await ocr_service.process_file(temp_path, request=request)
+    except HTTPException:
+        raise
     except Exception as e:
         raise HTTPException(status_code=HTTP_400_BAD_REQUEST, detail=str(e))
     finally:
-        import os
         if os.path.exists(temp_path):
             os.remove(temp_path)
 
@@ -82,9 +116,8 @@ async def ocr_uploaded_document(
     if not project or project.user_id != user.id:
         raise HTTPException(status_code=HTTP_404_NOT_FOUND, detail="Documento no encontrado")
 
-    temp_path = f"/tmp/{user.id}_{document_id}_{doc.filename}"
+    temp_path = _safe_temp_path(user.id, document_id, doc.filename)
     try:
-        # Download file from storage to temp
         download_url = await storage.get_download_url(
             settings.STORAGE_BUCKET, doc.storage_path
         )
@@ -95,10 +128,11 @@ async def ocr_uploaded_document(
 
         request = OcrRequest(language=language)
         result = await ocr_service.process_file(temp_path, request=request)
+    except HTTPException:
+        raise
     except Exception as e:
         raise HTTPException(status_code=HTTP_400_BAD_REQUEST, detail=str(e))
     finally:
-        import os
         if os.path.exists(temp_path):
             os.remove(temp_path)
     return result
@@ -117,27 +151,19 @@ async def detect_windows(
     if not project or project.user_id != user.id:
         raise HTTPException(status_code=HTTP_404_NOT_FOUND, detail="Proyecto no encontrado")
 
-    if not file.filename:
-        raise HTTPException(status_code=HTTP_400_BAD_REQUEST, detail="Archivo no proporcionado")
-
-    ext = file.filename.rsplit(".", 1)[-1].lower() if "." in file.filename else ""
-    if f".{ext}" not in settings.ALLOWED_EXTENSIONS:
-        raise HTTPException(
-            status_code=HTTP_400_BAD_REQUEST,
-            detail=f"Formato .{ext} no soportado",
-        )
-
-    content = await file.read()
-    temp_path = f"/tmp/{user.id}_{project_id}_windows_{file.filename}"
-    with open(temp_path, "wb") as f:
-        f.write(content)
-
+    _validate_upload(file)
+    content = await _read_upload_safe(file)
+    temp_path = _safe_temp_path(user.id, project_id, file.filename, prefix="windows")
     try:
+        with open(temp_path, "wb") as f:
+            f.write(content)
+
         result = await detection_service.process_file_windows(temp_path)
+    except HTTPException:
+        raise
     except Exception as e:
         raise HTTPException(status_code=HTTP_400_BAD_REQUEST, detail=str(e))
     finally:
-        import os
         if os.path.exists(temp_path):
             os.remove(temp_path)
 
@@ -157,27 +183,19 @@ async def detect_lines(
     if not project or project.user_id != user.id:
         raise HTTPException(status_code=HTTP_404_NOT_FOUND, detail="Proyecto no encontrado")
 
-    if not file.filename:
-        raise HTTPException(status_code=HTTP_400_BAD_REQUEST, detail="Archivo no proporcionado")
-
-    ext = file.filename.rsplit(".", 1)[-1].lower() if "." in file.filename else ""
-    if f".{ext}" not in settings.ALLOWED_EXTENSIONS:
-        raise HTTPException(
-            status_code=HTTP_400_BAD_REQUEST,
-            detail=f"Formato .{ext} no soportado",
-        )
-
-    content = await file.read()
-    temp_path = f"/tmp/{user.id}_{project_id}_lines_{file.filename}"
-    with open(temp_path, "wb") as f:
-        f.write(content)
-
+    _validate_upload(file)
+    content = await _read_upload_safe(file)
+    temp_path = _safe_temp_path(user.id, project_id, file.filename, prefix="lines")
     try:
+        with open(temp_path, "wb") as f:
+            f.write(content)
+
         result = await detection_service.process_file(temp_path)
+    except HTTPException:
+        raise
     except Exception as e:
         raise HTTPException(status_code=HTTP_400_BAD_REQUEST, detail=str(e))
     finally:
-        import os
         if os.path.exists(temp_path):
             os.remove(temp_path)
 
@@ -197,27 +215,19 @@ async def detect_doors(
     if not project or project.user_id != user.id:
         raise HTTPException(status_code=HTTP_404_NOT_FOUND, detail="Proyecto no encontrado")
 
-    if not file.filename:
-        raise HTTPException(status_code=HTTP_400_BAD_REQUEST, detail="Archivo no proporcionado")
-
-    ext = file.filename.rsplit(".", 1)[-1].lower() if "." in file.filename else ""
-    if f".{ext}" not in settings.ALLOWED_EXTENSIONS:
-        raise HTTPException(
-            status_code=HTTP_400_BAD_REQUEST,
-            detail=f"Formato .{ext} no soportado",
-        )
-
-    content = await file.read()
-    temp_path = f"/tmp/{user.id}_{project_id}_doors_{file.filename}"
-    with open(temp_path, "wb") as f:
-        f.write(content)
-
+    _validate_upload(file)
+    content = await _read_upload_safe(file)
+    temp_path = _safe_temp_path(user.id, project_id, file.filename, prefix="doors")
     try:
+        with open(temp_path, "wb") as f:
+            f.write(content)
+
         result = await detection_service.process_file_doors(temp_path)
+    except HTTPException:
+        raise
     except Exception as e:
         raise HTTPException(status_code=HTTP_400_BAD_REQUEST, detail=str(e))
     finally:
-        import os
         if os.path.exists(temp_path):
             os.remove(temp_path)
 

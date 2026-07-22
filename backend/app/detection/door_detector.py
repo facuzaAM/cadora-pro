@@ -30,9 +30,11 @@ class DoorDetector:
         image: np.ndarray,
         grouped_lines: list[LineSegment],
         all_lines: list[LineSegment],
+        binary: np.ndarray | None = None,
     ) -> DoorDetectionResult:
-        gray = self._preprocess(image)
+        gray = self._preprocess(image) if binary is None else binary
         h, w = image.shape[:2]
+        threshold = self._compute_threshold(gray)
 
         walls = [l for l in grouped_lines
                  if l.category in (LineCategory.HORIZONTAL, LineCategory.VERTICAL)
@@ -40,7 +42,7 @@ class DoorDetector:
 
         leaf_candidates = [l for l in all_lines
                            if MIN_DOOR_W <= l.length <= MAX_DOOR_W * 1.5
-                           and not self._is_wall_edge(l, gray)]
+                           and not self._is_wall_edge(l, gray, threshold)]
 
         doors: list[Door] = []
         used_leaf_ids: set[str] = set()
@@ -49,13 +51,14 @@ class DoorDetector:
             leaf_key = f"{leaf.x1:.1f}_{leaf.y1:.1f}_{leaf.x2:.1f}_{leaf.y2:.1f}"
             if leaf_key in used_leaf_ids:
                 continue
-            door = self._leaf_to_door(leaf, walls, gray)
+            door = self._leaf_to_door(leaf, walls, gray, threshold)
             if door is not None:
                 doors.append(door)
                 used_leaf_ids.add(leaf_key)
 
         doors = self._deduplicate_doors(doors)
         doors = self._classify_double_doors(doors)
+        doors = self._classify_sliding_doors(doors, gray)
 
         return DoorDetectionResult(doors=doors, image_width=w, image_height=h)
 
@@ -65,7 +68,16 @@ class DoorDetector:
         return ImagePreprocessor().detect_pipeline(image)
 
     @staticmethod
-    def _is_wall_edge(line: LineSegment, gray: np.ndarray) -> bool:
+    def _compute_threshold(gray: np.ndarray) -> float:
+        """Compute adaptive dark/bright threshold from image."""
+        std = float(np.std(gray))
+        if std < 10:
+            return 128.0
+        mean = float(np.mean(gray))
+        return max(80.0, min(180.0, mean))
+
+    @staticmethod
+    def _is_wall_edge(line: LineSegment, gray: np.ndarray, threshold: float) -> bool:
         if line.category not in (LineCategory.HORIZONTAL, LineCategory.VERTICAL):
             return False
 
@@ -80,9 +92,9 @@ class DoorDetector:
                 y = int(y_min + t * (y_max - y_min))
                 if y < 0 or y >= gray.shape[0] or x < 2 or x > gray.shape[1] - 3:
                     continue
-                if gray[y, x - 2] < 128:
+                if gray[y, x - 2] < threshold:
                     left_counts += 1
-                if gray[y, x + 2] < 128:
+                if gray[y, x + 2] < threshold:
                     right_counts += 1
             return left_counts >= 2 or right_counts >= 2
 
@@ -97,9 +109,9 @@ class DoorDetector:
                 x = int(x_min + t * (x_max - x_min))
                 if y < 2 or y > gray.shape[0] - 3 or x < 0 or x >= gray.shape[1]:
                     continue
-                if gray[y - 2, x] < 128:
+                if gray[y - 2, x] < threshold:
                     up_counts += 1
-                if gray[y + 2, x] < 128:
+                if gray[y + 2, x] < threshold:
                     down_counts += 1
             return up_counts >= 2 or down_counts >= 2
 
@@ -108,6 +120,7 @@ class DoorDetector:
         gray: np.ndarray, fixed_coord: int,
         scan_start: int, scan_end: int,
         hinge_pos: int, is_horizontal: bool = True,
+        threshold: float = 128.0,
     ) -> tuple[int | None, int | None]:
         h, w = gray.shape[:2]
         lo = max(0, scan_start - MAX_DOOR_W)
@@ -116,7 +129,7 @@ class DoorDetector:
         in_gap = False
         start = lo
         for p in range(lo, hi + 1):
-            is_white = (gray[fixed_coord, p] > 128) if is_horizontal else (gray[p, fixed_coord] > 128)
+            is_white = (gray[fixed_coord, p] > threshold) if is_horizontal else (gray[p, fixed_coord] > threshold)
             if is_white and not in_gap:
                 start = p
                 in_gap = True
@@ -143,15 +156,17 @@ class DoorDetector:
 
     def _leaf_to_door(
         self, leaf: LineSegment, walls: list[LineSegment], gray: np.ndarray,
+        threshold: float,
     ) -> Door | None:
         if leaf.category == LineCategory.VERTICAL:
-            return self._vertical_leaf_to_door(leaf, walls, gray)
+            return self._vertical_leaf_to_door(leaf, walls, gray, threshold)
         elif leaf.category == LineCategory.HORIZONTAL:
-            return self._horizontal_leaf_to_door(leaf, walls, gray)
+            return self._horizontal_leaf_to_door(leaf, walls, gray, threshold)
         return None
 
     def _vertical_leaf_to_door(
         self, leaf: LineSegment, walls: list[LineSegment], gray: np.ndarray,
+        threshold: float,
     ) -> Door | None:
         lx = (leaf.x1 + leaf.x2) / 2.0
         ly_min = min(leaf.y1, leaf.y2)
@@ -165,10 +180,10 @@ class DoorDetector:
 
             # Leaf must be near the wall
             dist_to_wall = min(abs(wy - ly_min), abs(wy - ly_max))
-            if dist_to_wall > 15:
+            if dist_to_wall > 25:
                 continue
             # Leaf must be within wall x-range
-            if lx < wx1 - 30 or lx > wx2 + 30:
+            if lx < wx1 - 40 or lx > wx2 + 40:
                 continue
 
             # Determine which end touches the wall
@@ -181,25 +196,26 @@ class DoorDetector:
 
             gap_start, gap_end = self._find_gap_on_line(
                 gray, int(round(wy)), int(round(wx1)), int(round(wx2)),
-                int(round(hinge_x)),
+                int(round(hinge_x)), threshold=threshold,
             )
             if gap_start is None:
                 continue
             gap_w = gap_end - gap_start
 
             dist_to_gap = min(abs(hinge_x - gap_start), abs(hinge_x - gap_end))
-            if dist_to_gap > 30:
+            if dist_to_gap > 40:
                 continue
 
             return self._make_door(
                 leaf, hinge_x, hinge_y, tip_x, tip_y,
-                gap_start, wy, gap_end, wy, gap_w, gray,
+                gap_start, wy, gap_end, wy, gap_w, gray, threshold,
             )
 
         return None
 
     def _horizontal_leaf_to_door(
         self, leaf: LineSegment, walls: list[LineSegment], gray: np.ndarray,
+        threshold: float,
     ) -> Door | None:
         ly = (leaf.y1 + leaf.y2) / 2.0
         lx_min = min(leaf.x1, leaf.x2)
@@ -212,9 +228,9 @@ class DoorDetector:
             wy1, wy2 = min(w.y1, w.y2), max(w.y1, w.y2)
 
             dist_to_wall = min(abs(wx - lx_min), abs(wx - lx_max))
-            if dist_to_wall > 15:
+            if dist_to_wall > 25:
                 continue
-            if ly < wy1 - 30 or ly > wy2 + 30:
+            if ly < wy1 - 40 or ly > wy2 + 40:
                 continue
 
             if abs(wx - lx_min) < abs(wx - lx_max):
@@ -226,19 +242,19 @@ class DoorDetector:
 
             gap_start, gap_end = self._find_gap_on_line(
                 gray, int(round(wx)), int(round(wy1)), int(round(wy2)),
-                int(round(hinge_y)), is_horizontal=False,
+                int(round(hinge_y)), is_horizontal=False, threshold=threshold,
             )
             if gap_start is None:
                 continue
             gap_w = gap_end - gap_start
 
             dist_to_gap = min(abs(hinge_y - gap_start), abs(hinge_y - gap_end))
-            if dist_to_gap > 30:
+            if dist_to_gap > 40:
                 continue
 
             return self._make_door(
                 leaf, hinge_x, hinge_y, tip_x, tip_y,
-                wx, gap_start, wx, gap_end, gap_w, gray,
+                wx, gap_start, wx, gap_end, gap_w, gray, threshold,
             )
 
         return None
@@ -249,13 +265,13 @@ class DoorDetector:
         self, leaf: LineSegment,
         hx: float, hy: float, tx: float, ty: float,
         gx1: float, gy1: float, gx2: float, gy2: float,
-        gap_w: float, gray: np.ndarray,
+        gap_w: float, gray: np.ndarray, threshold: float,
     ) -> Door:
         dx, dy = tx - hx, ty - hy
         leaf_len = math.sqrt(dx ** 2 + dy ** 2)
         rotation = 90.0 if leaf.category == LineCategory.VERTICAL else 0.0
 
-        arc = self._detect_arc(gray, hx, hy, tx, ty)
+        arc = self._detect_arc(gray, hx, hy, tx, ty, threshold)
 
         swing = "right"
         if abs(dy) > abs(dx):
@@ -281,6 +297,7 @@ class DoorDetector:
     def _detect_arc(
         self, gray: np.ndarray,
         hx: float, hy: float, tx: float, ty: float,
+        threshold: float = 128.0,
     ) -> DoorArc | None:
         dx, dy = tx - hx, ty - hy
         radius = math.sqrt(dx ** 2 + dy ** 2) * 0.95
@@ -306,10 +323,10 @@ class DoorDetector:
             py = int(round(hy + radius * math.sin(rad)))
             if 0 <= px < w_img and 0 <= py < h_img:
                 total += 1
-                if gray[py, px] < 128:
+                if gray[py, px] < threshold:
                     hits += 1
 
-        if total == 0 or hits / total < 0.10:
+        if total == 0 or hits / total < 0.15:
             return None
 
         return DoorArc(
@@ -396,3 +413,73 @@ class DoorDetector:
                 result.append(a)
             used[i] = True
         return result
+
+    def _classify_sliding_doors(
+        self, doors: list[Door], gray: np.ndarray,
+    ) -> list[Door]:
+        """Reclassify single doors as SLIDING if the gap contains parallel
+        lines (tracks) instead of a swing arc."""
+        threshold = self._compute_threshold(gray)
+        result: list[Door] = []
+        for door in doors:
+            if door.type != DoorType.SINGLE or door.arc is not None:
+                result.append(door)
+                continue
+            if self._has_parallel_tracks(door, gray, threshold):
+                result.append(Door(
+                    id=door.id, type=DoorType.SLIDING,
+                    x=door.x, y=door.y, width=door.width,
+                    rotation=door.rotation,
+                    hinge_x=door.hinge_x, hinge_y=door.hinge_y,
+                    leaf_length=door.leaf_length,
+                    leaf_x1=door.leaf_x1, leaf_y1=door.leaf_y1,
+                    leaf_x2=door.leaf_x2, leaf_y2=door.leaf_y2,
+                    wall_gap_x1=door.wall_gap_x1, wall_gap_y1=door.wall_gap_y1,
+                    wall_gap_x2=door.wall_gap_x2, wall_gap_y2=door.wall_gap_y2,
+                    swing=door.swing,
+                    confidence=door.confidence + 0.05,
+                ))
+            else:
+                result.append(door)
+        return result
+
+    @staticmethod
+    def _has_parallel_tracks(door: Door, gray: np.ndarray, threshold: float) -> bool:
+        """Check if a door gap contains 2+ parallel dark lines (sliding tracks)."""
+        is_horizontal = door.rotation == 0 or abs(door.rotation) < 45
+        if is_horizontal:
+            cy = int((door.wall_gap_y1 + door.wall_gap_y2) / 2)
+            x1 = int(min(door.wall_gap_x1, door.wall_gap_x2))
+            x2 = int(max(door.wall_gap_x1, door.wall_gap_x2))
+            if x2 - x1 < MIN_DOOR_W:
+                return False
+            dark_runs = 0
+            in_dark = False
+            h, w = gray.shape[:2]
+            for x in range(max(0, x1), min(w, x2)):
+                pix = float(gray[cy, x]) if 0 <= cy < h else 255
+                if pix < threshold:
+                    if not in_dark:
+                        dark_runs += 1
+                        in_dark = True
+                else:
+                    in_dark = False
+            return dark_runs >= 2
+        else:
+            cx = int((door.wall_gap_x1 + door.wall_gap_x2) / 2)
+            y1 = int(min(door.wall_gap_y1, door.wall_gap_y2))
+            y2 = int(max(door.wall_gap_y1, door.wall_gap_y2))
+            if y2 - y1 < MIN_DOOR_W:
+                return False
+            dark_runs = 0
+            in_dark = False
+            h, w = gray.shape[:2]
+            for y in range(max(0, y1), min(h, y2)):
+                pix = float(gray[y, cx]) if 0 <= cx < w else 255
+                if pix < threshold:
+                    if not in_dark:
+                        dark_runs += 1
+                        in_dark = True
+                else:
+                    in_dark = False
+            return dark_runs >= 2

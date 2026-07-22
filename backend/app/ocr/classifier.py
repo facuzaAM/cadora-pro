@@ -60,8 +60,16 @@ class TextClassifier:
                 return TextCategory.SCALE
 
         # 2. Measurement detection
-        for pat in MEASUREMENT_PATTERNS:
+        for i, pat in enumerate(MEASUREMENT_PATTERNS):
             if pat.match(cleaned):
+                # Bare numbers below 100 are likely page numbers or labels
+                if i == len(MEASUREMENT_PATTERNS) - 1:
+                    try:
+                        val = float(cleaned.replace(',', '.'))
+                        if val < 100:
+                            continue
+                    except ValueError:
+                        pass
                 return TextCategory.MEASUREMENT
 
         # 3. Room name detection
@@ -73,9 +81,6 @@ class TextClassifier:
             for pat in ROOM_NAME_PATTERNS:
                 if pat.match(cleaned):
                     return TextCategory.ROOM_NAME
-
-            if cleaned.isupper() and len(cleaned) > 2 and len(cleaned) < 30:
-                return TextCategory.ROOM_NAME
 
         # 4. Note detection
         if any(kw in lower for kw in NOTE_KEYWORDS):
@@ -101,4 +106,4 @@ class TextClassifier:
         for pat in ROOM_NAME_PATTERNS:
             if pat.match(cleaned):
                 return True
-        return cleaned.isupper() and len(cleaned) > 2 and len(cleaned) < 30
+        return False

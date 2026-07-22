@@ -1,6 +1,8 @@
 from __future__ import annotations
 
+import asyncio
 import logging
+from functools import partial
 from pathlib import Path
 
 import cv2
@@ -17,10 +19,10 @@ logger = logging.getLogger(__name__)
 
 
 class DetectionService:
-    """Orchestrates detection: load → preprocess → detect → classify → group → intersect.
+    """Orchestrates detection: load -> preprocess -> detect -> classify -> group -> intersect.
 
-    The image is preprocessed once and the binary result is shared across
-    line, door, and window detectors for consistency and performance.
+    Heavy OpenCV/Tesseract work is offloaded to a thread pool to avoid
+    blocking the FastAPI event loop.
     """
 
     def __init__(self):
@@ -32,20 +34,15 @@ class DetectionService:
     async def process_file(
         self, file_path: str | Path,
     ) -> LineDetectionResult:
-        path = Path(file_path)
-        if path.suffix.lower() in (".pdf",):
-            images = self._pdf_to_images(path)
-            image = images[0]
-        else:
-            image = self._load_image(path)
-
-        return self._process_image(image)
+        image = await asyncio.to_thread(self._load_image_from_file, file_path)
+        return await asyncio.to_thread(self._process_image, image)
 
     async def process_image(self, image: np.ndarray) -> LineDetectionResult:
-        return self._process_image(image)
+        return await asyncio.to_thread(self._process_image, image)
 
     def _process_image(self, image: np.ndarray) -> LineDetectionResult:
-        lines, grouped, intersections, w, h = self.detector.detect(image)
+        binary = self.preprocessor.detect_pipeline(image)
+        lines, grouped, intersections, w, h = self.detector.detect(image, binary=binary)
 
         result = LineDetectionResult(
             lines=lines,
@@ -62,57 +59,44 @@ class DetectionService:
     async def process_file_doors(
         self, file_path: str | Path,
     ) -> DoorDetectionResult:
-        path = Path(file_path)
-        if path.suffix.lower() in (".pdf",):
-            images = self._pdf_to_images(path)
-            image = images[0]
-        else:
-            image = self._load_image(path)
-
-        return self._process_image_doors(image)
+        image = await asyncio.to_thread(self._load_image_from_file, file_path)
+        return await asyncio.to_thread(self._process_image_doors, image)
 
     async def process_image_doors(self, image: np.ndarray) -> DoorDetectionResult:
-        return self._process_image_doors(image)
+        return await asyncio.to_thread(self._process_image_doors, image)
 
     def _process_image_doors(self, image: np.ndarray) -> DoorDetectionResult:
-        lines, grouped, _, _, _ = self.detector.detect(image)
-        return self.door_detector.detect(image, grouped, lines)
+        binary = self.preprocessor.detect_pipeline(image)
+        lines, grouped, _, _, _ = self.detector.detect(image, binary=binary)
+        return self.door_detector.detect(image, grouped, lines, binary=binary)
 
     async def process_file_windows(
         self, file_path: str | Path,
     ) -> WindowDetectionResult:
-        path = Path(file_path)
-        if path.suffix.lower() in (".pdf",):
-            images = self._pdf_to_images(path)
-            image = images[0]
-        else:
-            image = self._load_image(path)
-        return self._process_image_windows(image)
+        image = await asyncio.to_thread(self._load_image_from_file, file_path)
+        return await asyncio.to_thread(self._process_image_windows, image)
 
     async def process_image_windows(self, image: np.ndarray) -> WindowDetectionResult:
-        return self._process_image_windows(image)
+        return await asyncio.to_thread(self._process_image_windows, image)
 
     def _process_image_windows(self, image: np.ndarray) -> WindowDetectionResult:
-        _, grouped, _, _, _ = self.detector.detect(image)
-        return self.window_detector.detect(image, grouped)
+        binary = self.preprocessor.detect_pipeline(image)
+        _, grouped, _, _, _ = self.detector.detect(image, binary=binary)
+        return self.window_detector.detect(image, grouped, binary=binary)
 
     async def process_all(
         self, file_path: str | Path,
     ) -> dict:
         """Run all detectors in one pass (lines + doors + windows)."""
-        path = Path(file_path)
-        if path.suffix.lower() in (".pdf",):
-            images = self._pdf_to_images(path)
-            image = images[0]
-        else:
-            image = self._load_image(path)
-        return self._process_all_image(image)
+        image = await asyncio.to_thread(self._load_image_from_file, file_path)
+        return await asyncio.to_thread(self._process_all_image, image)
 
     async def process_all_image(self, image: np.ndarray) -> dict:
-        return self._process_all_image(image)
+        return await asyncio.to_thread(self._process_all_image, image)
 
     def _process_all_image(self, image: np.ndarray) -> dict:
-        lines, grouped, intersections, w, h = self.detector.detect(image)
+        binary = self.preprocessor.detect_pipeline(image)
+        lines, grouped, intersections, w, h = self.detector.detect(image, binary=binary)
 
         line_result = LineDetectionResult(
             lines=lines,
@@ -125,8 +109,8 @@ class DetectionService:
         line_result.vertical = [l for l in lines if l.category.value == "vertical"]
         line_result.diagonal = [l for l in lines if l.category.value == "diagonal"]
 
-        door_result = self.door_detector.detect(image, grouped, lines)
-        window_result = self.window_detector.detect(image, grouped)
+        door_result = self.door_detector.detect(image, grouped, lines, binary=binary)
+        window_result = self.window_detector.detect(image, grouped, binary=binary)
 
         return {
             "lines": line_result,
@@ -136,6 +120,14 @@ class DetectionService:
 
     def to_json(self, result: LineDetectionResult, indent: int = 2) -> str:
         return result.model_dump_json(indent=indent)
+
+    @staticmethod
+    def _load_image_from_file(file_path: str | Path) -> np.ndarray:
+        path = Path(file_path)
+        if path.suffix.lower() in (".pdf",):
+            images = DetectionService._pdf_to_images(path)
+            return images[0]
+        return DetectionService._load_image(path)
 
     @staticmethod
     def _load_image(path: Path) -> np.ndarray:

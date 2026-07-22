@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import asyncio
 import logging
 from pathlib import Path
 
@@ -16,7 +17,10 @@ logger = logging.getLogger(__name__)
 
 
 class OcrService:
-    """Orchestrates the full OCR pipeline: load → preprocess → extract → classify."""
+    """Orchestrates the full OCR pipeline: load -> preprocess -> extract -> classify.
+
+    Heavy Tesseract/OpenCV work is offloaded to a thread pool.
+    """
 
     def __init__(self):
         self.engine = OcrEngine()
@@ -24,6 +28,14 @@ class OcrService:
         self.preprocessor = ImagePreprocessor()
 
     async def process_file(
+        self,
+        file_path: str | Path,
+        request: OcrRequest | None = None,
+        dpi: int = 72,
+    ) -> OcrResult:
+        return await asyncio.to_thread(self._process_file_sync, file_path, request, dpi)
+
+    def _process_file_sync(
         self,
         file_path: str | Path,
         request: OcrRequest | None = None,
@@ -38,25 +50,32 @@ class OcrService:
             images = [self._load_image(path)]
 
         all_texts = []
+        raw_parts = []
         for image in images:
             processed = self.preprocessor.pipeline(image, dpi=dpi)
             raw_elements = self.engine.extract(processed)
 
+            page_texts = []
             for raw in raw_elements:
                 category = self._classify_with_options(raw.text, opts)
                 element = self.engine.to_domain(raw, category)
-                all_texts.append(element)
+                page_texts.append(element)
+                raw_parts.append(raw.text)
+            all_texts.extend(page_texts)
 
-        raw_text = "\n".join(
-            pytesseract_output for image in images
-            if (pytesseract_output := self.engine.extract_raw_text(
-                self.preprocessor.pipeline(image, dpi=dpi)
-            ))
-        )
+        raw_text = " ".join(raw_parts)
 
         return self._build_result(all_texts, raw_text, len(images))
 
     async def process_image(
+        self,
+        image: np.ndarray,
+        request: OcrRequest | None = None,
+        dpi: int = 72,
+    ) -> OcrResult:
+        return await asyncio.to_thread(self._process_image_sync, image, request, dpi)
+
+    def _process_image_sync(
         self,
         image: np.ndarray,
         request: OcrRequest | None = None,
@@ -67,11 +86,13 @@ class OcrService:
         raw_elements = self.engine.extract(processed)
 
         texts = []
+        raw_parts = []
         for raw in raw_elements:
             category = self._classify_with_options(raw.text, opts)
             texts.append(self.engine.to_domain(raw, category))
+            raw_parts.append(raw.text)
 
-        raw_text = self.engine.extract_raw_text(processed)
+        raw_text = " ".join(raw_parts)
         return self._build_result(texts, raw_text, 1)
 
     # ── helpers ──────────────────────────────────────────────────────────────

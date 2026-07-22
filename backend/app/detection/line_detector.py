@@ -29,9 +29,10 @@ class LineDetector:
     """
 
     def detect(
-        self, image: np.ndarray
+        self, image: np.ndarray, binary: np.ndarray | None = None,
     ) -> tuple[list[LineSegment], list[Intersection], int, int]:
-        binary = self._preprocess(image)
+        if binary is None:
+            binary = self._preprocess(image)
         edges = self._edge_detection(binary)
         raw = self._hough_lines(edges)
         filtered = self._filter_noise(raw)
@@ -183,6 +184,16 @@ class LineDetector:
             by_min, by_max = min(b.y1, b.y2), max(b.y1, b.y2)
             gap = max(ay_min, by_min) - min(ay_max, by_max)
             return gap <= GROUP_DISTANCE_THRESHOLD
+
+        if a.category == LineCategory.DIAGONAL and b.category == LineCategory.DIAGONAL:
+            a_mid = ((a.x1 + a.x2) / 2, (a.y1 + a.y2) / 2)
+            b_mid = ((b.x1 + b.x2) / 2, (b.y1 + b.y2) / 2)
+            mid_dist = math.hypot(a_mid[0] - b_mid[0], a_mid[1] - b_mid[1])
+            if mid_dist > GROUP_DISTANCE_THRESHOLD * 1.5:
+                return False
+            a_len = math.hypot(a.x2 - a.x1, a.y2 - a.y1)
+            b_len = math.hypot(b.x2 - b.x1, b.y2 - b.y1)
+            return min(a_len, b_len) > 0
 
         return False
 

@@ -24,7 +24,7 @@ MIN_DARK_RATIO = 0.08
 ARC_MIN_R = 15
 ARC_MAX_R = 120
 WALL_HALF = 1
-ARC_HIT_RATIO = 0.08
+ARC_HIT_RATIO = 0.12
 
 
 class WindowDetector:
@@ -41,9 +41,11 @@ class WindowDetector:
         self,
         image: np.ndarray,
         grouped_lines: list[LineSegment],
+        binary: np.ndarray | None = None,
     ) -> WindowDetectionResult:
-        gray = self._preprocess(image)
+        gray = self._preprocess(image) if binary is None else binary
         h, w = image.shape[:2]
+        threshold = self._compute_threshold(gray)
 
         walls = [l for l in grouped_lines
                  if l.category in (LineCategory.HORIZONTAL, LineCategory.VERTICAL)]
@@ -52,7 +54,7 @@ class WindowDetector:
         seen_gaps: set[str] = set()
 
         for wall in walls:
-            found = self._find_windows_on_wall(wall, gray)
+            found = self._find_windows_on_wall(wall, gray, threshold)
             for win in found:
                 key = f"{win.wall_gap_x1:.0f}_{win.wall_gap_y1:.0f}_"
                 key += f"{win.wall_gap_x2:.0f}_{win.wall_gap_y2:.0f}"
@@ -67,8 +69,17 @@ class WindowDetector:
         from app.ocr.preprocessor import ImagePreprocessor
         return ImagePreprocessor().detect_pipeline(image)
 
+    @staticmethod
+    def _compute_threshold(gray: np.ndarray) -> float:
+        """Compute adaptive dark/bright threshold from image."""
+        std = float(np.std(gray))
+        if std < 10:
+            return 128.0
+        mean = float(np.mean(gray))
+        return max(80.0, min(180.0, mean))
+
     def _find_windows_on_wall(
-        self, wall: LineSegment, gray: np.ndarray,
+        self, wall: LineSegment, gray: np.ndarray, threshold: float,
     ) -> list[Window]:
         h_img, w_img = gray.shape[:2]
 
@@ -83,7 +94,7 @@ class WindowDetector:
             hi = min(h_img - 1, int(max(wall.y1, wall.y2)) + MAX_WINDOW_W)
             is_horizontal = False
 
-        gaps = self._find_gaps_at_offset(gray, center, lo, hi, is_horizontal)
+        gaps = self._find_gaps_at_offset(gray, center, lo, hi, is_horizontal, threshold)
 
         result: list[Window] = []
         for gs, ge in gaps:
@@ -91,7 +102,7 @@ class WindowDetector:
             if gap_w < MIN_WINDOW_W:
                 continue
             win = self._gap_to_window(
-                gray, gs, ge, is_horizontal, center,
+                gray, gs, ge, is_horizontal, center, threshold,
             )
             if win is not None:
                 result.append(win)
@@ -101,6 +112,7 @@ class WindowDetector:
     def _find_gaps_at_offset(
         gray: np.ndarray, center: int,
         lo: int, hi: int, horizontal: bool,
+        threshold: float = 128.0,
     ) -> list[tuple[int, int]]:
         candidates: set[tuple[int, int]] = {}
 
@@ -113,7 +125,7 @@ class WindowDetector:
             start = lo
             p = lo
             while p <= hi:
-                is_wall = (gray[fc, p] < 128) if horizontal else (gray[p, fc] < 128)
+                is_wall = (gray[fc, p] < threshold) if horizontal else (gray[p, fc] < threshold)
                 if not is_wall and not in_gap:
                     start = p
                     in_gap = True
@@ -121,7 +133,7 @@ class WindowDetector:
                 elif is_wall and in_gap:
                     thin_line = False
                     if p + 1 <= hi:
-                        next_pix = (gray[fc, p + 1] < 128) if horizontal else (gray[p + 1, fc] < 128)
+                        next_pix = (gray[fc, p + 1] < threshold) if horizontal else (gray[p + 1, fc] < threshold)
                         if not next_pix:
                             thin_line = True
                     if thin_line:
@@ -132,8 +144,8 @@ class WindowDetector:
                         left_ok = (start - 1) >= lo
                         right_ok = p <= hi
                         if left_ok and right_ok:
-                            left_wall = (gray[fc, start - 1] < 128) if horizontal else (gray[start - 1, fc] < 128)
-                            right_wall = (gray[fc, p] < 128) if horizontal else (gray[p, fc] < 128)
+                            left_wall = (gray[fc, start - 1] < threshold) if horizontal else (gray[start - 1, fc] < threshold)
+                            right_wall = (gray[fc, p] < threshold) if horizontal else (gray[p, fc] < threshold)
                             if left_wall and right_wall:
                                 candidates[(start, p - 1)] = True
                     in_gap = False
@@ -143,7 +155,7 @@ class WindowDetector:
                 if wp >= MIN_WINDOW_W:
                     left_ok = (start - 1) >= lo
                     if left_ok:
-                        left_wall = (gray[fc, start - 1] < 128) if horizontal else (gray[start - 1, fc] < 128)
+                        left_wall = (gray[fc, start - 1] < threshold) if horizontal else (gray[start - 1, fc] < threshold)
                         if left_wall:
                             candidates[(start, hi)] = True
 
@@ -153,9 +165,10 @@ class WindowDetector:
         self, gray: np.ndarray,
         gs: int, ge: int,
         is_horizontal: bool, center: int,
+        threshold: float,
     ) -> Window | None:
         dark_runs, dark_pixels = self._find_dark_runs(
-            gray, center, gs, ge, is_horizontal,
+            gray, center, gs, ge, is_horizontal, threshold,
         )
         gap_w = ge - gs
         dark_ratio = dark_pixels / gap_w if gap_w > 0 else 0
@@ -166,7 +179,7 @@ class WindowDetector:
         glass_lines = len(dark_runs)
 
         wtype, confidence = self._classify_window(
-            gray, dark_runs, dark_ratio, gs, ge, is_horizontal, center,
+            gray, dark_runs, dark_ratio, gs, ge, is_horizontal, center, threshold,
         )
 
         gap_center = (gs + ge) / 2.0
@@ -180,13 +193,13 @@ class WindowDetector:
             orientation = Orientation.VERTICAL
 
         height = self._find_window_height(
-            gray, gs, ge, is_horizontal, center,
+            gray, gs, ge, is_horizontal, center, threshold,
         )
 
         arc_model = None
         if wtype == WindowType.CASEMENT:
             arc_model = self._detect_window_arc(
-                gray, gs, ge, is_horizontal, center,
+                gray, gs, ge, is_horizontal, center, threshold,
             )
 
         return Window(
@@ -210,6 +223,7 @@ class WindowDetector:
         dark_ratio: float,
         gs: int, ge: int,
         is_horizontal: bool, center: int,
+        threshold: float = 128.0,
     ) -> tuple[WindowType, float]:
         glass_lines = len(dark_runs)
 
@@ -221,7 +235,7 @@ class WindowDetector:
             return WindowType.SLIDING, 0.6
 
         arc = self._detect_window_arc(
-            gray, gs, ge, is_horizontal, center,
+            gray, gs, ge, is_horizontal, center, threshold,
         )
         if arc is not None:
             return WindowType.CASEMENT, 0.7
@@ -232,6 +246,7 @@ class WindowDetector:
         self, gray: np.ndarray,
         gs: int, ge: int,
         is_horizontal: bool, center: int,
+        threshold: float = 128.0,
     ) -> float:
         h_img, w_img = gray.shape[:2]
 
@@ -245,13 +260,13 @@ class WindowDetector:
 
             up_extent = scan_y
             for y in range(scan_y, up_lo - 1, -1):
-                if gray[y, scan_x] < 128:
+                if gray[y, scan_x] < threshold:
                     break
                 up_extent = y
 
             down_extent = scan_y
             for y in range(scan_y, down_hi + 1):
-                if gray[y, scan_x] < 128:
+                if gray[y, scan_x] < threshold:
                     break
                 down_extent = y
 
@@ -266,13 +281,13 @@ class WindowDetector:
 
             left_extent = scan_x
             for x in range(scan_x, left_lo - 1, -1):
-                if gray[scan_y, x] < 128:
+                if gray[scan_y, x] < threshold:
                     break
                 left_extent = x
 
             right_extent = scan_x
             for x in range(scan_x, right_hi + 1):
-                if gray[scan_y, x] < 128:
+                if gray[scan_y, x] < threshold:
                     break
                 right_extent = x
 
@@ -284,13 +299,14 @@ class WindowDetector:
     def _find_dark_runs(
         gray: np.ndarray, fixed_coord: int,
         gs: int, ge: int, horizontal: bool,
+        threshold: float = 128.0,
     ) -> tuple[list[tuple[int, int]], int]:
         runs: list[tuple[int, int]] = []
         in_run = False
         start = gs
         dark_total = 0
         for p in range(gs, ge + 1):
-            is_dark = (gray[fixed_coord, p] < 128) if horizontal else (gray[p, fixed_coord] < 128)
+            is_dark = (gray[fixed_coord, p] < threshold) if horizontal else (gray[p, fixed_coord] < threshold)
             if is_dark:
                 dark_total += 1
             if is_dark and not in_run:
@@ -307,6 +323,7 @@ class WindowDetector:
         self, gray: np.ndarray,
         gs: int, ge: int,
         is_horizontal: bool, fixed_coord: int,
+        threshold: float = 128.0,
     ) -> WindowArc | None:
         gap_w = ge - gs
         radius = gap_w * 0.4
@@ -330,7 +347,7 @@ class WindowDetector:
             py = int(round(hy + radius * math.sin(rad)))
             if 0 <= px < w_img and 0 <= py < h_img:
                 total += 1
-                if gray[py, px] < 128:
+                if gray[py, px] < threshold:
                     hits += 1
 
         if total == 0 or hits / total < ARC_HIT_RATIO:

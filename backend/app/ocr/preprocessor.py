@@ -146,6 +146,7 @@ class ImagePreprocessor:
         binary = self.remove_salt_pepper(binary, ksize=3)
         binary = self.close_gaps(binary, ksize=3)
         binary = self.thin_noise(binary, min_area=20)
+        binary = self.remove_grid_lines(binary)
         binary = self.dilate_lines(binary, ksize=2)
         return binary
 
