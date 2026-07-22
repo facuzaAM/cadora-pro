@@ -1,0 +1,11 @@
+.git
+.gitignore
+.env
+.env.*
+node_modules/
+.next/
+.next-env.d.ts
+*.tsbuildinfo
+.pytest_cache/
+__pycache__/
+*.pyc

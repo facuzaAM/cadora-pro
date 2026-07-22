@@ -1,0 +1,224 @@
+from uuid import UUID
+
+from fastapi import APIRouter, Depends, HTTPException, UploadFile
+from sqlalchemy.ext.asyncio import AsyncSession
+from starlette.status import HTTP_400_BAD_REQUEST, HTTP_404_NOT_FOUND
+
+from app.config import settings
+from app.database import get_db
+from app.ocr.schemas import OcrRequest, OcrResult
+from app.ocr.service import OcrService
+from app.detection.schemas import LineDetectionResult, DoorDetectionResult, WindowDetectionResult
+from app.detection.service import DetectionService
+from app.repositories.project_repository import ProjectRepository
+from app.services.storage_service import StorageService
+from app.utils.dependencies import get_current_user
+
+router = APIRouter()
+ocr_service = OcrService()
+detection_service = DetectionService()
+storage = StorageService()
+
+
+@router.post("/ocr/{project_id}", response_model=OcrResult)
+async def ocr_document(
+    project_id: UUID,
+    file: UploadFile,
+    language: str = "spa+eng",
+    user=Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """Run OCR on an uploaded document image/PDF and return classified texts."""
+    project_repo = ProjectRepository(db)
+    project = await project_repo.get_by_id(project_id)
+    if not project or project.user_id != user.id:
+        raise HTTPException(status_code=HTTP_404_NOT_FOUND, detail="Proyecto no encontrado")
+
+    if not file.filename:
+        raise HTTPException(status_code=HTTP_400_BAD_REQUEST, detail="Archivo no proporcionado")
+
+    ext = file.filename.rsplit(".", 1)[-1].lower() if "." in file.filename else ""
+    if f".{ext}" not in settings.ALLOWED_EXTENSIONS:
+        raise HTTPException(
+            status_code=HTTP_400_BAD_REQUEST,
+            detail=f"Formato .{ext} no soportado",
+        )
+
+    content = await file.read()
+    temp_path = f"/tmp/{user.id}_{project_id}_{file.filename}"
+    with open(temp_path, "wb") as f:
+        f.write(content)
+
+    request = OcrRequest(language=language)
+    try:
+        result = await ocr_service.process_file(temp_path, request=request)
+    except Exception as e:
+        raise HTTPException(status_code=HTTP_400_BAD_REQUEST, detail=str(e))
+    finally:
+        import os
+        if os.path.exists(temp_path):
+            os.remove(temp_path)
+
+    return result
+
+
+@router.post("/ocr/uploaded/{document_id}", response_model=OcrResult)
+async def ocr_uploaded_document(
+    document_id: UUID,
+    language: str = "spa+eng",
+    user=Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """Run OCR on a previously uploaded document."""
+    from app.repositories.document_repository import DocumentRepository
+
+    doc_repo = DocumentRepository(db)
+    doc = await doc_repo.get_by_id(document_id)
+    if not doc:
+        raise HTTPException(status_code=HTTP_404_NOT_FOUND, detail="Documento no encontrado")
+
+    project_repo = ProjectRepository(db)
+    project = await project_repo.get_by_id(doc.project_id)
+    if not project or project.user_id != user.id:
+        raise HTTPException(status_code=HTTP_404_NOT_FOUND, detail="Documento no encontrado")
+
+    temp_path = f"/tmp/{user.id}_{document_id}_{doc.filename}"
+    try:
+        # Download file from storage to temp
+        download_url = await storage.get_download_url(
+            settings.STORAGE_BUCKET, doc.storage_path
+        )
+        import httpx
+        response = httpx.get(download_url)
+        with open(temp_path, "wb") as f:
+            f.write(response.content)
+
+        request = OcrRequest(language=language)
+        result = await ocr_service.process_file(temp_path, request=request)
+    except Exception as e:
+        raise HTTPException(status_code=HTTP_400_BAD_REQUEST, detail=str(e))
+    finally:
+        import os
+        if os.path.exists(temp_path):
+            os.remove(temp_path)
+    return result
+
+
+@router.post("/windows/{project_id}", response_model=WindowDetectionResult)
+async def detect_windows(
+    project_id: UUID,
+    file: UploadFile,
+    user=Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """Detect windows (sliding, fixed, casement) in a floor plan image."""
+    project_repo = ProjectRepository(db)
+    project = await project_repo.get_by_id(project_id)
+    if not project or project.user_id != user.id:
+        raise HTTPException(status_code=HTTP_404_NOT_FOUND, detail="Proyecto no encontrado")
+
+    if not file.filename:
+        raise HTTPException(status_code=HTTP_400_BAD_REQUEST, detail="Archivo no proporcionado")
+
+    ext = file.filename.rsplit(".", 1)[-1].lower() if "." in file.filename else ""
+    if f".{ext}" not in settings.ALLOWED_EXTENSIONS:
+        raise HTTPException(
+            status_code=HTTP_400_BAD_REQUEST,
+            detail=f"Formato .{ext} no soportado",
+        )
+
+    content = await file.read()
+    temp_path = f"/tmp/{user.id}_{project_id}_windows_{file.filename}"
+    with open(temp_path, "wb") as f:
+        f.write(content)
+
+    try:
+        result = await detection_service.process_file_windows(temp_path)
+    except Exception as e:
+        raise HTTPException(status_code=HTTP_400_BAD_REQUEST, detail=str(e))
+    finally:
+        import os
+        if os.path.exists(temp_path):
+            os.remove(temp_path)
+
+    return result
+
+
+@router.post("/lines/{project_id}", response_model=LineDetectionResult)
+async def detect_lines(
+    project_id: UUID,
+    file: UploadFile,
+    user=Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """Detect horizontal, vertical and diagonal lines in a floor plan image."""
+    project_repo = ProjectRepository(db)
+    project = await project_repo.get_by_id(project_id)
+    if not project or project.user_id != user.id:
+        raise HTTPException(status_code=HTTP_404_NOT_FOUND, detail="Proyecto no encontrado")
+
+    if not file.filename:
+        raise HTTPException(status_code=HTTP_400_BAD_REQUEST, detail="Archivo no proporcionado")
+
+    ext = file.filename.rsplit(".", 1)[-1].lower() if "." in file.filename else ""
+    if f".{ext}" not in settings.ALLOWED_EXTENSIONS:
+        raise HTTPException(
+            status_code=HTTP_400_BAD_REQUEST,
+            detail=f"Formato .{ext} no soportado",
+        )
+
+    content = await file.read()
+    temp_path = f"/tmp/{user.id}_{project_id}_lines_{file.filename}"
+    with open(temp_path, "wb") as f:
+        f.write(content)
+
+    try:
+        result = await detection_service.process_file(temp_path)
+    except Exception as e:
+        raise HTTPException(status_code=HTTP_400_BAD_REQUEST, detail=str(e))
+    finally:
+        import os
+        if os.path.exists(temp_path):
+            os.remove(temp_path)
+
+    return result
+
+
+@router.post("/doors/{project_id}", response_model=DoorDetectionResult)
+async def detect_doors(
+    project_id: UUID,
+    file: UploadFile,
+    user=Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """Detect doors (single, double, sliding) in a floor plan image."""
+    project_repo = ProjectRepository(db)
+    project = await project_repo.get_by_id(project_id)
+    if not project or project.user_id != user.id:
+        raise HTTPException(status_code=HTTP_404_NOT_FOUND, detail="Proyecto no encontrado")
+
+    if not file.filename:
+        raise HTTPException(status_code=HTTP_400_BAD_REQUEST, detail="Archivo no proporcionado")
+
+    ext = file.filename.rsplit(".", 1)[-1].lower() if "." in file.filename else ""
+    if f".{ext}" not in settings.ALLOWED_EXTENSIONS:
+        raise HTTPException(
+            status_code=HTTP_400_BAD_REQUEST,
+            detail=f"Formato .{ext} no soportado",
+        )
+
+    content = await file.read()
+    temp_path = f"/tmp/{user.id}_{project_id}_doors_{file.filename}"
+    with open(temp_path, "wb") as f:
+        f.write(content)
+
+    try:
+        result = await detection_service.process_file_doors(temp_path)
+    except Exception as e:
+        raise HTTPException(status_code=HTTP_400_BAD_REQUEST, detail=str(e))
+    finally:
+        import os
+        if os.path.exists(temp_path):
+            os.remove(temp_path)
+
+    return result
