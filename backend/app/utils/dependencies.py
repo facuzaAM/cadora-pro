@@ -3,7 +3,7 @@ from uuid import UUID
 from fastapi import Depends, HTTPException, Security
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from sqlalchemy.ext.asyncio import AsyncSession
-from starlette.status import HTTP_401_UNAUTHORIZED, HTTP_403_FORBIDDEN
+from starlette.status import HTTP_401_UNAUTHORIZED
 
 from app.database import get_db
 from app.repositories.user_repository import UserRepository
@@ -28,11 +28,17 @@ async def get_current_user(
             status_code=HTTP_401_UNAUTHORIZED,
             detail="Token inválido",
         )
+    token_version = payload.get("token_version", 0)
     repo = UserRepository(db)
     user = await repo.get_by_id(UUID(user_id))
     if not user:
         raise HTTPException(
             status_code=HTTP_401_UNAUTHORIZED,
             detail="Usuario no encontrado",
+        )
+    if user.token_version != token_version:
+        raise HTTPException(
+            status_code=HTTP_401_UNAUTHORIZED,
+            detail="Token revocado",
         )
     return user

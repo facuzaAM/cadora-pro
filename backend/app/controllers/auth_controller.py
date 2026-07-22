@@ -1,6 +1,6 @@
 from fastapi import APIRouter, Depends, HTTPException, Request
 from sqlalchemy.ext.asyncio import AsyncSession
-from starlette.status import HTTP_400_BAD_REQUEST
+from starlette.status import HTTP_400_BAD_REQUEST, HTTP_401_UNAUTHORIZED
 
 from app.config import settings
 from app.database import get_db
@@ -9,6 +9,7 @@ from app.repositories.user_repository import UserRepository
 from app.schemas.auth import (
     LoginRequest,
     ProfileUpdateRequest,
+    RefreshRequest,
     RegisterRequest,
     TokenResponse,
     UserResponse,
@@ -38,6 +39,22 @@ async def login(request: Request, body: LoginRequest, db: AsyncSession = Depends
         return await service.login(body.email, body.password)
     except ValueError as e:
         raise HTTPException(status_code=HTTP_400_BAD_REQUEST, detail=str(e))
+
+
+@router.post("/refresh", response_model=TokenResponse)
+@limiter.limit(settings.RATE_LIMIT_AUTH)
+async def refresh(request: Request, body: RefreshRequest, db: AsyncSession = Depends(get_db)):
+    service = AuthService(db)
+    try:
+        return await service.refresh(body.refresh_token)
+    except ValueError as e:
+        raise HTTPException(status_code=HTTP_401_UNAUTHORIZED, detail=str(e))
+
+
+@router.post("/logout", status_code=204)
+async def logout(body: RefreshRequest, db: AsyncSession = Depends(get_db)):
+    service = AuthService(db)
+    await service.logout(body.refresh_token)
 
 
 @router.get("/me", response_model=UserResponse)

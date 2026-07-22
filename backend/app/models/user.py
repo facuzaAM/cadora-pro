@@ -50,6 +50,7 @@ class User(Base):
     priority_processing: Mapped[bool] = mapped_column(
         nullable=False, default=False
     )
+    token_version: Mapped[int] = mapped_column(nullable=False, default=0)
 
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), default=lambda: datetime.now(timezone.utc)

@@ -21,6 +21,8 @@ class Settings(BaseSettings):
     # JWT
     JWT_SECRET: str = ""
     JWT_ALGORITHM: str = "HS256"
+    JWT_ACCESS_EXPIRATION_MINUTES: int = 15
+    JWT_REFRESH_EXPIRATION_DAYS: int = 7
     JWT_EXPIRATION_HOURS: int = 24
 
     # Trusted hosts (comma-separated, for TrustedHostMiddleware)

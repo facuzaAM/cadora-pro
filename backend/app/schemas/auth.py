@@ -37,6 +37,10 @@ class LoginRequest(BaseModel):
     password: str
 
 
+class RefreshRequest(BaseModel):
+    refresh_token: str
+
+
 class ProfileUpdateRequest(BaseModel):
     name: str | None = None
     avatar_url: str | None = None
@@ -44,6 +48,7 @@ class ProfileUpdateRequest(BaseModel):
 
 class TokenResponse(BaseModel):
     access_token: str
+    refresh_token: str
     token_type: str = "bearer"
     user: "UserResponse"
 
