@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import logging
 from datetime import datetime, timezone
 from uuid import UUID
 
@@ -10,6 +11,8 @@ from app.config import settings
 from app.models.user import User
 from app.repositories.user_repository import UserRepository
 from app.services.plan_config import PLANS, get_plan
+
+logger = logging.getLogger(__name__)
 
 stripe.api_key = settings.STRIPE_SECRET_KEY
 
@@ -130,6 +133,12 @@ class StripeService:
             if getattr(settings, p.stripe_price_key, "") == price_id:
                 plan_name = name
                 break
+        else:
+            logger.warning(
+                "Stripe price_id %s no matchea ningun plan configurado. "
+                "Degradando a 'free' para customer %s",
+                price_id, customer_id,
+            )
 
         from app.database import async_session_factory
         from app.repositories.user_repository import UserRepository

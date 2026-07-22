@@ -1,20 +1,26 @@
+import logging
 import os
 import tempfile
+import uuid as _uuid
 from uuid import UUID
 
+import httpx
 from fastapi import APIRouter, Depends, HTTPException, UploadFile
 from sqlalchemy.ext.asyncio import AsyncSession
 from starlette.status import HTTP_400_BAD_REQUEST, HTTP_404_NOT_FOUND, HTTP_413_CONTENT_TOO_LARGE
 
 from app.config import settings
 from app.database import get_db
+from app.detection.schemas import DoorDetectionResult, LineDetectionResult, WindowDetectionResult
+from app.detection.service import DetectionService
 from app.ocr.schemas import OcrRequest, OcrResult
 from app.ocr.service import OcrService
-from app.detection.schemas import LineDetectionResult, DoorDetectionResult, WindowDetectionResult
-from app.detection.service import DetectionService
+from app.repositories.document_repository import DocumentRepository
 from app.repositories.project_repository import ProjectRepository
+from app.services.plan_enforcer import enforce_conversion_limit
 from app.services.storage_service import StorageService
-from app.utils.dependencies import get_current_user
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter()
 ocr_service = OcrService()
@@ -25,8 +31,11 @@ storage = StorageService()
 def _safe_temp_path(user_id: UUID, project_id: UUID, filename: str, prefix: str = "") -> str:
     """Create a safe temp file path with sanitized filename."""
     safe_name = os.path.basename(filename).replace("/", "").replace("\\", "")
+    tag = _uuid.uuid4().hex[:8]
     suffix = f"_{prefix}" if prefix else ""
-    fd, path = tempfile.mkstemp(suffix=f"_{safe_name}", prefix=f"{user_id}_{project_id}{suffix}_")
+    fd, path = tempfile.mkstemp(
+        suffix=f"_{safe_name}", prefix=f"{user_id}_{project_id}{suffix}_{tag}_"
+    )
     os.close(fd)
     return path
 
@@ -67,7 +76,7 @@ async def ocr_document(
     project_id: UUID,
     file: UploadFile,
     language: str = "spa+eng",
-    user=Depends(get_current_user),
+    user=Depends(enforce_conversion_limit),
     db: AsyncSession = Depends(get_db),
 ):
     """Run OCR on an uploaded document image/PDF and return classified texts."""
@@ -100,12 +109,10 @@ async def ocr_document(
 async def ocr_uploaded_document(
     document_id: UUID,
     language: str = "spa+eng",
-    user=Depends(get_current_user),
+    user=Depends(enforce_conversion_limit),
     db: AsyncSession = Depends(get_db),
 ):
     """Run OCR on a previously uploaded document."""
-    from app.repositories.document_repository import DocumentRepository
-
     doc_repo = DocumentRepository(db)
     doc = await doc_repo.get_by_id(document_id)
     if not doc:
@@ -121,7 +128,6 @@ async def ocr_uploaded_document(
         download_url = await storage.get_download_url(
             settings.STORAGE_BUCKET, doc.storage_path
         )
-        import httpx
         response = httpx.get(download_url)
         with open(temp_path, "wb") as f:
             f.write(response.content)
@@ -142,7 +148,7 @@ async def ocr_uploaded_document(
 async def detect_windows(
     project_id: UUID,
     file: UploadFile,
-    user=Depends(get_current_user),
+    user=Depends(enforce_conversion_limit),
     db: AsyncSession = Depends(get_db),
 ):
     """Detect windows (sliding, fixed, casement) in a floor plan image."""
@@ -174,7 +180,7 @@ async def detect_windows(
 async def detect_lines(
     project_id: UUID,
     file: UploadFile,
-    user=Depends(get_current_user),
+    user=Depends(enforce_conversion_limit),
     db: AsyncSession = Depends(get_db),
 ):
     """Detect horizontal, vertical and diagonal lines in a floor plan image."""
@@ -206,7 +212,7 @@ async def detect_lines(
 async def detect_doors(
     project_id: UUID,
     file: UploadFile,
-    user=Depends(get_current_user),
+    user=Depends(enforce_conversion_limit),
     db: AsyncSession = Depends(get_db),
 ):
     """Detect doors (single, double, sliding) in a floor plan image."""

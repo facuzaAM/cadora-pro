@@ -1,7 +1,10 @@
+import logging
 import os
 import tempfile
+import uuid as _uuid
 from uuid import UUID
 
+import httpx
 from fastapi import APIRouter, Depends, HTTPException
 from fastapi.responses import FileResponse
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -11,14 +14,22 @@ from app.cad.generator import CadGenerator
 from app.cad.schemas import CadGenerateRequest, CadGenerateResponse
 from app.config import settings
 from app.database import get_db
+from app.detection.schemas import (
+    DoorDetectionResult,
+    LineDetectionResult,
+    WindowDetectionResult,
+)
 from app.detection.service import DetectionService
+from app.ocr.schemas import OcrResult
 from app.ocr.service import OcrService
 from app.repositories.document_repository import DocumentRepository
 from app.repositories.project_repository import ProjectRepository
 from app.repositories.user_repository import UserRepository
-from app.services.storage_service import StorageService
 from app.services.plan_enforcer import enforce_conversion_limit
+from app.services.storage_service import StorageService
 from app.utils.dependencies import get_current_user
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter()
 detection_service = DetectionService()
@@ -26,18 +37,20 @@ ocr_service = OcrService()
 storage = StorageService()
 
 
-async def _download_doc_to_temp(user_id: UUID, project_id: UUID, doc, prefix: str = "cad") -> str:
+async def _download_doc_to_temp(
+    user_id: UUID, project_id: UUID, doc, prefix: str = "cad"
+) -> str:
     """Download a document to a safe temp file and return its path."""
     safe_name = os.path.basename(doc.filename).replace("/", "").replace("\\", "")
+    tag = _uuid.uuid4().hex[:8]
     fd, path = tempfile.mkstemp(
-        suffix=f"_{safe_name}", prefix=f"{user_id}_{project_id}_{prefix}_"
+        suffix=f"_{safe_name}", prefix=f"{user_id}_{project_id}_{prefix}_{tag}_"
     )
     os.close(fd)
     try:
         download_url = await storage.get_download_url(
             settings.STORAGE_BUCKET, doc.storage_path,
         )
-        import httpx
         response = httpx.get(download_url)
         with open(path, "wb") as f:
             f.write(response.content)
@@ -46,6 +59,88 @@ async def _download_doc_to_temp(user_id: UUID, project_id: UUID, doc, prefix: st
             os.remove(path)
         raise
     return path
+
+
+def _merge_line_results(results: list[LineDetectionResult]) -> LineDetectionResult:
+    merged = LineDetectionResult(
+        lines=[], horizontal=[], vertical=[], diagonal=[],
+        grouped_lines=[], intersections=[],
+    )
+    for r in results:
+        merged.lines.extend(r.lines)
+        merged.horizontal.extend(r.horizontal)
+        merged.vertical.extend(r.vertical)
+        merged.diagonal.extend(r.diagonal)
+        merged.grouped_lines.extend(r.grouped_lines)
+        merged.intersections.extend(r.intersections)
+        if r.image_width > merged.image_width:
+            merged.image_width = r.image_width
+        if r.image_height > merged.image_height:
+            merged.image_height = r.image_height
+    return merged
+
+
+def _merge_door_results(results: list[DoorDetectionResult]) -> DoorDetectionResult:
+    merged = DoorDetectionResult(doors=[], image_width=0, image_height=0)
+    for r in results:
+        merged.doors.extend(r.doors)
+        if r.image_width > merged.image_width:
+            merged.image_width = r.image_width
+        if r.image_height > merged.image_height:
+            merged.image_height = r.image_height
+    return merged
+
+
+def _merge_window_results(results: list[WindowDetectionResult]) -> WindowDetectionResult:
+    merged = WindowDetectionResult(windows=[], image_width=0, image_height=0)
+    for r in results:
+        merged.windows.extend(r.windows)
+        if r.image_width > merged.image_width:
+            merged.image_width = r.image_width
+        if r.image_height > merged.image_height:
+            merged.image_height = r.image_height
+    return merged
+
+
+def _merge_ocr_results(results: list[OcrResult]) -> OcrResult:
+    merged = OcrResult(
+        texts=[], measurements=[], room_names=[], scales=[], notes=[],
+        raw_text="", page_count=0,
+    )
+    for r in results:
+        merged.texts.extend(r.texts)
+        merged.measurements.extend(r.measurements)
+        merged.room_names.extend(r.room_names)
+        merged.scales.extend(r.scales)
+        merged.notes.extend(r.notes)
+        if merged.raw_text and r.raw_text:
+            merged.raw_text += "\n" + r.raw_text
+        elif r.raw_text:
+            merged.raw_text = r.raw_text
+        merged.page_count += r.page_count
+    return merged
+
+
+async def _run_pipeline_on_docs(
+    temp_paths: list[str],
+) -> tuple[LineDetectionResult, DoorDetectionResult, WindowDetectionResult, OcrResult]:
+    line_results = []
+    door_results = []
+    window_results = []
+    ocr_results = []
+
+    for path in temp_paths:
+        line_results.append(await detection_service.process_file(path))
+        door_results.append(await detection_service.process_file_doors(path))
+        window_results.append(await detection_service.process_file_windows(path))
+        ocr_results.append(await ocr_service.process_file(path))
+
+    return (
+        _merge_line_results(line_results),
+        _merge_door_results(door_results),
+        _merge_window_results(window_results),
+        _merge_ocr_results(ocr_results),
+    )
 
 
 @router.post("/generate/{project_id}", response_model=CadGenerateResponse)
@@ -62,24 +157,28 @@ async def generate_cad(
         raise HTTPException(status_code=HTTP_404_NOT_FOUND, detail="Proyecto no encontrado")
 
     doc_repo = DocumentRepository(db)
-    docs = await doc_repo.get_by_project(project_id)
+    docs = await doc_repo.list_by_project(project_id)
     if not docs:
         raise HTTPException(
             status_code=HTTP_400_BAD_REQUEST,
             detail="El proyecto no tiene documentos. Suba un plano primero.",
         )
 
-    doc = docs[0]
-    temp_path = await _download_doc_to_temp(user.id, project_id, doc)
+    temp_paths = []
     output_path = ""
-
     try:
-        lines_result = await detection_service.process_file(temp_path)
-        doors_result = await detection_service.process_file_doors(temp_path)
-        windows_result = await detection_service.process_file_windows(temp_path)
-        ocr_result = await ocr_service.process_file(temp_path)
+        for doc in docs:
+            path = await _download_doc_to_temp(user.id, project_id, doc)
+            temp_paths.append(path)
 
-        fd, output_path = tempfile.mkstemp(suffix=".dxf", prefix=f"{user_id}_{project_id}_cadora_")
+        lines_result, doors_result, windows_result, ocr_result = (
+            await _run_pipeline_on_docs(temp_paths)
+        )
+
+        tag = _uuid.uuid4().hex[:8]
+        fd, output_path = tempfile.mkstemp(
+            suffix=".dxf", prefix=f"{user.id}_{project_id}_cadora_{tag}_"
+        )
         os.close(fd)
 
         generator = CadGenerator()
@@ -106,17 +205,20 @@ async def generate_cad(
     except HTTPException:
         raise
     except Exception as e:
+        logger.exception("Error generando CAD para proyecto %s", project_id)
         raise HTTPException(status_code=HTTP_400_BAD_REQUEST, detail=str(e))
     finally:
-        for p in [temp_path, output_path]:
+        for p in temp_paths:
             if p and os.path.exists(p):
                 os.remove(p)
+        if output_path and os.path.exists(output_path):
+            os.remove(output_path)
 
 
 @router.get("/download/{project_id}")
 async def download_cad(
     project_id: UUID,
-    user=Depends(enforce_conversion_limit),
+    user=Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
     """Download the generated DXF for a project."""
@@ -126,23 +228,29 @@ async def download_cad(
         raise HTTPException(status_code=HTTP_404_NOT_FOUND, detail="Proyecto no encontrado")
 
     doc_repo = DocumentRepository(db)
-    docs = await doc_repo.get_by_project(project_id)
+    docs = await doc_repo.list_by_project(project_id)
     if not docs:
         raise HTTPException(
             status_code=HTTP_400_BAD_REQUEST,
             detail="El proyecto no tiene documentos.",
         )
 
-    doc = docs[0]
-    temp_img = await _download_doc_to_temp(user.id, project_id, doc, prefix="dl")
-    fd, output_path = tempfile.mkstemp(suffix=".dxf", prefix=f"{user_id}_{project_id}_cadora_")
-    os.close(fd)
-
+    temp_paths = []
+    output_path = ""
     try:
-        lines_result = await detection_service.process_file(temp_img)
-        doors_result = await detection_service.process_file_doors(temp_img)
-        windows_result = await detection_service.process_file_windows(temp_img)
-        ocr_result = await ocr_service.process_file(temp_img)
+        for doc in docs:
+            path = await _download_doc_to_temp(user.id, project_id, doc, prefix="dl")
+            temp_paths.append(path)
+
+        lines_result, doors_result, windows_result, ocr_result = (
+            await _run_pipeline_on_docs(temp_paths)
+        )
+
+        tag = _uuid.uuid4().hex[:8]
+        fd, output_path = tempfile.mkstemp(
+            suffix=".dxf", prefix=f"{user.id}_{project_id}_dl_{tag}_"
+        )
+        os.close(fd)
 
         generator = CadGenerator()
         generator.generate(
@@ -153,9 +261,6 @@ async def download_cad(
             output_path=output_path,
         )
 
-        # Return FileResponse BEFORE cleanup — it streams lazily, so we
-        # return it now and let FastAPI handle the response.  The temp
-        # file will be cleaned up by the OS eventually (mkstemp in /tmp).
         return FileResponse(
             path=output_path,
             filename=f"cadora_{project_id}.dxf",
@@ -164,9 +269,11 @@ async def download_cad(
     except HTTPException:
         raise
     except Exception as e:
-        if os.path.exists(output_path):
+        logger.exception("Error descargando CAD para proyecto %s", project_id)
+        if output_path and os.path.exists(output_path):
             os.remove(output_path)
         raise HTTPException(status_code=HTTP_400_BAD_REQUEST, detail=str(e))
     finally:
-        if os.path.exists(temp_img):
-            os.remove(temp_img)
+        for p in temp_paths:
+            if p and os.path.exists(p):
+                os.remove(p)
