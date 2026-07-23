@@ -1,3 +1,4 @@
+import asyncio
 import logging
 import os
 import tempfile
@@ -35,6 +36,8 @@ router = APIRouter()
 detection_service = DetectionService()
 ocr_service = OcrService()
 storage = StorageService()
+
+DXF_CACHE_DIR = "cad/generated"
 
 
 async def _download_doc_to_temp(
@@ -143,6 +146,27 @@ async def _run_pipeline_on_docs(
     )
 
 
+def _generate_dxf_sync(
+    output_path: str,
+    lines_result: LineDetectionResult,
+    doors_result: DoorDetectionResult,
+    windows_result: WindowDetectionResult,
+    ocr_result: OcrResult,
+) -> None:
+    generator = CadGenerator()
+    generator.generate(
+        lines_result=lines_result,
+        doors_result=doors_result,
+        windows_result=windows_result,
+        ocr_result=ocr_result,
+        output_path=output_path,
+    )
+
+
+def _dxf_cache_path(project_id: UUID) -> str:
+    return f"{DXF_CACHE_DIR}/{project_id}/cadora.dxf"
+
+
 @router.post("/generate/{project_id}", response_model=CadGenerateResponse)
 async def generate_cad(
     project_id: UUID,
@@ -181,16 +205,20 @@ async def generate_cad(
         )
         os.close(fd)
 
-        generator = CadGenerator()
-        generator.generate(
-            lines_result=lines_result,
-            doors_result=doors_result,
-            windows_result=windows_result,
-            ocr_result=ocr_result,
-            output_path=output_path,
+        await asyncio.to_thread(
+            _generate_dxf_sync,
+            output_path, lines_result, doors_result, windows_result, ocr_result,
         )
 
         file_size = os.path.getsize(output_path)
+
+        with open(output_path, "rb") as f:
+            dxf_bytes = f.read()
+        cache_key = _dxf_cache_path(project_id)
+        await storage.upload(
+            settings.STORAGE_BUCKET, cache_key, dxf_bytes,
+            content_type="application/dxf",
+        )
 
         user_repo = UserRepository(db)
         user_db = await user_repo.get_by_id(user.id)
@@ -221,11 +249,27 @@ async def download_cad(
     user=Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
-    """Download the generated DXF for a project."""
+    """Download the generated DXF for a project. Uses cache if available."""
     project_repo = ProjectRepository(db)
     project = await project_repo.get_by_id(project_id)
     if not project or project.user_id != user.id:
         raise HTTPException(status_code=HTTP_404_NOT_FOUND, detail="Proyecto no encontrado")
+
+    cache_key = _dxf_cache_path(project_id)
+    if await storage.exists(settings.STORAGE_BUCKET, cache_key):
+        try:
+            dxf_bytes = await storage.download_bytes(settings.STORAGE_BUCKET, cache_key)
+            fd, tmp = tempfile.mkstemp(suffix=".dxf", prefix=f"dl_{project_id}_")
+            os.close(fd)
+            with open(tmp, "wb") as f:
+                f.write(dxf_bytes)
+            return FileResponse(
+                path=tmp,
+                filename=f"cadora_{project_id}.dxf",
+                media_type="application/dxf",
+            )
+        except Exception:
+            logger.warning("Error leyendo cache DXF, regenerando")
 
     doc_repo = DocumentRepository(db)
     docs = await doc_repo.list_by_project(project_id)
@@ -252,13 +296,16 @@ async def download_cad(
         )
         os.close(fd)
 
-        generator = CadGenerator()
-        generator.generate(
-            lines_result=lines_result,
-            doors_result=doors_result,
-            windows_result=windows_result,
-            ocr_result=ocr_result,
-            output_path=output_path,
+        await asyncio.to_thread(
+            _generate_dxf_sync,
+            output_path, lines_result, doors_result, windows_result, ocr_result,
+        )
+
+        with open(output_path, "rb") as f:
+            dxf_bytes = f.read()
+        await storage.upload(
+            settings.STORAGE_BUCKET, cache_key, dxf_bytes,
+            content_type="application/dxf",
         )
 
         return FileResponse(

@@ -45,6 +45,16 @@ class ApiClient {
     return res.json();
   }
 
+  async delete<T>(path: string, token?: string): Promise<T> {
+    const res = await fetch(`${this.baseUrl}${path}`, {
+      method: "DELETE",
+      headers: this.headers(token),
+    });
+    if (!res.ok) throw new ApiError(res.status, await res.json());
+    if (res.status === 204) return undefined as T;
+    return res.json();
+  }
+
   private headers(token?: string): Record<string, string> {
     const headers: Record<string, string> = { "Content-Type": "application/json" };
     if (token) headers["Authorization"] = `Bearer ${token}`;

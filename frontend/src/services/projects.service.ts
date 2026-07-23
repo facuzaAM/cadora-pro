@@ -11,5 +11,5 @@ export const projectsService = {
     api.post<Project>("/projects", data, token),
 
   delete: (id: string, token?: string) =>
-    api.post(`/projects/${id}/delete`, {}, token),
+    api.delete(`/projects/${id}`, token),
 };

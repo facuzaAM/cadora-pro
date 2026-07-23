@@ -140,6 +140,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, [tryRefreshToken, scheduleRefresh]);
 
   useEffect(() => {
+    if (typeof window !== "undefined") {
+      const params = new URLSearchParams(window.location.search);
+      const at = params.get("access_token");
+      const rt = params.get("refresh_token");
+      if (at && rt) {
+        storeTokens(at, rt);
+        window.history.replaceState({}, "", window.location.pathname);
+      }
+    }
     fetchUser();
     return () => clearRefreshTimer();
   }, [fetchUser, clearRefreshTimer]);
