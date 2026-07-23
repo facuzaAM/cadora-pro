@@ -20,7 +20,12 @@ class UserRepository(BaseRepository):
         result = await self.db.execute(stmt)
         return result.scalar_one_or_none()
 
-    async def get_by_stripe_customer(self, customer_id: str) -> User | None:
-        stmt = select(User).where(User.stripe_customer_id == customer_id)
+    async def get_by_paddle_customer(self, customer_id: str) -> User | None:
+        stmt = select(User).where(User.paddle_customer_id == customer_id)
+        result = await self.db.execute(stmt)
+        return result.scalar_one_or_none()
+
+    async def get_by_paddle_subscription(self, subscription_id: str) -> User | None:
+        stmt = select(User).where(User.paddle_subscription_id == subscription_id)
         result = await self.db.execute(stmt)
         return result.scalar_one_or_none()

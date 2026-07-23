@@ -18,19 +18,16 @@ export interface Subscription {
   priority_processing: boolean;
 }
 
+export interface PaddleConfig {
+  client_token: string;
+  environment: string;
+}
+
 export const billingService = {
   getPlans: (token?: string) => api.get<Plan[]>("/billing/plans", token),
 
   getSubscription: (token?: string) =>
     api.get<Subscription>("/billing/subscription", token),
 
-  createCheckoutSession: (plan: string, priceId: string, token?: string) =>
-    api.post<{ url: string }>(
-      "/billing/create-checkout-session",
-      { plan, price_id: priceId },
-      token,
-    ),
-
-  createPortalSession: (token?: string) =>
-    api.post<{ url: string }>("/billing/create-portal-session", {}, token),
+  getConfig: () => api.get<PaddleConfig>("/billing/config"),
 };

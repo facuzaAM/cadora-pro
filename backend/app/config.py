@@ -32,14 +32,14 @@ class Settings(BaseSettings):
     DB_POOL_SIZE: int = 10
     DB_MAX_OVERFLOW: int = 20
 
-    # Stripe
-    STRIPE_SECRET_KEY: str = ""
-    STRIPE_WEBHOOK_SECRET: str = ""
-    STRIPE_PRICE_STARTER: str = ""
-    STRIPE_PRICE_PRO: str = ""
-    STRIPE_PRICE_BUSINESS: str = ""
-    STRIPE_CANCEL_URL: str = "http://localhost:3000/billing"
-    STRIPE_SUCCESS_URL: str = "http://localhost:3000/billing?success=true"
+    # Paddle Billing
+    PADDLE_API_KEY: str = ""
+    PADDLE_WEBHOOK_SECRET: str = ""
+    PADDLE_CLIENT_TOKEN: str = ""
+    PADDLE_PRICE_STARTER: str = ""
+    PADDLE_PRICE_PRO: str = ""
+    PADDLE_PRICE_BUSINESS: str = ""
+    PADDLE_ENVIRONMENT: str = "sandbox"  # "sandbox" or "production"
 
     # Upload limits
     MAX_FILE_SIZE_MB: int = 50
@@ -69,7 +69,7 @@ class Settings(BaseSettings):
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
         if self.ENVIRONMENT == "production":
-            required = ["JWT_SECRET", "DATABASE_URL", "STRIPE_SECRET_KEY"]
+            required = ["JWT_SECRET", "DATABASE_URL", "PADDLE_API_KEY"]
             missing = [v for v in required if not getattr(self, v)]
             if missing:
                 raise RuntimeError(

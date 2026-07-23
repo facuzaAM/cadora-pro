@@ -1,6 +1,7 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
+import Script from "next/script";
 import { PricingCard } from "@/components/features/pricing/pricing-card";
 import { LandingNav } from "@/components/features/landing/landing-nav";
 import { Logo } from "@/components/shared/logo";
@@ -10,6 +11,7 @@ import { billingService } from "@/services/billing.service";
 export default function PricingPage() {
   const [userPlan, setUserPlan] = useState<string | undefined>();
   const [isAuthenticated, setIsAuthenticated] = useState(false);
+  const paddleReady = useRef(false);
 
   useEffect(() => {
     const token = localStorage.getItem("access_token");
@@ -21,19 +23,50 @@ export default function PricingPage() {
     }
   }, []);
 
+  useEffect(() => {
+    const initPaddle = async () => {
+      if (paddleReady.current || typeof window === "undefined" || !window.Paddle) return;
+      try {
+        const config = await billingService.getConfig();
+        window.Paddle.Initialize({
+          token: config.client_token,
+          environment: config.environment === "sandbox" ? "sandbox" : "production",
+        });
+        paddleReady.current = true;
+      } catch {
+        // Paddle init failed — checkout won't work
+      }
+    };
+
+    const checkPaddle = setInterval(() => {
+      if (typeof window !== "undefined" && window.Paddle) {
+        clearInterval(checkPaddle);
+        initPaddle();
+      }
+    }, 100);
+
+    return () => clearInterval(checkPaddle);
+  }, []);
+
   const handleSubscribe = useCallback(async (planId: string) => {
-    const token = localStorage.getItem("access_token");
-    if (!token) return;
+    if (!window.Paddle || !paddleReady.current) return;
     const plan = PLANS.find((p) => p.id === planId);
-    if (!plan?.stripePriceId) return;
-    const res = await billingService.createCheckoutSession(planId, plan.stripePriceId, token);
-    if (res.url) {
-      window.location.href = res.url;
-    }
+    if (!plan?.paddlePriceId) return;
+
+    window.Paddle.Checkout.open({
+      items: [{ priceId: plan.paddlePriceId, quantity: 1 }],
+      customData: { plan: planId },
+      settings: {
+        displayMode: "overlay",
+        theme: "light",
+      },
+    });
   }, []);
 
   return (
     <div className="flex min-h-screen flex-col">
+      <Script src="https://cdn.paddle.com/paddle/v2/paddle.js" strategy="afterInteractive" />
+
       <LandingNav />
 
       <main className="flex-1 py-16 lg:py-24">

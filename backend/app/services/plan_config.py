@@ -1,4 +1,4 @@
-"""Plan definitions used for feature enforcement and Stripe price mapping."""
+"""Plan definitions used for feature enforcement and Paddle price mapping."""
 
 from dataclasses import dataclass
 
@@ -10,7 +10,7 @@ class Plan:
     conversions_limit: int
     storage_limit: int  # bytes
     priority_processing: bool
-    stripe_price_key: str  # key into settings.STRIPE_PRICE_*
+    paddle_price_id: str  # key into settings.PADDLE_PRICE_*
     description: str
 
 
@@ -21,7 +21,7 @@ PLANS: dict[str, Plan] = {
         conversions_limit=3,
         storage_limit=50 * 1024 * 1024,
         priority_processing=False,
-        stripe_price_key="",
+        paddle_price_id="",
         description="Para pruebas ocasionales",
     ),
     "starter": Plan(
@@ -30,7 +30,7 @@ PLANS: dict[str, Plan] = {
         conversions_limit=50,
         storage_limit=1 * 1024 * 1024 * 1024,
         priority_processing=False,
-        stripe_price_key="STRIPE_PRICE_STARTER",
+        paddle_price_id="PADDLE_PRICE_STARTER",
         description="Para profesionales independientes",
     ),
     "pro": Plan(
@@ -39,7 +39,7 @@ PLANS: dict[str, Plan] = {
         conversions_limit=200,
         storage_limit=5 * 1024 * 1024 * 1024,
         priority_processing=True,
-        stripe_price_key="STRIPE_PRICE_PRO",
+        paddle_price_id="PADDLE_PRICE_PRO",
         description="Para estudios y equipos pequeños",
     ),
     "business": Plan(
@@ -48,7 +48,7 @@ PLANS: dict[str, Plan] = {
         conversions_limit=0,  # unlimited
         storage_limit=25 * 1024 * 1024 * 1024,
         priority_processing=True,
-        stripe_price_key="STRIPE_PRICE_BUSINESS",
+        paddle_price_id="PADDLE_PRICE_BUSINESS",
         description="Para empresas con alto volumen",
     ),
 }

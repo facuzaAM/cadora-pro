@@ -19,8 +19,9 @@ class User(Base):
     hashed_password: Mapped[str] = mapped_column(String(255), nullable=False)
     avatar_url: Mapped[str | None] = mapped_column(String(500), nullable=True)
 
-    # Stripe / billing
-    stripe_customer_id: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    # Paddle / billing
+    paddle_customer_id: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    paddle_subscription_id: Mapped[str | None] = mapped_column(String(255), nullable=True)
     subscription_plan: Mapped[str] = mapped_column(
         String(50), nullable=False, default="free"
     )

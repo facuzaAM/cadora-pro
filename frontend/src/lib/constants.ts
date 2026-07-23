@@ -22,7 +22,7 @@ export const PLANS = [
     id: "free",
     name: "Free",
     price: 0,
-    stripePriceId: "",
+    paddlePriceId: "",
     description: "Para pruebas ocasionales",
     features: [
       "3 conversiones/mes",
@@ -40,7 +40,7 @@ export const PLANS = [
     id: "starter",
     name: "Starter",
     price: 19,
-    stripePriceId: "price_starter_id",
+    paddlePriceId: "price_starter_id",
     description: "Para profesionales independientes",
     features: [
       "50 conversiones/mes",
@@ -60,7 +60,7 @@ export const PLANS = [
     id: "pro",
     name: "Pro",
     price: 49,
-    stripePriceId: "price_pro_id",
+    paddlePriceId: "price_pro_id",
     description: "Para estudios y equipos pequeños",
     features: [
       "200 conversiones/mes",
@@ -81,7 +81,7 @@ export const PLANS = [
     id: "business",
     name: "Business",
     price: 99,
-    stripePriceId: "price_business_id",
+    paddlePriceId: "price_business_id",
     description: "Para empresas con alto volumen",
     features: [
       "Conversiones ilimitadas",

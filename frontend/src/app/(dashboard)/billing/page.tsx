@@ -29,7 +29,6 @@ function formatBytes(bytes: number): string {
 export default function BillingPage() {
   const [sub, setSub] = useState<Subscription | null>(null);
   const [loading, setLoading] = useState(true);
-  const [portalLoading, setPortalLoading] = useState(false);
 
   useEffect(() => {
     const token = localStorage.getItem("access_token");
@@ -37,15 +36,9 @@ export default function BillingPage() {
     billingService.getSubscription(token).then(setSub).finally(() => setLoading(false));
   }, []);
 
-  const handlePortal = useCallback(async () => {
-    const token = localStorage.getItem("access_token");
-    if (!token) return;
-    setPortalLoading(true);
-    try {
-      const res = await billingService.createPortalSession(token);
-      if (res.url) window.location.href = res.url;
-    } finally {
-      setPortalLoading(false);
+  const handleManage = useCallback(async () => {
+    if (typeof window !== "undefined" && window.Paddle) {
+      window.Paddle.CustomerPortal.open();
     }
   }, []);
 
@@ -93,15 +86,10 @@ export default function BillingPage() {
                 <Button
                   variant="outline"
                   size="sm"
-                  onClick={handlePortal}
-                  disabled={portalLoading}
+                  onClick={handleManage}
                   className="gap-2"
                 >
-                  {portalLoading ? (
-                    <RefreshCw className="h-4 w-4 animate-spin" />
-                  ) : (
-                    <ExternalLink className="h-4 w-4" />
-                  )}
+                  <ExternalLink className="h-4 w-4" />
                   Gestionar
                 </Button>
               )}

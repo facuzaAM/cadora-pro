@@ -1,17 +1,14 @@
 from fastapi import APIRouter, Depends, HTTPException, Request
-from sqlalchemy.ext.asyncio import AsyncSession
 from starlette.status import HTTP_400_BAD_REQUEST
 
-from app.database import get_db
+from app.config import settings
 from app.schemas.billing import (
-    BillingPortalResponse,
-    CheckoutSessionRequest,
-    CheckoutSessionResponse,
+    PaddleConfigResponse,
     PlanResponse,
     SubscriptionResponse,
 )
+from app.services.paddle_service import PaddleService
 from app.services.plan_config import PLANS
-from app.services.stripe_service import StripeService
 from app.utils.dependencies import get_current_user
 
 router = APIRouter()
@@ -31,41 +28,6 @@ async def list_plans():
     ]
 
 
-@router.post("/create-checkout-session", response_model=CheckoutSessionResponse)
-async def create_checkout_session(
-    request: CheckoutSessionRequest,
-    user=Depends(get_current_user),
-    db: AsyncSession = Depends(get_db),
-):
-    if request.plan not in PLANS:
-        raise HTTPException(status_code=HTTP_400_BAD_REQUEST, detail="Plan no válido")
-    if request.plan == "free":
-        raise HTTPException(
-            status_code=HTTP_400_BAD_REQUEST,
-            detail="El plan Free no requiere pago",
-        )
-
-    service = StripeService(db)
-    try:
-        url = await service.create_checkout_session(user, request.plan)
-        return CheckoutSessionResponse(url=url)
-    except ValueError as e:
-        raise HTTPException(status_code=HTTP_400_BAD_REQUEST, detail=str(e))
-
-
-@router.post("/create-portal-session", response_model=BillingPortalResponse)
-async def create_portal_session(
-    user=Depends(get_current_user),
-    db: AsyncSession = Depends(get_db),
-):
-    service = StripeService(db)
-    try:
-        url = await service.create_portal_session(user)
-        return BillingPortalResponse(url=url)
-    except ValueError as e:
-        raise HTTPException(status_code=HTTP_400_BAD_REQUEST, detail=str(e))
-
-
 @router.get("/subscription", response_model=SubscriptionResponse)
 async def get_subscription(
     user=Depends(get_current_user),
@@ -81,16 +43,26 @@ async def get_subscription(
     )
 
 
-@router.post("/webhook")
-async def stripe_webhook(request: Request):
-    payload = await request.body()
-    sig_header = request.headers.get("stripe-signature", "")
+@router.get("/config", response_model=PaddleConfigResponse)
+async def get_paddle_config():
+    return PaddleConfigResponse(
+        client_token=settings.PADDLE_CLIENT_TOKEN,
+        environment=settings.PADDLE_ENVIRONMENT,
+    )
 
-    if not sig_header:
-        raise HTTPException(status_code=HTTP_400_BAD_REQUEST, detail="Missing stripe-signature")
+
+@router.post("/webhook")
+async def paddle_webhook(request: Request):
+    payload = await request.body()
+    paddle_signature = request.headers.get("paddle-signature", "")
+
+    if not paddle_signature:
+        raise HTTPException(
+            status_code=HTTP_400_BAD_REQUEST, detail="Missing paddle-signature",
+        )
 
     try:
-        await StripeService.handle_webhook(payload, sig_header)
+        await PaddleService.handle_webhook(payload, paddle_signature)
     except ValueError as e:
         raise HTTPException(status_code=HTTP_400_BAD_REQUEST, detail=str(e))
 

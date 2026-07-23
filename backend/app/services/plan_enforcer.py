@@ -30,7 +30,7 @@ def _maybe_reset_monthly(user: User) -> bool:
     """Reset conversions_used when a new billing month starts.
 
     For free users: resets on the 1st of each month (UTC).
-    For paid users: resets when the Stripe billing period renews
+    For paid users: resets when the Paddle billing period renews
     (handled by the invoice.paid webhook via conversions_reset_at).
     Returns True if the user was modified.
     """

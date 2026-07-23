@@ -1,19 +1,6 @@
 from pydantic import BaseModel
 
 
-class CheckoutSessionRequest(BaseModel):
-    price_id: str
-    plan: str
-
-
-class CheckoutSessionResponse(BaseModel):
-    url: str
-
-
-class BillingPortalResponse(BaseModel):
-    url: str
-
-
 class PlanResponse(BaseModel):
     name: str
     price: int
@@ -30,3 +17,8 @@ class SubscriptionResponse(BaseModel):
     storage_used: int
     storage_limit: int
     priority_processing: bool
+
+
+class PaddleConfigResponse(BaseModel):
+    client_token: str
+    environment: str
