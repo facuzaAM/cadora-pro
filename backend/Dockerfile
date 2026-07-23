@@ -10,17 +10,20 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     poppler-utils \
     wget \
     xz-utils \
+    texinfo \
+    zlib1g-dev \
     && rm -rf /var/lib/apt/lists/*
 
 COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
-RUN wget -q https://github.com/LibreDWG/libredwg/releases/download/0.13.4/libredwg-0.13.4.tar.xz -O /tmp/libredwg.tar.xz \
+RUN wget -q https://ftp.gnu.org/gnu/libredwg/libredwg-0.13.4.tar.xz -O /tmp/libredwg.tar.xz \
     && tar -xf /tmp/libredwg.tar.xz -C /tmp \
     && cd /tmp/libredwg-0.13.4 \
-    && ./configure --prefix=/usr/local --disable-bindings --disable-python \
+    && ./configure --prefix=/usr/local --disable-bindings --disable-python --disable-nls \
     && make -j$(nproc) \
     && make install \
+    && ldconfig \
     && rm -rf /tmp/libredwg*
 
 FROM python:3.12-slim AS runner
