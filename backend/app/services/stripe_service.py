@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import logging
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from uuid import UUID
 
 import stripe
@@ -97,7 +97,7 @@ class StripeService:
                 return
 
             plan = get_plan(plan_name)
-            now = datetime.now(timezone.utc)
+            now = datetime.now(UTC)
 
             user.subscription_plan = plan_name
             user.subscription_status = "active"
@@ -112,7 +112,7 @@ class StripeService:
             if not period_end:
                 period_end = session.get("expires_at")
             user.subscription_end = (
-                datetime.fromtimestamp(period_end, tz=timezone.utc)
+                datetime.fromtimestamp(period_end, tz=UTC)
                 if period_end
                 else None
             )
@@ -156,7 +156,7 @@ class StripeService:
             user.storage_limit = plan.storage_limit
             user.priority_processing = plan.priority_processing
             user.subscription_end = (
-                datetime.fromtimestamp(current_period_end, tz=timezone.utc)
+                datetime.fromtimestamp(current_period_end, tz=UTC)
                 if current_period_end
                 else None
             )
@@ -175,7 +175,7 @@ class StripeService:
             if not user:
                 return
 
-            now = datetime.now(timezone.utc)
+            now = datetime.now(UTC)
             free_plan = get_plan("free")
             user.subscription_plan = "free"
             user.subscription_status = "canceled"
@@ -191,7 +191,6 @@ class StripeService:
     @staticmethod
     async def _handle_invoice_paid(invoice: dict) -> None:
         customer_id = invoice.get("customer")
-        subscription_id = invoice.get("subscription")
         if not customer_id:
             return
 
@@ -204,14 +203,14 @@ class StripeService:
             if not user:
                 return
 
-            now = datetime.now(timezone.utc)
+            now = datetime.now(UTC)
             user.subscription_status = "active"
             user.conversions_used = 0
             user.conversions_reset_at = now
 
             period_end = invoice.get("lines", {}).get("data", [{}])[0].get("period", {}).get("end")
             if period_end:
-                user.subscription_end = datetime.fromtimestamp(period_end, tz=timezone.utc)
+                user.subscription_end = datetime.fromtimestamp(period_end, tz=UTC)
 
             await repo._save(user)
             await db.commit()

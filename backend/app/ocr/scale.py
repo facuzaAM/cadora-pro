@@ -8,7 +8,7 @@ from __future__ import annotations
 
 import re
 
-from app.ocr.schemas import OcrResult, TextCategory
+from app.ocr.schemas import OcrResult
 
 
 def detect_scale_factor(ocr_result: OcrResult, image_width_px: int) -> float | None:

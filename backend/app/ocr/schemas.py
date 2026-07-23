@@ -1,12 +1,12 @@
 from __future__ import annotations
 
-from enum import Enum
+from enum import StrEnum
 from uuid import UUID, uuid4
 
 from pydantic import BaseModel, Field
 
 
-class TextCategory(str, Enum):
+class TextCategory(StrEnum):
     MEASUREMENT = "measurement"
     ROOM_NAME = "room_name"
     SCALE = "scale"

@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import contextlib
 import math
 from pathlib import Path
 
@@ -7,13 +8,13 @@ import ezdxf
 
 from app.detection.schemas import (
     DoorDetectionResult,
-    LineDetectionResult,
     LineCategory,
+    LineDetectionResult,
     WindowDetectionResult,
     WindowType,
 )
-from app.ocr.schemas import OcrResult
 from app.ocr.scale import detect_scale_factor
+from app.ocr.schemas import OcrResult
 
 # ── Layer configuration ──────────────────────────────────────────────────────
 # Each layer: (name, ACI color, lineweight in 1/100 mm, linetype)
@@ -89,10 +90,8 @@ class CadGenerator:
             layer.color = color
             layer.dxf.lineweight = lw
             if ltype != "CONTINUOUS":
-                try:
+                with contextlib.suppress(Exception):
                     layer.linetype = ltype
-                except Exception:
-                    pass
 
     # ── Grid (reference rectangle) ───────────────────────────────────────────
 

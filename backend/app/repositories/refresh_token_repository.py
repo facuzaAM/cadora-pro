@@ -1,4 +1,4 @@
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from uuid import UUID
 
 from sqlalchemy import select
@@ -13,7 +13,7 @@ class RefreshTokenRepository(BaseRepository):
             user_id=user_id,
             token=token,
             expires_at=expires_at,
-            created_at=datetime.now(timezone.utc),
+            created_at=datetime.now(UTC),
         )
         await self._save(rt)
         return rt
@@ -40,7 +40,7 @@ class RefreshTokenRepository(BaseRepository):
             self.db.add(rt)
 
     async def cleanup_expired(self) -> int:
-        now = datetime.now(timezone.utc)
+        now = datetime.now(UTC)
         stmt = select(RefreshToken).where(RefreshToken.expires_at < now)
         result = await self.db.execute(stmt)
         tokens = result.scalars().all()

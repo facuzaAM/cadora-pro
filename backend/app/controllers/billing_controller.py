@@ -1,6 +1,6 @@
 from fastapi import APIRouter, Depends, HTTPException, Request
 from sqlalchemy.ext.asyncio import AsyncSession
-from starlette.status import HTTP_400_BAD_REQUEST, HTTP_401_UNAUTHORIZED
+from starlette.status import HTTP_400_BAD_REQUEST
 
 from app.database import get_db
 from app.schemas.billing import (
@@ -40,7 +40,10 @@ async def create_checkout_session(
     if request.plan not in PLANS:
         raise HTTPException(status_code=HTTP_400_BAD_REQUEST, detail="Plan no válido")
     if request.plan == "free":
-        raise HTTPException(status_code=HTTP_400_BAD_REQUEST, detail="El plan Free no requiere pago")
+        raise HTTPException(
+            status_code=HTTP_400_BAD_REQUEST,
+            detail="El plan Free no requiere pago",
+        )
 
     service = StripeService(db)
     try:

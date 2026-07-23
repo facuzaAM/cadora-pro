@@ -1,4 +1,4 @@
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
 from fastapi import Depends, HTTPException
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -34,7 +34,7 @@ def _maybe_reset_monthly(user: User) -> bool:
     (handled by the invoice.paid webhook via conversions_reset_at).
     Returns True if the user was modified.
     """
-    now = datetime.now(timezone.utc)
+    now = datetime.now(UTC)
 
     if user.conversions_reset_at is None:
         user.conversions_reset_at = now

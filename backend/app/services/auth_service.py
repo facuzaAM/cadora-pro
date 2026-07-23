@@ -1,4 +1,4 @@
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 from uuid import UUID
 
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -43,7 +43,7 @@ class AuthService:
         rt = await self.refresh_repo.get_by_token(refresh_token_str)
         if not rt or rt.revoked:
             raise ValueError("Refresh token inválido")
-        if rt.expires_at.replace(tzinfo=timezone.utc) < datetime.now(timezone.utc):
+        if rt.expires_at.replace(tzinfo=UTC) < datetime.now(UTC):
             raise ValueError("Refresh token expirado")
 
         user = await self.repo.get_by_id(rt.user_id)
@@ -71,7 +71,7 @@ class AuthService:
         access_token = create_access_token(payload)
         refresh_token = create_refresh_token(payload)
 
-        expires_at = datetime.now(timezone.utc) + timedelta(
+        expires_at = datetime.now(UTC) + timedelta(
             days=settings.JWT_REFRESH_EXPIRATION_DAYS
         )
         await self.refresh_repo.create(

@@ -1,13 +1,11 @@
-import pytest
-from uuid import uuid4
 from app.detection.schemas import (
-    Orientation,
-    LineCategory,
-    DoorType,
-    WindowType,
-    LineSegment,
     Door,
+    DoorType,
+    LineCategory,
+    LineSegment,
+    Orientation,
     Window,
+    WindowType,
 )
 
 

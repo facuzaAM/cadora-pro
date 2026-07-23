@@ -1,12 +1,12 @@
 from app.schemas.auth import (
-    RegisterRequest,
     LoginRequest,
     RefreshRequest,
+    RegisterRequest,
     TokenResponse,
     UserResponse,
 )
-from app.schemas.project import ProjectCreateRequest, ProjectUpdateRequest, ProjectResponse
 from app.schemas.document import DocumentResponse, UploadResponse
+from app.schemas.project import ProjectCreateRequest, ProjectResponse, ProjectUpdateRequest
 
 __all__ = [
     "RegisterRequest",

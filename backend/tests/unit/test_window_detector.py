@@ -1,22 +1,17 @@
 from __future__ import annotations
 
-import numpy as np
 import cv2
+import numpy as np
 import pytest
 
-from app.detection.window_detector import (
-    WindowDetector,
-    MIN_WINDOW_W,
-    MAX_WINDOW_W,
-    MIN_WINDOW_H,
-    MIN_DARK_RATIO,
-)
 from app.detection.schemas import (
     LineCategory,
     LineSegment,
-    Window,
     WindowType,
-    Orientation,
+)
+from app.detection.window_detector import (
+    MIN_WINDOW_W,
+    WindowDetector,
 )
 
 

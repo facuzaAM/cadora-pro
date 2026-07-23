@@ -1,6 +1,7 @@
 """Tests for the security utils (password hashing)."""
 
 import pytest
+
 from app.utils.security import hash_password, verify_password
 
 
@@ -26,6 +27,7 @@ def test_different_hashes():
 
 def test_password_validation():
     from pydantic import ValidationError
+
     from app.schemas.auth import RegisterRequest
 
     # Too short

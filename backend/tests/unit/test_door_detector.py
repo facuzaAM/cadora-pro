@@ -1,13 +1,12 @@
 from __future__ import annotations
 
-import numpy as np
 import cv2
+import numpy as np
 import pytest
 
 from app.detection.door_detector import (
-    DoorDetector,
     MIN_DOOR_W,
-    MAX_DOOR_W,
+    DoorDetector,
 )
 from app.detection.schemas import (
     Door,

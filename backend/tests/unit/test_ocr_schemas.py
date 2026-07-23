@@ -1,5 +1,4 @@
-import pytest
-from app.ocr.schemas import OcrTextElement, OcrResult, TextCategory
+from app.ocr.schemas import OcrResult, OcrTextElement, TextCategory
 
 
 def test_text_category_values():

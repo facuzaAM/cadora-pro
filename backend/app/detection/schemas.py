@@ -1,12 +1,12 @@
 from __future__ import annotations
 
-from enum import Enum
+from enum import StrEnum
 from uuid import UUID, uuid4
 
 from pydantic import BaseModel, Field
 
 
-class LineCategory(str, Enum):
+class LineCategory(StrEnum):
     HORIZONTAL = "horizontal"
     VERTICAL = "vertical"
     DIAGONAL = "diagonal"
@@ -44,7 +44,7 @@ class LineDetectionResult(BaseModel):
 # ── Door detection ──────────────────────────────────────────────────────────
 
 
-class DoorType(str, Enum):
+class DoorType(StrEnum):
     SINGLE = "single"
     DOUBLE = "double"
     SLIDING = "sliding"
@@ -90,13 +90,13 @@ class DoorDetectionResult(BaseModel):
 # ── Window detection ─────────────────────────────────────────────────────────
 
 
-class WindowType(str, Enum):
+class WindowType(StrEnum):
     SLIDING = "sliding"      # Corredera
     FIXED = "fixed"           # Fija
     CASEMENT = "casement"     # Batiente
 
 
-class Orientation(str, Enum):
+class Orientation(StrEnum):
     HORIZONTAL = "horizontal"
     VERTICAL = "vertical"
 

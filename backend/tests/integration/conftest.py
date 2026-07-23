@@ -1,8 +1,8 @@
 import pytest
-from httpx import AsyncClient, ASGITransport
+from httpx import ASGITransport, AsyncClient
 
+from app.database import Base, async_session_factory, engine
 from app.main import app
-from app.database import Base, engine, async_session_factory
 
 
 @pytest.fixture(autouse=True)

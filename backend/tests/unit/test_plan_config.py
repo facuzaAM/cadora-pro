@@ -1,4 +1,3 @@
-import pytest
 from app.services.plan_config import PLANS, get_plan
 
 

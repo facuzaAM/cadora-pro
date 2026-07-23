@@ -9,11 +9,11 @@ from slowapi.errors import RateLimitExceeded
 
 from app.config import settings
 from app.controllers.auth_controller import router as auth_router
-from app.controllers.project_controller import router as project_router
-from app.controllers.document_controller import router as document_router
-from app.controllers.detection_controller import router as detection_router
-from app.controllers.cad_controller import router as cad_router
 from app.controllers.billing_controller import router as billing_router
+from app.controllers.cad_controller import router as cad_router
+from app.controllers.detection_controller import router as detection_router
+from app.controllers.document_controller import router as document_router
+from app.controllers.project_controller import router as project_router
 from app.database import Base, engine
 from app.utils.logging import setup_logging
 from app.utils.rate_limit import limiter
@@ -90,6 +90,7 @@ app.include_router(billing_router, prefix="/api/v1/billing", tags=["billing"])
 @app.get("/api/v1/health", tags=["health"])
 async def health():
     from sqlalchemy import text
+
     from app.database import async_session_factory
 
     db_ok = False

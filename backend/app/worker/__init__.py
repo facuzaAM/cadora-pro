@@ -3,10 +3,10 @@
 from loguru import logger
 
 from app.cad import CadGenerator
+from app.config import settings
 from app.detection.service import DetectionService
 from app.ocr.service import OcrService
 from app.services.storage_service import StorageService
-from app.config import settings
 
 
 async def process_detection(document_id: str, project_id: str) -> dict:

@@ -8,10 +8,10 @@ import cv2
 import numpy as np
 from pdf2image import convert_from_path
 
-from app.ocr.schemas import OcrRequest, OcrResult, TextCategory
-from app.ocr.engine import OcrEngine
 from app.ocr.classifier import TextClassifier
+from app.ocr.engine import OcrEngine
 from app.ocr.preprocessor import ImagePreprocessor
+from app.ocr.schemas import OcrRequest, OcrResult, TextCategory
 
 logger = logging.getLogger(__name__)
 

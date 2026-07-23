@@ -3,7 +3,6 @@ from __future__ import annotations
 import math
 from uuid import uuid4
 
-import cv2
 import numpy as np
 
 from app.detection.schemas import (
@@ -47,8 +46,8 @@ class WindowDetector:
         h, w = image.shape[:2]
         threshold = self._compute_threshold(gray)
 
-        walls = [l for l in grouped_lines
-                 if l.category in (LineCategory.HORIZONTAL, LineCategory.VERTICAL)]
+        walls = [line for line in grouped_lines
+                 if line.category in (LineCategory.HORIZONTAL, LineCategory.VERTICAL)]
 
         windows: list[Window] = []
         seen_gaps: set[str] = set()
@@ -118,14 +117,18 @@ class WindowDetector:
 
         for offset in [WALL_HALF, -WALL_HALF]:
             fc = center + offset
-            if fc < 0 or (horizontal and fc >= gray.shape[0]) or (not horizontal and fc >= gray.shape[1]):
+            if fc < 0:
+                continue
+            if horizontal and fc >= gray.shape[0]:
+                continue
+            if not horizontal and fc >= gray.shape[1]:
                 continue
 
             in_gap = False
             start = lo
             p = lo
             while p <= hi:
-                is_wall = (gray[fc, p] < threshold) if horizontal else (gray[p, fc] < threshold)
+                is_wall = gray[fc, p] < threshold if horizontal else gray[p, fc] < threshold
                 if not is_wall and not in_gap:
                     start = p
                     in_gap = True
@@ -133,7 +136,10 @@ class WindowDetector:
                 elif is_wall and in_gap:
                     thin_line = False
                     if p + 1 <= hi:
-                        next_pix = (gray[fc, p + 1] < threshold) if horizontal else (gray[p + 1, fc] < threshold)
+                        if horizontal:
+                            next_pix = gray[fc, p + 1] < threshold
+                        else:
+                            next_pix = gray[p + 1, fc] < threshold
                         if not next_pix:
                             thin_line = True
                     if thin_line:
@@ -144,8 +150,12 @@ class WindowDetector:
                         left_ok = (start - 1) >= lo
                         right_ok = p <= hi
                         if left_ok and right_ok:
-                            left_wall = (gray[fc, start - 1] < threshold) if horizontal else (gray[start - 1, fc] < threshold)
-                            right_wall = (gray[fc, p] < threshold) if horizontal else (gray[p, fc] < threshold)
+                            if horizontal:
+                                left_wall = gray[fc, start - 1] < threshold
+                                right_wall = gray[fc, p] < threshold
+                            else:
+                                left_wall = gray[start - 1, fc] < threshold
+                                right_wall = gray[p, fc] < threshold
                             if left_wall and right_wall:
                                 candidates[(start, p - 1)] = True
                     in_gap = False
@@ -155,7 +165,10 @@ class WindowDetector:
                 if wp >= MIN_WINDOW_W:
                     left_ok = (start - 1) >= lo
                     if left_ok:
-                        left_wall = (gray[fc, start - 1] < threshold) if horizontal else (gray[start - 1, fc] < threshold)
+                        if horizontal:
+                            left_wall = gray[fc, start - 1] < threshold
+                        else:
+                            left_wall = gray[start - 1, fc] < threshold
                         if left_wall:
                             candidates[(start, hi)] = True
 
@@ -254,8 +267,6 @@ class WindowDetector:
             scan_x = int(round((gs + ge) / 2.0))
             scan_y = center
             up_lo = max(0, scan_y - MAX_WINDOW_H)
-            up_hi = scan_y
-            down_lo = scan_y
             down_hi = min(h_img - 1, scan_y + MAX_WINDOW_H)
 
             up_extent = scan_y
@@ -275,8 +286,6 @@ class WindowDetector:
             scan_y = int(round((gs + ge) / 2.0))
             scan_x = center
             left_lo = max(0, scan_x - MAX_WINDOW_H)
-            left_hi = scan_x
-            right_lo = scan_x
             right_hi = min(w_img - 1, scan_x + MAX_WINDOW_H)
 
             left_extent = scan_x
@@ -306,7 +315,10 @@ class WindowDetector:
         start = gs
         dark_total = 0
         for p in range(gs, ge + 1):
-            is_dark = (gray[fixed_coord, p] < threshold) if horizontal else (gray[p, fixed_coord] < threshold)
+            if horizontal:
+                is_dark = gray[fixed_coord, p] < threshold
+            else:
+                is_dark = gray[p, fixed_coord] < threshold
             if is_dark:
                 dark_total += 1
             if is_dark and not in_run:

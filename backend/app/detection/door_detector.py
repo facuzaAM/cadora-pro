@@ -3,16 +3,15 @@ from __future__ import annotations
 import math
 from uuid import uuid4
 
-import cv2
 import numpy as np
 
 from app.detection.schemas import (
-    LineCategory,
-    LineSegment,
     Door,
     DoorArc,
     DoorDetectionResult,
     DoorType,
+    LineCategory,
+    LineSegment,
 )
 
 MIN_DOOR_W = 15
@@ -36,13 +35,13 @@ class DoorDetector:
         h, w = image.shape[:2]
         threshold = self._compute_threshold(gray)
 
-        walls = [l for l in grouped_lines
-                 if l.category in (LineCategory.HORIZONTAL, LineCategory.VERTICAL)
-                 and l.length > MIN_DOOR_W]
+        walls = [line for line in grouped_lines
+                 if line.category in (LineCategory.HORIZONTAL, LineCategory.VERTICAL)
+                 and line.length > MIN_DOOR_W]
 
-        leaf_candidates = [l for l in all_lines
-                           if MIN_DOOR_W <= l.length <= MAX_DOOR_W * 1.5
-                           and not self._is_wall_edge(l, gray, threshold)]
+        leaf_candidates = [line for line in all_lines
+                           if MIN_DOOR_W <= line.length <= MAX_DOOR_W * 1.5
+                           and not self._is_wall_edge(line, gray, threshold)]
 
         doors: list[Door] = []
         used_leaf_ids: set[str] = set()
@@ -129,7 +128,10 @@ class DoorDetector:
         in_gap = False
         start = lo
         for p in range(lo, hi + 1):
-            is_white = (gray[fixed_coord, p] > threshold) if is_horizontal else (gray[p, fixed_coord] > threshold)
+            if is_horizontal:
+                is_white = gray[fixed_coord, p] > threshold
+            else:
+                is_white = gray[p, fixed_coord] > threshold
             if is_white and not in_gap:
                 start = p
                 in_gap = True
@@ -273,11 +275,9 @@ class DoorDetector:
 
         arc = self._detect_arc(gray, hx, hy, tx, ty, threshold)
 
-        swing = "right"
-        if abs(dy) > abs(dx):
-            swing = "down" if dy > 0 else "up"
-        else:
-            swing = "right" if dx > 0 else "left"
+        swing = ("down" if dy > 0 else "up") if abs(dy) > abs(
+            dx
+        ) else ("right" if dx > 0 else "left")
 
         return Door(
             id=uuid4(), type=DoorType.SINGLE,
@@ -353,8 +353,14 @@ class DoorDetector:
                     continue
                 if abs(a.wall_gap_x1 - b.wall_gap_x1) > 5 or abs(a.wall_gap_y1 - b.wall_gap_y1) > 5:
                     continue
-                a1, a2 = (a.wall_gap_y1, a.wall_gap_y2) if a.rotation == 0 else (a.wall_gap_x1, a.wall_gap_x2)
-                b1, b2 = (b.wall_gap_y1, b.wall_gap_y2) if b.rotation == 0 else (b.wall_gap_x1, b.wall_gap_x2)
+                if a.rotation == 0:
+                    a1, a2 = a.wall_gap_y1, a.wall_gap_y2
+                else:
+                    a1, a2 = a.wall_gap_x1, a.wall_gap_x2
+                if b.rotation == 0:
+                    b1, b2 = b.wall_gap_y1, b.wall_gap_y2
+                else:
+                    b1, b2 = b.wall_gap_x1, b.wall_gap_x2
                 overlap = min(a2, b2) - max(a1, b1)
                 if overlap <= 0:
                     continue
@@ -389,8 +395,14 @@ class DoorDetector:
                     continue
                 if abs(a.wall_gap_x1 - b.wall_gap_x1) > 5 or abs(a.wall_gap_y1 - b.wall_gap_y1) > 5:
                     continue
-                a1, a2 = (a.wall_gap_y1, a.wall_gap_y2) if a.rotation == 0 else (a.wall_gap_x1, a.wall_gap_x2)
-                b1, b2 = (b.wall_gap_y1, b.wall_gap_y2) if b.rotation == 0 else (b.wall_gap_x1, b.wall_gap_x2)
+                if a.rotation == 0:
+                    a1, a2 = a.wall_gap_y1, a.wall_gap_y2
+                else:
+                    a1, a2 = a.wall_gap_x1, a.wall_gap_x2
+                if b.rotation == 0:
+                    b1, b2 = b.wall_gap_y1, b.wall_gap_y2
+                else:
+                    b1, b2 = b.wall_gap_x1, b.wall_gap_x2
                 gap_between = max(a1, b1) - min(a2, b2)
                 if gap_between > 15:
                     continue

@@ -2,16 +2,15 @@ from __future__ import annotations
 
 import asyncio
 import logging
-from functools import partial
 from pathlib import Path
 
 import cv2
 import numpy as np
 from pdf2image import convert_from_path
 
-from app.detection.schemas import LineDetectionResult, DoorDetectionResult, WindowDetectionResult
-from app.detection.line_detector import LineDetector
 from app.detection.door_detector import DoorDetector
+from app.detection.line_detector import LineDetector
+from app.detection.schemas import DoorDetectionResult, LineDetectionResult, WindowDetectionResult
 from app.detection.window_detector import WindowDetector
 from app.ocr.preprocessor import ImagePreprocessor
 
@@ -51,9 +50,9 @@ class DetectionService:
             image_width=w,
             image_height=h,
         )
-        result.horizontal = [l for l in lines if l.category.value == "horizontal"]
-        result.vertical = [l for l in lines if l.category.value == "vertical"]
-        result.diagonal = [l for l in lines if l.category.value == "diagonal"]
+        result.horizontal = [line for line in lines if line.category.value == "horizontal"]
+        result.vertical = [line for line in lines if line.category.value == "vertical"]
+        result.diagonal = [line for line in lines if line.category.value == "diagonal"]
         return result
 
     async def process_file_doors(
@@ -105,9 +104,9 @@ class DetectionService:
             image_width=w,
             image_height=h,
         )
-        line_result.horizontal = [l for l in lines if l.category.value == "horizontal"]
-        line_result.vertical = [l for l in lines if l.category.value == "vertical"]
-        line_result.diagonal = [l for l in lines if l.category.value == "diagonal"]
+        line_result.horizontal = [line for line in lines if line.category.value == "horizontal"]
+        line_result.vertical = [line for line in lines if line.category.value == "vertical"]
+        line_result.diagonal = [line for line in lines if line.category.value == "diagonal"]
 
         door_result = self.door_detector.detect(image, grouped, lines, binary=binary)
         window_result = self.window_detector.detect(image, grouped, binary=binary)

@@ -1,10 +1,9 @@
 from __future__ import annotations
 
-import pytest
+from uuid import uuid4
 
 from app.ocr.scale import _parse_scale_text, detect_scale_factor
 from app.ocr.schemas import OcrResult, OcrTextElement, TextCategory
-from uuid import uuid4
 
 
 def _make_ocr_result(scale_texts: list[str]) -> OcrResult:

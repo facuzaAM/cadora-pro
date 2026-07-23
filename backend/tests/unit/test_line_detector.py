@@ -1,19 +1,15 @@
 from __future__ import annotations
 
-import math
-
-import numpy as np
 import cv2
+import numpy as np
 import pytest
 
 from app.detection.line_detector import (
+    MIN_LINE_LENGTH,
     LineDetector,
     RawLine,
-    MIN_LINE_LENGTH,
-    GROUP_DISTANCE_THRESHOLD,
-    ANGLE_TOLERANCE,
 )
-from app.detection.schemas import LineCategory, LineSegment, Intersection
+from app.detection.schemas import LineCategory, LineSegment
 
 
 @pytest.fixture
@@ -65,7 +61,7 @@ class TestDetectHorizontalLine:
         _draw_h_line(img, 200, 50, 350)
         binary = _make_binary_with_h_line(200, 50, 350)
         classified, grouped, _, _, _ = detector.detect(img, binary=binary)
-        h_lines = [l for l in classified if l.category == LineCategory.HORIZONTAL]
+        h_lines = [line for line in classified if line.category == LineCategory.HORIZONTAL]
         assert len(h_lines) >= 1
 
 
@@ -75,7 +71,7 @@ class TestDetectVerticalLine:
         _draw_v_line(img, 200, 50, 350)
         binary = _make_binary_with_v_line(200, 50, 350)
         classified, grouped, _, _, _ = detector.detect(img, binary=binary)
-        v_lines = [l for l in classified if l.category == LineCategory.VERTICAL]
+        v_lines = [line for line in classified if line.category == LineCategory.VERTICAL]
         assert len(v_lines) >= 1
 
 
@@ -88,8 +84,8 @@ class TestDetectBothLines:
         binary[100, 30:370] = 0
         binary[30:370, 200] = 0
         classified, grouped, _, _, _ = detector.detect(img, binary=binary)
-        h_lines = [l for l in classified if l.category == LineCategory.HORIZONTAL]
-        v_lines = [l for l in classified if l.category == LineCategory.VERTICAL]
+        h_lines = [line for line in classified if line.category == LineCategory.HORIZONTAL]
+        v_lines = [line for line in classified if line.category == LineCategory.VERTICAL]
         assert len(h_lines) >= 1
         assert len(v_lines) >= 1
 
@@ -99,8 +95,8 @@ class TestFilterNoise:
         short = RawLine(0, 0, 5, 0)
         long_line = RawLine(0, 0, 50, 0)
         result = detector._filter_noise([short, long_line])
-        lengths = [LineDetector._line_length(l) for l in result]
-        assert all(l >= MIN_LINE_LENGTH for l in lengths)
+        lengths = [LineDetector._line_length(line) for line in result]
+        assert all(line >= MIN_LINE_LENGTH for line in lengths)
 
     def test_keeps_valid_lines(self, detector: LineDetector):
         lines = [RawLine(0, 0, 100, 0), RawLine(0, 0, 0, 100)]
@@ -120,7 +116,7 @@ class TestGroupCollinear:
                         angle=0.0, length=60.0, category=LineCategory.HORIZONTAL),
         ]
         result = detector._group_collinear(lines)
-        h_merged = [l for l in result if l.category == LineCategory.HORIZONTAL]
+        h_merged = [line for line in result if line.category == LineCategory.HORIZONTAL]
         assert len(h_merged) == 1
         assert h_merged[0].x1 <= 0
         assert h_merged[0].x2 >= 120

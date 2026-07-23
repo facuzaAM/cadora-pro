@@ -92,10 +92,7 @@ class TextClassifier:
         return TextCategory.UNKNOWN
 
     def is_measurement(self, text: str) -> bool:
-        for pat in MEASUREMENT_PATTERNS:
-            if pat.match(text.strip()):
-                return True
-        return False
+        return any(pat.match(text.strip()) for pat in MEASUREMENT_PATTERNS)
 
     def is_room_name(self, text: str) -> bool:
         cleaned = text.strip()
@@ -103,7 +100,4 @@ class TextClassifier:
         for black in ROOM_NAME_BLACKLIST:
             if lower.startswith(black):
                 return False
-        for pat in ROOM_NAME_PATTERNS:
-            if pat.match(cleaned):
-                return True
-        return False
+        return any(pat.match(cleaned) for pat in ROOM_NAME_PATTERNS)

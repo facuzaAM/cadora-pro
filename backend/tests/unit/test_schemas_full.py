@@ -1,7 +1,6 @@
-import pytest
-from app.schemas.project import ProjectCreateRequest
 from app.schemas.auth import LoginRequest
 from app.schemas.billing import PlanResponse
+from app.schemas.project import ProjectCreateRequest
 
 
 def test_project_create_request():

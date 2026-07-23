@@ -7,7 +7,7 @@ from uuid import uuid4
 import cv2
 import numpy as np
 
-from app.detection.schemas import LineCategory, LineSegment, Intersection
+from app.detection.schemas import Intersection, LineCategory, LineSegment
 
 ANGLE_TOLERANCE = 5.0
 MIN_LINE_LENGTH = 20
@@ -36,7 +36,7 @@ class LineDetector:
         edges = self._edge_detection(binary)
         raw = self._hough_lines(edges)
         filtered = self._filter_noise(raw)
-        classified = [self._to_domain(l) for l in filtered]
+        classified = [self._to_domain(line) for line in filtered]
         grouped = self._group_collinear(classified)
         intersections = self._find_intersections(grouped, image.shape)
 
@@ -81,14 +81,14 @@ class LineDetector:
         if lines is None:
             return []
         return [
-            RawLine(x1=int(l[0]), y1=int(l[1]), x2=int(l[2]), y2=int(l[3]))
-            for l in lines
+            RawLine(x1=int(line[0]), y1=int(line[1]), x2=int(line[2]), y2=int(line[3]))
+            for line in lines
         ]
 
     # ── filtering ───────────────────────────────────────────────────────
 
     def _filter_noise(self, lines: list[RawLine]) -> list[RawLine]:
-        return [l for l in lines if self._line_length(l) >= MIN_LINE_LENGTH]
+        return [line for line in lines if self._line_length(line) >= MIN_LINE_LENGTH]
 
     # ── classification ──────────────────────────────────────────────────
 
@@ -127,7 +127,7 @@ class LineDetector:
             return []
         result: list[LineSegment] = []
         for cat in LineCategory:
-            cat_lines = [l for l in lines if l.category == cat]
+            cat_lines = [line for line in lines if line.category == cat]
             if cat_lines:
                 result.extend(self._merge_collinear(cat_lines))
         return result
@@ -198,8 +198,8 @@ class LineDetector:
         return False
 
     def _merge_group(self, group: list[LineSegment]) -> LineSegment:
-        xs = [p for l in group for p in (l.x1, l.x2)]
-        ys = [p for l in group for p in (l.y1, l.y2)]
+        xs = [p for line in group for p in (line.x1, line.x2)]
+        ys = [p for line in group for p in (line.y1, line.y2)]
         cat = group[0].category
 
         if cat == LineCategory.HORIZONTAL:
@@ -232,7 +232,7 @@ class LineDetector:
     def _farthest_points(
         group: list[LineSegment],
     ) -> tuple[tuple[float, float], tuple[float, float], float]:
-        pts = [(l.x1, l.y1) for l in group] + [(l.x2, l.y2) for l in group]
+        pts = [(line.x1, line.y1) for line in group] + [(line.x2, line.y2) for line in group]
         best = (0.0, (0.0, 0.0), (0.0, 0.0))
         for i, p1 in enumerate(pts):
             for p2 in pts[i + 1:]:

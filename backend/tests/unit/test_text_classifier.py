@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import pytest
 
-from app.ocr.classifier import TextClassifier, ROOM_NAME_BLACKLIST
+from app.ocr.classifier import TextClassifier
 from app.ocr.schemas import TextCategory
 
 
