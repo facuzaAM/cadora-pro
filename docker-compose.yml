@@ -53,6 +53,7 @@ services:
         condition: service_healthy
     volumes:
       - uploads_volume:/app/uploads
+      - logs_volume:/app/logs
     restart: unless-stopped
     healthcheck:
       test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/api/v1/health')"]
@@ -95,5 +96,6 @@ services:
 volumes:
   pgdata:
   uploads_volume:
+  logs_volume:
   certbot-www:
   backups:

@@ -30,7 +30,8 @@ RUN groupadd -r plan2cad && useradd -r -g plan2cad -d /app plan2cad
 
 COPY --chown=plan2cad:plan2cad . .
 
-RUN chown -R plan2cad:plan2cad /app/uploads /app/alembic
+RUN mkdir -p /app/logs /app/uploads \
+    && chown -R plan2cad:plan2cad /app/logs /app/uploads /app/alembic
 
 ENV PATH=/root/.local/bin:$PATH
 

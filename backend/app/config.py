@@ -69,7 +69,7 @@ class Settings(BaseSettings):
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
         if self.ENVIRONMENT == "production":
-            required = ["JWT_SECRET", "DATABASE_URL", "PADDLE_API_KEY"]
+            required = ["JWT_SECRET", "DATABASE_URL"]
             missing = [v for v in required if not getattr(self, v)]
             if missing:
                 raise RuntimeError(
