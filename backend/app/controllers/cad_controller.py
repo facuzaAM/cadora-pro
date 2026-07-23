@@ -232,9 +232,9 @@ async def generate_cad(
         )
     except HTTPException:
         raise
-    except Exception as e:
+    except Exception:
         logger.exception("Error generando CAD para proyecto %s", project_id)
-        raise HTTPException(status_code=HTTP_400_BAD_REQUEST, detail=str(e))
+        raise HTTPException(status_code=HTTP_400_BAD_REQUEST, detail="Error interno del servidor")
     finally:
         for p in temp_paths:
             if p and os.path.exists(p):
@@ -315,11 +315,11 @@ async def download_cad(
         )
     except HTTPException:
         raise
-    except Exception as e:
+    except Exception:
         logger.exception("Error descargando CAD para proyecto %s", project_id)
         if output_path and os.path.exists(output_path):
             os.remove(output_path)
-        raise HTTPException(status_code=HTTP_400_BAD_REQUEST, detail=str(e))
+        raise HTTPException(status_code=HTTP_400_BAD_REQUEST, detail="Error interno del servidor")
     finally:
         for p in temp_paths:
             if p and os.path.exists(p):

@@ -1,5 +1,8 @@
 .git
 .gitignore
+.env
+.env.*
+.env.local
 *.pyc
 __pycache__/
 .pytest_cache/

@@ -31,52 +31,18 @@ interface AuthState {
 
 interface TokenData {
   access_token: string;
-  refresh_token: string;
   user: AuthUser;
 }
 
 const AuthContext = createContext<AuthState | undefined>(undefined);
 
-const ACCESS_TOKEN_KEY = "access_token";
-const REFRESH_TOKEN_KEY = "refresh_token";
-const REFRESH_COOKIE = "cadora_token";
 const REFRESH_INTERVAL_MS = 14 * 60 * 1000;
-
-function setCookie(name: string, value: string, days: number) {
-  const expires = new Date(Date.now() + days * 864e5).toUTCString();
-  document.cookie = `${name}=${encodeURIComponent(value)}; expires=${expires}; path=/; SameSite=Lax`;
-}
-
-function removeCookie(name: string) {
-  document.cookie = `${name}=; expires=Thu, 01 Jan 1970 00:00:00 GMT; path=/`;
-}
-
-function getAccessToken(): string | null {
-  if (typeof window === "undefined") return null;
-  return localStorage.getItem(ACCESS_TOKEN_KEY);
-}
-
-function getRefreshToken(): string | null {
-  if (typeof window === "undefined") return null;
-  return localStorage.getItem(REFRESH_TOKEN_KEY);
-}
-
-function storeTokens(accessToken: string, refreshToken: string) {
-  localStorage.setItem(ACCESS_TOKEN_KEY, accessToken);
-  localStorage.setItem(REFRESH_TOKEN_KEY, refreshToken);
-  setCookie(REFRESH_COOKIE, refreshToken, 7);
-}
-
-function clearTokens() {
-  localStorage.removeItem(ACCESS_TOKEN_KEY);
-  localStorage.removeItem(REFRESH_TOKEN_KEY);
-  removeCookie(REFRESH_COOKIE);
-}
 
 export function AuthProvider({ children }: { children: ReactNode }) {
   const router = useRouter();
   const [user, setUser] = useState<AuthUser | null>(null);
   const [loading, setLoading] = useState(true);
+  const accessTokenRef = useRef<string | null>(null);
   const refreshTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   const clearRefreshTimer = useCallback(() => {
@@ -87,15 +53,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const tryRefreshToken = useCallback(async (): Promise<boolean> => {
-    const refreshToken = getRefreshToken();
-    if (!refreshToken) return false;
     try {
-      const data = await api.post<TokenData>("/auth/refresh", { refresh_token: refreshToken });
-      storeTokens(data.access_token, data.refresh_token);
+      const data = await api.post<TokenData>("/auth/refresh", {});
+      accessTokenRef.current = data.access_token;
+      api.setAccessToken(data.access_token);
       setUser(data.user);
       return true;
     } catch {
-      clearTokens();
+      accessTokenRef.current = null;
+      api.setAccessToken(null);
       setUser(null);
       clearRefreshTimer();
       return false;
@@ -111,20 +77,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, [clearRefreshTimer, tryRefreshToken]);
 
   const fetchUser = useCallback(async () => {
-    const token = getAccessToken();
-    if (!token) {
-      const refreshed = await tryRefreshToken();
-      if (!refreshed) {
-        setUser(null);
-        setLoading(false);
-        return;
-      }
-      setLoading(false);
-      scheduleRefresh();
-      return;
-    }
     try {
-      const data = await api.get<AuthUser>("/auth/me", token);
+      const data = await api.get<AuthUser>("/auth/me", accessTokenRef.current ?? undefined);
       setUser(data);
       scheduleRefresh();
     } catch {
@@ -140,22 +94,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, [tryRefreshToken, scheduleRefresh]);
 
   useEffect(() => {
-    if (typeof window !== "undefined") {
-      const params = new URLSearchParams(window.location.search);
-      const at = params.get("access_token");
-      const rt = params.get("refresh_token");
-      if (at && rt) {
-        storeTokens(at, rt);
-        window.history.replaceState({}, "", window.location.pathname);
-      }
-    }
     fetchUser();
     return () => clearRefreshTimer();
   }, [fetchUser, clearRefreshTimer]);
 
   const signIn = async (email: string, password: string) => {
     const data = await api.post<TokenData>("/auth/login", { email, password });
-    storeTokens(data.access_token, data.refresh_token);
+    accessTokenRef.current = data.access_token;
+    api.setAccessToken(data.access_token);
     setUser(data.user);
     scheduleRefresh();
     router.push("/dashboard");
@@ -163,7 +109,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const signUp = async (email: string, password: string, name: string) => {
     const data = await api.post<TokenData>("/auth/register", { email, password, name });
-    storeTokens(data.access_token, data.refresh_token);
+    accessTokenRef.current = data.access_token;
+    api.setAccessToken(data.access_token);
     setUser(data.user);
     scheduleRefresh();
     router.push("/dashboard");
@@ -174,15 +121,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   };
 
   const signOut = async () => {
-    const refreshToken = getRefreshToken();
-    if (refreshToken) {
-      try {
-        await api.post("/auth/logout", { refresh_token: refreshToken });
-      } catch {
-        // best-effort server-side logout
-      }
+    try {
+      await api.post("/auth/logout", {});
+    } catch {
+      // best-effort server-side logout
     }
-    clearTokens();
+    accessTokenRef.current = null;
+    api.setAccessToken(null);
     clearRefreshTimer();
     setUser(null);
     router.push("/");

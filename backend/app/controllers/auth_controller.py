@@ -1,9 +1,10 @@
 import secrets
+from typing import Literal
 from urllib.parse import urlencode
 
 import httpx
 from fastapi import APIRouter, Depends, HTTPException, Request
-from fastapi.responses import RedirectResponse
+from fastapi.responses import JSONResponse, RedirectResponse
 from sqlalchemy.ext.asyncio import AsyncSession
 from starlette.status import HTTP_400_BAD_REQUEST, HTTP_401_UNAUTHORIZED
 
@@ -24,6 +25,42 @@ from app.utils.dependencies import get_current_user
 from app.utils.rate_limit import limiter
 
 router = APIRouter()
+
+ACCESS_COOKIE = "cadora_access"
+REFRESH_COOKIE = "cadora_refresh"
+COOKIE_SECURE = True
+COOKIE_SAMESITE: Literal["none"] = "none"
+
+
+def _auth_response(tokens: TokenResponse, user: User) -> JSONResponse:
+    """Create a JSON response with refresh token as HttpOnly cookie."""
+    resp = JSONResponse(content={
+        "access_token": tokens.access_token,
+        "user": {
+            "id": str(user.id),
+            "email": user.email,
+            "name": user.name,
+            "avatar_url": user.avatar_url,
+            "subscription_plan": user.subscription_plan,
+            "subscription_status": user.subscription_status,
+            "conversions_used": user.conversions_used,
+            "conversions_limit": user.conversions_limit,
+            "storage_used": user.storage_used,
+            "storage_limit": user.storage_limit,
+            "priority_processing": user.priority_processing,
+            "created_at": user.created_at.isoformat() if user.created_at else "",
+        },
+    })
+    resp.set_cookie(
+        key=REFRESH_COOKIE,
+        value=tokens.refresh_token,
+        httponly=True,
+        secure=COOKIE_SECURE,
+        samesite=COOKIE_SAMESITE,
+        max_age=7 * 24 * 3600,
+        path="/",
+    )
+    return resp
 
 GOOGLE_AUTH_URL = "https://accounts.google.com/o/oauth2/v2/auth"
 GOOGLE_TOKEN_URL = "https://oauth2.googleapis.com/token"
@@ -106,47 +143,125 @@ async def google_callback(request: Request, db: AsyncSession = Depends(get_db)):
     tokens = await service._build_token(user)
 
     frontend_url = str(request.base_url).rstrip("/")
-    params = urlencode({
-        "access_token": tokens.access_token,
-        "refresh_token": tokens.refresh_token,
-    })
-    return RedirectResponse(f"{frontend_url}/auth/callback?{params}")
+    resp = RedirectResponse(f"{frontend_url}/login")
+    resp.set_cookie(
+        key=REFRESH_COOKIE,
+        value=tokens.refresh_token,
+        httponly=True,
+        secure=True,
+        samesite="none",
+        max_age=7 * 24 * 3600,
+        path="/",
+    )
+    resp.set_cookie(
+        key=ACCESS_COOKIE,
+        value=tokens.access_token,
+        httponly=False,
+        secure=True,
+        samesite="none",
+        max_age=15 * 60,
+        path="/",
+    )
+    return resp
 
 
-@router.post("/register", response_model=TokenResponse)
+@router.post("/register")
 @limiter.limit(settings.RATE_LIMIT_AUTH)
-async def register(request: Request, body: RegisterRequest, db: AsyncSession = Depends(get_db)):
+async def register(
+    request: Request,
+    body: RegisterRequest,
+    db: AsyncSession = Depends(get_db),
+):
     service = AuthService(db)
     try:
-        return await service.register(body)
+        result = await service.register(body)
     except ValueError as e:
-        raise HTTPException(status_code=HTTP_400_BAD_REQUEST, detail=str(e))
+        raise HTTPException(
+            status_code=HTTP_400_BAD_REQUEST, detail=str(e)
+        )
+    user = await service.repo.get_by_email(body.email)
+    if not user:
+        raise HTTPException(
+            status_code=HTTP_400_BAD_REQUEST,
+            detail="Error creando usuario",
+        )
+    return _auth_response(result, user)
 
 
-@router.post("/login", response_model=TokenResponse)
+@router.post("/login")
 @limiter.limit(settings.RATE_LIMIT_AUTH)
-async def login(request: Request, body: LoginRequest, db: AsyncSession = Depends(get_db)):
+async def login(
+    request: Request,
+    body: LoginRequest,
+    db: AsyncSession = Depends(get_db),
+):
     service = AuthService(db)
     try:
-        return await service.login(body.email, body.password)
+        result = await service.login(body.email, body.password)
     except ValueError as e:
-        raise HTTPException(status_code=HTTP_400_BAD_REQUEST, detail=str(e))
+        raise HTTPException(
+            status_code=HTTP_400_BAD_REQUEST, detail=str(e)
+        )
+    user = await service.repo.get_by_email(body.email)
+    if not user:
+        raise HTTPException(
+            status_code=HTTP_400_BAD_REQUEST,
+            detail="Error obteniendo usuario",
+        )
+    return _auth_response(result, user)
 
 
-@router.post("/refresh", response_model=TokenResponse)
+@router.post("/refresh")
 @limiter.limit(settings.RATE_LIMIT_AUTH)
-async def refresh(request: Request, body: RefreshRequest, db: AsyncSession = Depends(get_db)):
+async def refresh(
+    request: Request,
+    body: RefreshRequest | None = None,
+    db: AsyncSession = Depends(get_db),
+):
     service = AuthService(db)
+    token = None
+    if body and body.refresh_token:
+        token = body.refresh_token
+    if not token:
+        token = request.cookies.get(REFRESH_COOKIE)
+    if not token:
+        raise HTTPException(
+            status_code=HTTP_401_UNAUTHORIZED,
+            detail="No refresh token provided",
+        )
     try:
-        return await service.refresh(body.refresh_token)
+        result = await service.refresh(token)
     except ValueError as e:
-        raise HTTPException(status_code=HTTP_401_UNAUTHORIZED, detail=str(e))
+        raise HTTPException(
+            status_code=HTTP_401_UNAUTHORIZED, detail=str(e)
+        )
+    user = await service.repo.get_by_id(result.user.id)
+    if not user:
+        raise HTTPException(
+            status_code=HTTP_401_UNAUTHORIZED,
+            detail="Usuario no encontrado",
+        )
+    return _auth_response(result, user)
 
 
 @router.post("/logout", status_code=204)
-async def logout(body: RefreshRequest, db: AsyncSession = Depends(get_db)):
+async def logout(
+    request: Request,
+    body: RefreshRequest | None = None,
+    db: AsyncSession = Depends(get_db),
+):
     service = AuthService(db)
-    await service.logout(body.refresh_token)
+    token = None
+    if body and body.refresh_token:
+        token = body.refresh_token
+    if not token:
+        token = request.cookies.get(REFRESH_COOKIE)
+    if token:
+        await service.logout(token)
+    resp = JSONResponse(status_code=204, content=None)
+    resp.delete_cookie(REFRESH_COOKIE, path="/")
+    resp.delete_cookie(ACCESS_COOKIE, path="/")
+    return resp
 
 
 @router.get("/me", response_model=UserResponse)

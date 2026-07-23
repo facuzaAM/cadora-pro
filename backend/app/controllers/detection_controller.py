@@ -96,8 +96,9 @@ async def ocr_document(
         result = await ocr_service.process_file(temp_path, request=request)
     except HTTPException:
         raise
-    except Exception as e:
-        raise HTTPException(status_code=HTTP_400_BAD_REQUEST, detail=str(e))
+    except Exception:
+        logger.exception("Error procesando OCR en documento")
+        raise HTTPException(status_code=HTTP_400_BAD_REQUEST, detail="Error interno del servidor")
     finally:
         if os.path.exists(temp_path):
             os.remove(temp_path)
@@ -136,8 +137,9 @@ async def ocr_uploaded_document(
         result = await ocr_service.process_file(temp_path, request=request)
     except HTTPException:
         raise
-    except Exception as e:
-        raise HTTPException(status_code=HTTP_400_BAD_REQUEST, detail=str(e))
+    except Exception:
+        logger.exception("Error procesando OCR en documento subido")
+        raise HTTPException(status_code=HTTP_400_BAD_REQUEST, detail="Error interno del servidor")
     finally:
         if os.path.exists(temp_path):
             os.remove(temp_path)
@@ -167,8 +169,9 @@ async def detect_windows(
         result = await detection_service.process_file_windows(temp_path)
     except HTTPException:
         raise
-    except Exception as e:
-        raise HTTPException(status_code=HTTP_400_BAD_REQUEST, detail=str(e))
+    except Exception:
+        logger.exception("Error detectando ventanas")
+        raise HTTPException(status_code=HTTP_400_BAD_REQUEST, detail="Error interno del servidor")
     finally:
         if os.path.exists(temp_path):
             os.remove(temp_path)
@@ -199,8 +202,9 @@ async def detect_lines(
         result = await detection_service.process_file(temp_path)
     except HTTPException:
         raise
-    except Exception as e:
-        raise HTTPException(status_code=HTTP_400_BAD_REQUEST, detail=str(e))
+    except Exception:
+        logger.exception("Error detectando lineas")
+        raise HTTPException(status_code=HTTP_400_BAD_REQUEST, detail="Error interno del servidor")
     finally:
         if os.path.exists(temp_path):
             os.remove(temp_path)
@@ -231,8 +235,9 @@ async def detect_doors(
         result = await detection_service.process_file_doors(temp_path)
     except HTTPException:
         raise
-    except Exception as e:
-        raise HTTPException(status_code=HTTP_400_BAD_REQUEST, detail=str(e))
+    except Exception:
+        logger.exception("Error detectando puertas")
+        raise HTTPException(status_code=HTTP_400_BAD_REQUEST, detail="Error interno del servidor")
     finally:
         if os.path.exists(temp_path):
             os.remove(temp_path)

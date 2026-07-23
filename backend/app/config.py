@@ -68,7 +68,14 @@ class Settings(BaseSettings):
 
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
-        if not self.JWT_SECRET:
+        if self.ENVIRONMENT == "production":
+            required = ["JWT_SECRET", "DATABASE_URL", "STRIPE_SECRET_KEY"]
+            missing = [v for v in required if not getattr(self, v)]
+            if missing:
+                raise RuntimeError(
+                    f"Missing required environment variables for production: {', '.join(missing)}"
+                )
+        elif not self.JWT_SECRET:
             self.JWT_SECRET = secrets.token_hex(32)
             warnings.warn(
                 "JWT_SECRET not set. Generated a random secret. "

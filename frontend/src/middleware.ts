@@ -3,7 +3,7 @@ import { type NextRequest, NextResponse } from "next/server";
 const protectedRoutes = ["/dashboard", "/projects", "/settings", "/profile", "/billing"];
 
 export function middleware(request: NextRequest) {
-  const token = request.cookies.get("cadora_token")?.value;
+  const token = request.cookies.get("cadora_refresh")?.value;
   const { pathname } = request.nextUrl;
 
   const isProtected = protectedRoutes.some((route) => pathname.startsWith(route));
