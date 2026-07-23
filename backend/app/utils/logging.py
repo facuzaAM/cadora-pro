@@ -36,16 +36,19 @@ def setup_logging() -> None:
     )
 
     if settings.LOG_FILE:
-        log_path = Path(settings.LOG_FILE)
-        log_path.parent.mkdir(parents=True, exist_ok=True)
-        logger.add(
-            str(log_path),
-            format=log_format,
-            level=log_level,
-            rotation="10 MB",
-            retention="30 days",
-            compression="gz",
-        )
+        try:
+            log_path = Path(settings.LOG_FILE)
+            log_path.parent.mkdir(parents=True, exist_ok=True)
+            logger.add(
+                str(log_path),
+                format=log_format,
+                level=log_level,
+                rotation="10 MB",
+                retention="30 days",
+                compression="gz",
+            )
+        except OSError:
+            logger.warning("Could not create log file at {}", settings.LOG_FILE)
 
     logging.basicConfig(handlers=[InterceptHandler()], level=0, force=True)
 
