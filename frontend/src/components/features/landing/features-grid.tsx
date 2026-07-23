@@ -29,7 +29,7 @@ const features = [
   {
     icon: Ruler,
     title: "Exportación CAD",
-    desc: "Genera DXF editable y DWG con capas organizadas.",
+    desc: "Genera archivos DXF editable con capas organizadas. DWG disponible en planes Pro y Business.",
   },
 ] as const;
 

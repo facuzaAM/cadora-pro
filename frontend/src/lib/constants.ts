@@ -45,7 +45,7 @@ export const PLANS = [
     features: [
       "50 conversiones/mes",
       "1 GB de almacenamiento",
-      "Exportación DXF + DWG",
+      "Exportación DXF",
       "Detección avanzada",
       "OCR de textos y cotas",
       "Soporte por email",

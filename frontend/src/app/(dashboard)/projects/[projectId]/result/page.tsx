@@ -2,37 +2,47 @@
 
 import { useEffect, useState } from "react";
 import { useRouter, useParams } from "next/navigation";
-import { ArrowLeft, Download, Share2, Loader2 } from "lucide-react";
+import { ArrowLeft, Download, Share2, Loader2, ChevronDown } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import { PageHeader } from "@/components/shared/page-header";
 import { DetectionViewer } from "@/components/features/result/detection-viewer";
 import { EnvironmentList } from "@/components/features/result/environment-list";
 import { projectsService } from "@/services/projects.service";
-import { cadService } from "@/services/cad.service";
+import { cadService, type CadFormat } from "@/services/cad.service";
 import { useAuth } from "@/hooks/useAuth";
 import { toast } from "sonner";
+
+const DWG_PLANS = new Set(["pro", "business"]);
 
 export default function ResultPage() {
   const router = useRouter();
   const params = useParams();
   const projectId = params.projectId as string;
-  const { user: _user } = useAuth();
+  const { user } = useAuth();
   const [projectName, setProjectName] = useState("Proyecto");
   const [downloading, setDownloading] = useState(false);
+
+  const canExportDwg = user && DWG_PLANS.has(user.subscription_plan);
 
   useEffect(() => {
     const token = localStorage.getItem("access_token") || undefined;
     projectsService.getById(projectId, token).then((p) => setProjectName(p.name)).catch(() => {});
   }, [projectId]);
 
-  const handleDownload = async () => {
+  const handleDownload = async (format: CadFormat = "dxf") => {
     setDownloading(true);
     try {
       const token = localStorage.getItem("access_token") || undefined;
-      await cadService.generate(projectId, token);
-      const url = cadService.downloadUrl(projectId);
+      await cadService.generate(projectId, format, token);
+      const url = cadService.downloadUrl(projectId, format);
       window.open(url, "_blank");
-      toast.success("Archivo DXF generado");
+      toast.success(`Archivo ${format.toUpperCase()} generado`);
     } catch {
       toast.error("Error al generar el archivo");
     } finally {
@@ -65,14 +75,38 @@ export default function ResultPage() {
               <Share2 className="mr-2 h-4 w-4" />
               Compartir
             </Button>
-            <Button size="sm" onClick={handleDownload} disabled={downloading}>
-              {downloading ? (
-                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-              ) : (
-                <Download className="mr-2 h-4 w-4" />
-              )}
-              Exportar Todo
-            </Button>
+            {canExportDwg ? (
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button size="sm" disabled={downloading}>
+                    {downloading ? (
+                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    ) : (
+                      <Download className="mr-2 h-4 w-4" />
+                    )}
+                    Exportar
+                    <ChevronDown className="ml-1 h-3 w-3" />
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end">
+                  <DropdownMenuItem onClick={() => handleDownload("dxf")}>
+                    DXF
+                  </DropdownMenuItem>
+                  <DropdownMenuItem onClick={() => handleDownload("dwg")}>
+                    DWG
+                  </DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
+            ) : (
+              <Button size="sm" onClick={() => handleDownload("dxf")} disabled={downloading}>
+                {downloading ? (
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                ) : (
+                  <Download className="mr-2 h-4 w-4" />
+                )}
+                Exportar DXF
+              </Button>
+            )}
           </div>
         }
       />

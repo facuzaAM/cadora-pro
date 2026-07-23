@@ -17,7 +17,7 @@ const steps = [
     icon: Download,
     step: "3",
     title: "Exporta a CAD",
-    desc: "Descarga DXF editable con capas, o DWG convertible.",
+    desc: "Descarga DXF editable con capas organizadas. DWG disponible en planes Pro y Business.",
   },
 ] as const;
 

@@ -1,7 +1,10 @@
 from __future__ import annotations
 
 import contextlib
+import logging
 import math
+import shutil
+import subprocess
 from pathlib import Path
 
 import ezdxf
@@ -15,6 +18,8 @@ from app.detection.schemas import (
 )
 from app.ocr.scale import detect_scale_factor
 from app.ocr.schemas import OcrResult
+
+logger = logging.getLogger(__name__)
 
 # ── Layer configuration ──────────────────────────────────────────────────────
 # Each layer: (name, ACI color, lineweight in 1/100 mm, linetype)
@@ -344,3 +349,32 @@ class CadGenerator:
         path.parent.mkdir(parents=True, exist_ok=True)
         self.doc.saveas(str(path))
         return path
+
+
+def convert_dxf_to_dwg(dxf_path: Path, dwg_path: Path) -> bool:
+    """Convert a DXF file to DWG using dxf2dwg (libredwg).
+
+    Returns True on success, False otherwise.
+    """
+    dxf2dwg = shutil.which("dxf2dwg")
+    if dxf2dwg is None:
+        logger.warning("dxf2dwg not found in PATH, DWG conversion unavailable")
+        return False
+
+    try:
+        result = subprocess.run(
+            [dxf2dwg, "-o", str(dwg_path), str(dxf_path)],
+            capture_output=True,
+            text=True,
+            timeout=120,
+        )
+        if result.returncode != 0:
+            logger.error("dxf2dwg failed: %s", result.stderr)
+            return False
+        return dwg_path.exists()
+    except subprocess.TimeoutExpired:
+        logger.error("dxf2dwg timed out")
+        return False
+    except FileNotFoundError:
+        logger.error("dxf2dwg binary not found")
+        return False

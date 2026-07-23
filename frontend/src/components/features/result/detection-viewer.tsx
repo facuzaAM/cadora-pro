@@ -1,14 +1,21 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { Eye, EyeOff, Download } from "lucide-react";
+import { Eye, EyeOff, Download, ChevronDown } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import { detectionService } from "@/services/detection.service";
 import { documentsService } from "@/services/documents.service";
-import { cadService } from "@/services/cad.service";
+import { cadService, type CadFormat } from "@/services/cad.service";
+import { useAuth } from "@/hooks/useAuth";
 
 interface DetectionViewerProps {
   projectId: string;
@@ -23,9 +30,14 @@ const defaultLayers = [
   { id: "dimensions", label: "Cotas", visible: true, color: "#dc2626" },
 ];
 
+const DWG_PLANS = new Set(["pro", "business"]);
+
 export function DetectionViewer({ projectId }: DetectionViewerProps) {
+  const { user } = useAuth();
   const [layerState, setLayerState] = useState(defaultLayers);
   const [wallCount, setWallCount] = useState(0);
+
+  const canExportDwg = user && DWG_PLANS.has(user.subscription_plan);
 
   useEffect(() => {
     const token = localStorage.getItem("access_token") || undefined;
@@ -55,8 +67,8 @@ export function DetectionViewer({ projectId }: DetectionViewerProps) {
     );
   };
 
-  const handleDownloadDxf = () => {
-    window.open(cadService.downloadUrl(projectId), "_blank");
+  const handleDownload = (format: CadFormat) => {
+    window.open(cadService.downloadUrl(projectId, format), "_blank");
   };
 
   return (
@@ -64,10 +76,30 @@ export function DetectionViewer({ projectId }: DetectionViewerProps) {
       <CardHeader className="flex flex-row items-center justify-between">
         <CardTitle className="text-sm">Vista Previa del Plano</CardTitle>
         <div className="flex items-center gap-2">
-          <Button variant="outline" size="sm" onClick={handleDownloadDxf}>
-            <Download className="mr-2 h-4 w-4" />
-            DXF
-          </Button>
+          {canExportDwg ? (
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button variant="outline" size="sm">
+                  <Download className="mr-2 h-4 w-4" />
+                  Descargar
+                  <ChevronDown className="ml-1 h-3 w-3" />
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end">
+                <DropdownMenuItem onClick={() => handleDownload("dxf")}>
+                  DXF
+                </DropdownMenuItem>
+                <DropdownMenuItem onClick={() => handleDownload("dwg")}>
+                  DWG
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
+          ) : (
+            <Button variant="outline" size="sm" onClick={() => handleDownload("dxf")}>
+              <Download className="mr-2 h-4 w-4" />
+              DXF
+            </Button>
+          )}
         </div>
       </CardHeader>
       <CardContent>

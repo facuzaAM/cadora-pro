@@ -3,15 +3,16 @@ import logging
 import os
 import tempfile
 import uuid as _uuid
+from pathlib import Path
 from uuid import UUID
 
 import httpx
 from fastapi import APIRouter, Depends, HTTPException
 from fastapi.responses import FileResponse
 from sqlalchemy.ext.asyncio import AsyncSession
-from starlette.status import HTTP_400_BAD_REQUEST, HTTP_404_NOT_FOUND
+from starlette.status import HTTP_400_BAD_REQUEST, HTTP_403_FORBIDDEN, HTTP_404_NOT_FOUND
 
-from app.cad.generator import CadGenerator
+from app.cad.generator import CadGenerator, convert_dxf_to_dwg
 from app.cad.schemas import CadGenerateRequest, CadGenerateResponse
 from app.config import settings
 from app.database import get_db
@@ -21,11 +22,13 @@ from app.detection.schemas import (
     WindowDetectionResult,
 )
 from app.detection.service import DetectionService
+from app.models.user import User
 from app.ocr.schemas import OcrResult
 from app.ocr.service import OcrService
 from app.repositories.document_repository import DocumentRepository
 from app.repositories.project_repository import ProjectRepository
 from app.repositories.user_repository import UserRepository
+from app.services.plan_config import get_plan
 from app.services.plan_enforcer import enforce_conversion_limit
 from app.services.storage_service import StorageService
 from app.utils.dependencies import get_current_user
@@ -37,7 +40,7 @@ detection_service = DetectionService()
 ocr_service = OcrService()
 storage = StorageService()
 
-DXF_CACHE_DIR = "cad/generated"
+CAD_CACHE_DIR = "cad/generated"
 
 
 async def _download_doc_to_temp(
@@ -163,18 +166,32 @@ def _generate_dxf_sync(
     )
 
 
-def _dxf_cache_path(project_id: UUID) -> str:
-    return f"{DXF_CACHE_DIR}/{project_id}/cadora.dxf"
+def _cad_cache_path(project_id: UUID, fmt: str) -> str:
+    ext = "dwg" if fmt == "dwg" else "dxf"
+    return f"{CAD_CACHE_DIR}/{project_id}/cadora.{ext}"
+
+
+def _get_user_format(user: User, requested_format: str) -> str:
+    """Validate and resolve the requested format against the user's plan."""
+    plan = get_plan(user.subscription_plan)
+    if requested_format == "dwg" and not plan.dwg_enabled:
+        raise HTTPException(
+            status_code=HTTP_403_FORBIDDEN,
+            detail="La exportación DWG requiere un plan Pro o Business.",
+        )
+    return requested_format
 
 
 @router.post("/generate/{project_id}", response_model=CadGenerateResponse)
 async def generate_cad(
     project_id: UUID,
     body: CadGenerateRequest = CadGenerateRequest(),
-    user=Depends(enforce_conversion_limit),
+    user: User = Depends(enforce_conversion_limit),
     db: AsyncSession = Depends(get_db),
 ):
-    """Run full detection pipeline and generate a DXF file."""
+    """Run full detection pipeline and generate a DXF/DWG file."""
+    fmt = _get_user_format(user, body.format)
+
     project_repo = ProjectRepository(db)
     project = await project_repo.get_by_id(project_id)
     if not project or project.user_id != user.id:
@@ -210,14 +227,30 @@ async def generate_cad(
             output_path, lines_result, doors_result, windows_result, ocr_result,
         )
 
-        file_size = os.path.getsize(output_path)
+        final_path = output_path
+        if fmt == "dwg":
+            dwg_path = output_path.replace(".dxf", ".dwg")
+            converted = await asyncio.to_thread(
+                convert_dxf_to_dwg, Path(output_path), Path(dwg_path),
+            )
+            if not converted:
+                raise HTTPException(
+                    status_code=HTTP_400_BAD_REQUEST,
+                    detail="Error al convertir a DWG. Intente descargar como DXF.",
+                )
+            final_path = dwg_path
 
-        with open(output_path, "rb") as f:
-            dxf_bytes = f.read()
-        cache_key = _dxf_cache_path(project_id)
+        file_size = os.path.getsize(final_path)
+
+        with open(final_path, "rb") as f:
+            file_bytes = f.read()
+
+        ext = "dwg" if fmt == "dwg" else "dxf"
+        cache_key = _cad_cache_path(project_id, fmt)
+        content_type = "application/dwg" if fmt == "dwg" else "application/dxf"
         await storage.upload(
-            settings.STORAGE_BUCKET, cache_key, dxf_bytes,
-            content_type="application/dxf",
+            settings.STORAGE_BUCKET, cache_key, file_bytes,
+            content_type=content_type,
         )
 
         user_repo = UserRepository(db)
@@ -227,7 +260,7 @@ async def generate_cad(
             await user_repo._save(user_db)
 
         return CadGenerateResponse(
-            filename=f"cadora_{project_id}.dxf",
+            filename=f"cadora_{project_id}.{ext}",
             file_size=file_size,
         )
     except HTTPException:
@@ -241,35 +274,45 @@ async def generate_cad(
                 os.remove(p)
         if output_path and os.path.exists(output_path):
             os.remove(output_path)
+        if fmt == "dwg" and output_path:
+            dwg_temp = output_path.replace(".dxf", ".dwg")
+            if os.path.exists(dwg_temp):
+                os.remove(dwg_temp)
 
 
 @router.get("/download/{project_id}")
 async def download_cad(
     project_id: UUID,
-    user=Depends(get_current_user),
+    format: str = "dxf",
+    user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
-    """Download the generated DXF for a project. Uses cache if available."""
+    """Download the generated DXF/DWG for a project. Uses cache if available."""
+    fmt = _get_user_format(user, format)
+
     project_repo = ProjectRepository(db)
     project = await project_repo.get_by_id(project_id)
     if not project or project.user_id != user.id:
         raise HTTPException(status_code=HTTP_404_NOT_FOUND, detail="Proyecto no encontrado")
 
-    cache_key = _dxf_cache_path(project_id)
+    ext = "dwg" if fmt == "dwg" else "dxf"
+    content_type = "application/dwg" if fmt == "dwg" else "application/dxf"
+    cache_key = _cad_cache_path(project_id, fmt)
+
     if await storage.exists(settings.STORAGE_BUCKET, cache_key):
         try:
-            dxf_bytes = await storage.download_bytes(settings.STORAGE_BUCKET, cache_key)
-            fd, tmp = tempfile.mkstemp(suffix=".dxf", prefix=f"dl_{project_id}_")
+            file_bytes = await storage.download_bytes(settings.STORAGE_BUCKET, cache_key)
+            fd, tmp = tempfile.mkstemp(suffix=f".{ext}", prefix=f"dl_{project_id}_")
             os.close(fd)
             with open(tmp, "wb") as f:
-                f.write(dxf_bytes)
+                f.write(file_bytes)
             return FileResponse(
                 path=tmp,
-                filename=f"cadora_{project_id}.dxf",
-                media_type="application/dxf",
+                filename=f"cadora_{project_id}.{ext}",
+                media_type=content_type,
             )
         except Exception:
-            logger.warning("Error leyendo cache DXF, regenerando")
+            logger.warning("Error leyendo cache %s, regenerando", ext.upper())
 
     doc_repo = DocumentRepository(db)
     docs = await doc_repo.list_by_project(project_id)
@@ -280,7 +323,7 @@ async def download_cad(
         )
 
     temp_paths = []
-    output_path = ""
+    dxf_output = ""
     try:
         for doc in docs:
             path = await _download_doc_to_temp(user.id, project_id, doc, prefix="dl")
@@ -291,34 +334,55 @@ async def download_cad(
         )
 
         tag = _uuid.uuid4().hex[:8]
-        fd, output_path = tempfile.mkstemp(
+        fd, dxf_output = tempfile.mkstemp(
             suffix=".dxf", prefix=f"{user.id}_{project_id}_dl_{tag}_"
         )
         os.close(fd)
 
         await asyncio.to_thread(
             _generate_dxf_sync,
-            output_path, lines_result, doors_result, windows_result, ocr_result,
+            dxf_output, lines_result, doors_result, windows_result, ocr_result,
         )
 
-        with open(output_path, "rb") as f:
+        with open(dxf_output, "rb") as f:
             dxf_bytes = f.read()
+        dxf_cache_key = _cad_cache_path(project_id, "dxf")
         await storage.upload(
-            settings.STORAGE_BUCKET, cache_key, dxf_bytes,
+            settings.STORAGE_BUCKET, dxf_cache_key, dxf_bytes,
             content_type="application/dxf",
         )
 
+        final_path = dxf_output
+        if fmt == "dwg":
+            dwg_path = dxf_output.replace(".dxf", ".dwg")
+            converted = await asyncio.to_thread(
+                convert_dxf_to_dwg, Path(dxf_output), Path(dwg_path),
+            )
+            if converted:
+                final_path = dwg_path
+                with open(dwg_path, "rb") as f:
+                    dwg_bytes = f.read()
+                await storage.upload(
+                    settings.STORAGE_BUCKET, cache_key, dwg_bytes,
+                    content_type=content_type,
+                )
+            else:
+                logger.warning("DWG conversion failed, falling back to DXF")
+                fmt = "dxf"
+                ext = "dxf"
+                content_type = "application/dxf"
+
         return FileResponse(
-            path=output_path,
-            filename=f"cadora_{project_id}.dxf",
-            media_type="application/dxf",
+            path=final_path,
+            filename=f"cadora_{project_id}.{ext}",
+            media_type=content_type,
         )
     except HTTPException:
         raise
     except Exception:
         logger.exception("Error descargando CAD para proyecto %s", project_id)
-        if output_path and os.path.exists(output_path):
-            os.remove(output_path)
+        if dxf_output and os.path.exists(dxf_output):
+            os.remove(dxf_output)
         raise HTTPException(status_code=HTTP_400_BAD_REQUEST, detail="Error interno del servidor")
     finally:
         for p in temp_paths:
