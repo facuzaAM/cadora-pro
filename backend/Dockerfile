@@ -24,16 +24,16 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     poppler-utils \
     && rm -rf /var/lib/apt/lists/*
 
-COPY --from=builder /root/.local /root/.local
-
 RUN groupadd -r plan2cad && useradd -r -g plan2cad -d /app plan2cad
+
+COPY --from=builder /root/.local /home/plan2cad/.local
 
 COPY --chown=plan2cad:plan2cad . .
 
 RUN mkdir -p /app/logs /app/uploads \
-    && chown -R plan2cad:plan2cad /app/logs /app/uploads /app/alembic
+    && chown -R plan2cad:plan2cad /app/logs /app/uploads /app/alembic /home/plan2cad/.local
 
-ENV PATH=/root/.local/bin:$PATH
+ENV PATH=/home/plan2cad/.local/bin:$PATH
 
 USER plan2cad
 
