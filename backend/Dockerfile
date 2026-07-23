@@ -11,7 +11,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     && rm -rf /var/lib/apt/lists/*
 
 COPY requirements.txt .
-RUN pip install --no-cache-dir --user -r requirements.txt
+RUN pip install --no-cache-dir -r requirements.txt
 
 FROM python:3.12-slim AS runner
 
@@ -24,16 +24,15 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     poppler-utils \
     && rm -rf /var/lib/apt/lists/*
 
-RUN groupadd -r plan2cad && useradd -r -g plan2cad -d /app plan2cad
+COPY --from=builder /usr/local/lib/python3.12/site-packages /usr/local/lib/python3.12/site-packages
+COPY --from=builder /usr/local/bin/alembic /usr/local/bin/alembic
 
-COPY --from=builder /root/.local /home/plan2cad/.local
+RUN groupadd -r plan2cad && useradd -r -g plan2cad -d /app plan2cad
 
 COPY --chown=plan2cad:plan2cad . .
 
 RUN mkdir -p /app/logs /app/uploads \
-    && chown -R plan2cad:plan2cad /app/logs /app/uploads /app/alembic /home/plan2cad/.local
-
-ENV PATH=/home/plan2cad/.local/bin:$PATH
+    && chown -R plan2cad:plan2cad /app/logs /app/uploads /app/alembic
 
 USER plan2cad
 
