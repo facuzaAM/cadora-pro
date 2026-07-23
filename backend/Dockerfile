@@ -8,23 +8,20 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     libglib2.0-0 \
     tesseract-ocr \
     poppler-utils \
-    git \
-    autoconf \
-    automake \
-    libtool \
-    pkg-config \
+    wget \
+    xz-utils \
     && rm -rf /var/lib/apt/lists/*
 
 COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
-RUN git clone --depth 1 https://github.com/LibreDWG/libredwg.git /tmp/libredwg \
-    && cd /tmp/libredwg \
-    && sh ./autogen.sh \
-    && ./configure --prefix=/usr/local --disable-bindings \
+RUN wget -q https://github.com/LibreDWG/libredwg/releases/download/0.13.4/libredwg-0.13.4.tar.xz -O /tmp/libredwg.tar.xz \
+    && tar -xf /tmp/libredwg.tar.xz -C /tmp \
+    && cd /tmp/libredwg-0.13.4 \
+    && ./configure --prefix=/usr/local --disable-bindings --disable-python \
     && make -j$(nproc) \
     && make install \
-    && rm -rf /tmp/libredwg
+    && rm -rf /tmp/libredwg*
 
 FROM python:3.12-slim AS runner
 
@@ -40,7 +37,6 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 COPY --from=builder /usr/local/lib/python3.12/site-packages /usr/local/lib/python3.12/site-packages
 COPY --from=builder /usr/local/bin/dxf2dwg /usr/local/bin/dxf2dwg
 COPY --from=builder /usr/local/lib/libredwg* /usr/local/lib/
-COPY --from=builder /usr/local/share/libredwg /usr/local/share/libredwg
 
 RUN ldconfig
 
