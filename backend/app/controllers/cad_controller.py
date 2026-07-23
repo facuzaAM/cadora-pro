@@ -228,26 +228,26 @@ async def generate_cad(
         )
 
         final_path = output_path
+        ext = "dxf"
         if fmt == "dwg":
             dwg_path = output_path.replace(".dxf", ".dwg")
             converted = await asyncio.to_thread(
                 convert_dxf_to_dwg, Path(output_path), Path(dwg_path),
             )
-            if not converted:
-                raise HTTPException(
-                    status_code=HTTP_400_BAD_REQUEST,
-                    detail="Error al convertir a DWG. Intente descargar como DXF.",
-                )
-            final_path = dwg_path
+            if converted:
+                final_path = dwg_path
+                ext = "dwg"
+            else:
+                logger.warning("DWG conversion unavailable, falling back to DXF")
+                fmt = "dxf"
 
         file_size = os.path.getsize(final_path)
 
         with open(final_path, "rb") as f:
             file_bytes = f.read()
 
-        ext = "dwg" if fmt == "dwg" else "dxf"
-        cache_key = _cad_cache_path(project_id, fmt)
-        content_type = "application/dwg" if fmt == "dwg" else "application/dxf"
+        cache_key = _cad_cache_path(project_id, ext)
+        content_type = "application/dwg" if ext == "dwg" else "application/dxf"
         await storage.upload(
             settings.STORAGE_BUCKET, cache_key, file_bytes,
             content_type=content_type,
