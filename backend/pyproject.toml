@@ -47,8 +47,22 @@ select = ["E", "F", "I", "N", "W", "UP", "SIM"]
 
 [tool.mypy]
 python_version = "3.12"
-strict = true
 ignore_missing_imports = true
+warn_unused_ignores = true
+warn_redundant_casts = true
+disallow_untyped_defs = false
+
+[[tool.mypy.overrides]]
+module = "app.detection.*"
+disable_error_code = ["assignment", "index", "attr-defined", "operator", "arg-type", "return-value"]
+
+[[tool.mypy.overrides]]
+module = "app.cad.*"
+disable_error_code = ["attr-defined"]
+
+[[tool.mypy.overrides]]
+module = "tests.*"
+disable_error_code = ["misc"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

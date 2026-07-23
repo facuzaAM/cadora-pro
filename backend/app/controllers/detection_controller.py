@@ -28,9 +28,9 @@ detection_service = DetectionService()
 storage = StorageService()
 
 
-def _safe_temp_path(user_id: UUID, project_id: UUID, filename: str, prefix: str = "") -> str:
+def _safe_temp_path(user_id: UUID, project_id: UUID, filename: str | None, prefix: str = "") -> str:
     """Create a safe temp file path with sanitized filename."""
-    safe_name = os.path.basename(filename).replace("/", "").replace("\\", "")
+    safe_name = os.path.basename(filename or "upload").replace("/", "").replace("\\", "")
     tag = _uuid.uuid4().hex[:8]
     suffix = f"_{prefix}" if prefix else ""
     fd, path = tempfile.mkstemp(

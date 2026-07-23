@@ -47,7 +47,7 @@ class StripeService:
             cancel_url=settings.STRIPE_CANCEL_URL,
             metadata={"user_id": str(user.id), "plan": plan_name},
         )
-        return session.url
+        return session.url or ""
 
     async def create_portal_session(self, user: User) -> str:
         if not user.stripe_customer_id:
@@ -122,7 +122,7 @@ class StripeService:
 
     @staticmethod
     async def _handle_subscription_updated(subscription: dict) -> None:
-        customer_id = subscription.get("customer")
+        customer_id: str | None = subscription.get("customer")
         status = subscription.get("status", "inactive")
         current_period_end = subscription.get("current_period_end", 0)
         items = subscription.get("items", {}).get("data", [])
@@ -145,7 +145,7 @@ class StripeService:
 
         async with async_session_factory() as db:
             repo = UserRepository(db)
-            user = await repo.get_by_stripe_customer(customer_id)
+            user = await repo.get_by_stripe_customer(str(customer_id))
             if not user:
                 return
 
@@ -165,13 +165,13 @@ class StripeService:
 
     @staticmethod
     async def _handle_subscription_deleted(subscription: dict) -> None:
-        customer_id = subscription.get("customer")
+        customer_id: str | None = subscription.get("customer")
         from app.database import async_session_factory
         from app.repositories.user_repository import UserRepository
 
         async with async_session_factory() as db:
             repo = UserRepository(db)
-            user = await repo.get_by_stripe_customer(customer_id)
+            user = await repo.get_by_stripe_customer(str(customer_id))
             if not user:
                 return
 

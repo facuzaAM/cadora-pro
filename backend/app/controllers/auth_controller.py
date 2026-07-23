@@ -105,7 +105,7 @@ async def google_callback(request: Request, db: AsyncSession = Depends(get_db)):
     service = AuthService(db)
     tokens = await service._build_token(user)
 
-    frontend_url = request.base_url.origin
+    frontend_url = str(request.base_url).rstrip("/")
     params = urlencode({
         "access_token": tokens.access_token,
         "refresh_token": tokens.refresh_token,
