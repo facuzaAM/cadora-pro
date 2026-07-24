@@ -4,7 +4,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import Script from "next/script";
 import { PricingCard } from "@/components/features/pricing/pricing-card";
 import { LandingNav } from "@/components/features/landing/landing-nav";
-import { Logo } from "@/components/shared/logo";
+import { SiteFooter } from "@/components/layout/site-footer";
 import { PLANS } from "@/lib/constants";
 import { billingService } from "@/services/billing.service";
 
@@ -92,16 +92,7 @@ export default function PricingPage() {
         </div>
       </main>
 
-      <footer className="border-t py-8">
-        <div className="mx-auto max-w-6xl px-4">
-          <div className="flex flex-col items-center justify-between gap-4 sm:flex-row">
-            <Logo />
-            <p className="text-sm text-muted-foreground">
-              &copy; 2026 Cadora. Todos los derechos reservados.
-            </p>
-          </div>
-        </div>
-      </footer>
+      <SiteFooter />
     </div>
   );
 }

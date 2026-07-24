@@ -15,6 +15,7 @@ export default function RegisterPage() {
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [acceptedTerms, setAcceptedTerms] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [googleLoading, setGoogleLoading] = useState(false);
 
@@ -109,7 +110,27 @@ export default function RegisterPage() {
                 minLength={8}
               />
             </div>
-            <Button type="submit" className="w-full" disabled={submitting}>
+            <div className="flex items-start gap-2">
+              <input
+                id="terms"
+                type="checkbox"
+                checked={acceptedTerms}
+                onChange={(e) => setAcceptedTerms(e.target.checked)}
+                className="mt-0.5 h-4 w-4 rounded border-input"
+                required
+              />
+              <label htmlFor="terms" className="text-sm text-muted-foreground">
+                Acepto los{" "}
+                <Link href="/terminos" target="_blank" className="text-primary underline-offset-4 hover:underline">
+                  Términos de Servicio
+                </Link>{" "}
+                y la{" "}
+                <Link href="/privacidad" target="_blank" className="text-primary underline-offset-4 hover:underline">
+                  Política de Privacidad
+                </Link>
+              </label>
+            </div>
+            <Button type="submit" className="w-full" disabled={submitting || !acceptedTerms}>
               {submitting ? "Creando cuenta..." : "Crear Cuenta"}
             </Button>
           </form>

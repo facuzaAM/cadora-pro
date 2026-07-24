@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import { Logo } from "@/components/shared/logo";
 import { LandingNav } from "@/components/features/landing/landing-nav";
+import { SiteFooter } from "@/components/layout/site-footer";
 import { Upload, Cog, Download, DoorOpen, BrickWall, ScanLine, TextSearch, Hash, Ruler } from "lucide-react";
 
 export const metadata: Metadata = {
@@ -147,14 +147,7 @@ export default function ComoFuncionaPage() {
           </div>
         </section>
       </main>
-      <footer className="border-t py-8">
-        <div className="mx-auto flex max-w-6xl flex-col items-center justify-between gap-4 px-4 sm:flex-row">
-          <Logo />
-          <p className="text-sm text-muted-foreground">
-            &copy; 2026 Cadora. Todos los derechos reservados.
-          </p>
-        </div>
-      </footer>
+      <SiteFooter />
     </div>
   );
 }
