@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useEffect, useState } from "react";
-import { LayoutDashboard, FolderKanban, CreditCard, User, Settings, Plus } from "lucide-react";
+import { LayoutDashboard, FolderKanban, CreditCard, User, Settings, Plus, History } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
@@ -16,6 +16,7 @@ import { billingService } from "@/services/billing.service";
 
 const navItems = [
   { label: "Dashboard", href: "/dashboard", icon: LayoutDashboard },
+  { label: "Historial", href: "/dashboard/history", icon: History },
   { label: "Mis Proyectos", href: "/projects", icon: FolderKanban },
   { label: "Facturación", href: "/billing", icon: CreditCard },
   { label: "Perfil", href: "/profile", icon: User },

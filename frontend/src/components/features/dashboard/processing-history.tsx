@@ -2,8 +2,10 @@
 
 import { useEffect, useState } from "react";
 import type React from "react";
-import { CheckCircle2, Clock, AlertCircle, Loader2, FileDown, Upload } from "lucide-react";
+import Link from "next/link";
+import { CheckCircle2, Clock, AlertCircle, Loader2, FileDown, Upload, ArrowUpRight } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
 import { cn } from "@/lib/utils";
 import { projectsService } from "@/services/projects.service";
@@ -79,8 +81,14 @@ export function ProcessingHistory() {
 
   return (
     <Card>
-      <CardHeader className="px-5 py-4">
+      <CardHeader className="flex flex-row items-center justify-between px-5 py-4">
         <CardTitle className="text-sm font-medium">Historial</CardTitle>
+        <Button variant="ghost" size="sm" className="gap-1 text-xs" asChild>
+          <Link href="/dashboard/history">
+            Ver todo
+            <ArrowUpRight className="h-3 w-3" />
+          </Link>
+        </Button>
       </CardHeader>
       <Separator />
       <CardContent className="p-0">

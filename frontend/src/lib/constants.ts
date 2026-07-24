@@ -11,6 +11,7 @@ export const NAV_ITEMS = [
 
 export const DASHBOARD_NAV = [
   { label: "Dashboard", href: "/dashboard", icon: "LayoutDashboard" },
+  { label: "Historial", href: "/dashboard/history", icon: "History" },
   { label: "Mis Proyectos", href: "/projects", icon: "FolderKanban" },
   { label: "Facturación", href: "/billing", icon: "CreditCard" },
   { label: "Perfil", href: "/profile", icon: "User" },
