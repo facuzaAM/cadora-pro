@@ -42,19 +42,6 @@ export function Hero() {
             Ver Planes
           </Link>
         </div>
-
-        <div className="mt-16 grid gap-4 sm:grid-cols-3">
-          {[
-            { number: "10K+", label: "Planos procesados" },
-            { number: "98%", label: "Precisión de detección" },
-            { number: "4.9", label: "Valoración media" },
-          ].map((stat) => (
-            <div key={stat.label} className="rounded-xl border border-white/5 bg-white/[0.03] px-6 py-5 backdrop-blur-sm">
-              <div className="text-2xl font-bold text-white">{stat.number}</div>
-              <div className="mt-1 text-sm text-white/50">{stat.label}</div>
-            </div>
-          ))}
-        </div>
       </div>
     </section>
   );
