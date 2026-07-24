@@ -25,7 +25,7 @@ const steps = [
     icon: Cog,
     step: "2",
     title: "Detección automática",
-    description: "Nuestro motor de procesamiento analiza tu plano y detecta automáticamente todos los elementos arquitectónicos.",
+    description: "Nuestro motor de procesamiento analiza tu plano y detecta automáticamente todos los elementos arquitectónicos. El procesamiento normalmente toma entre 1 y 3 minutos según el tamaño y complejidad del plano.",
     details: [
       "Muros y tabiques con espesor y longitud",
       "Puertas con dirección de apertura",
