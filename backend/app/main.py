@@ -11,6 +11,7 @@ from app.config import settings
 from app.controllers.auth_controller import router as auth_router
 from app.controllers.billing_controller import router as billing_router
 from app.controllers.cad_controller import router as cad_router
+from app.controllers.contact_controller import router as contact_router
 from app.controllers.demo_controller import router as demo_router
 from app.controllers.detection_controller import router as detection_router
 from app.controllers.document_controller import router as document_router
@@ -87,6 +88,7 @@ app.include_router(detection_router, prefix="/api/v1/detection", tags=["detectio
 app.include_router(cad_router, prefix="/api/v1/cad", tags=["cad"])
 app.include_router(billing_router, prefix="/api/v1/billing", tags=["billing"])
 app.include_router(demo_router, prefix="/api/v1/demo", tags=["demo"])
+app.include_router(contact_router, prefix="/api/v1/contact", tags=["contact"])
 
 
 @app.get("/api/v1/health", tags=["health"])
