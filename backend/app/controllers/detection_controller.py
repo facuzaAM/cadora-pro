@@ -95,8 +95,8 @@ async def ocr_document(
         with open(temp_path, "wb") as f:
             f.write(content)
 
-        request = OcrRequest(language=language)
-        result = await ocr_service.process_file(temp_path, request=request)
+        ocr_request = OcrRequest(language=language)
+        result = await ocr_service.process_file(temp_path, request=ocr_request)
     except HTTPException:
         raise
     except Exception:
@@ -138,8 +138,8 @@ async def ocr_uploaded_document(
         with open(temp_path, "wb") as f:
             f.write(response.content)
 
-        request = OcrRequest(language=language)
-        result = await ocr_service.process_file(temp_path, request=request)
+        ocr_request = OcrRequest(language=language)
+        result = await ocr_service.process_file(temp_path, request=ocr_request)
     except HTTPException:
         raise
     except Exception:

@@ -60,7 +60,7 @@ async def _cleanup_expired_refresh_tokens() -> int:
     async with async_session_factory() as session:
         stmt = delete(RefreshToken).where(RefreshToken.expires_at < now)
         result = await session.execute(stmt)
-        deleted_count = result.rowcount
+        deleted_count = result.rowcount  # type: ignore[attr-defined]
         if deleted_count > 0:
             await session.commit()
             logger.info("Cleaned up %d expired refresh tokens", deleted_count)

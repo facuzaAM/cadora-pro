@@ -1,4 +1,5 @@
 import secrets
+from typing import Literal
 from urllib.parse import urlencode
 
 import httpx
@@ -34,7 +35,7 @@ def _cookie_secure() -> bool:
     return settings.ENVIRONMENT == "production"
 
 
-def _cookie_samesite() -> str:
+def _cookie_samesite() -> Literal["none", "lax"]:
     return "none" if settings.ENVIRONMENT == "production" else "lax"
 
 
