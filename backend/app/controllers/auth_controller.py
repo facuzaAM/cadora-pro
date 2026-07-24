@@ -14,10 +14,12 @@ from app.models.user import User
 from app.repositories.user_repository import UserRepository
 from app.schemas.auth import (
     ChangePasswordRequest,
+    ForgotPasswordRequest,
     LoginRequest,
     ProfileUpdateRequest,
     RefreshRequest,
     RegisterRequest,
+    ResetPasswordRequest,
     TokenResponse,
     UserResponse,
 )
@@ -315,3 +317,29 @@ async def logout_all(
     resp.delete_cookie(REFRESH_COOKIE, path="/")
     resp.delete_cookie(ACCESS_COOKIE, path="/")
     return resp
+
+
+@router.post("/forgot-password", status_code=204)
+@limiter.limit("3/minute")
+async def forgot_password(
+    request: Request,
+    body: ForgotPasswordRequest,
+    db: AsyncSession = Depends(get_db),
+):
+    service = AuthService(db)
+    await service.forgot_password(body.email)
+
+
+@router.post("/reset-password")
+@limiter.limit("5/minute")
+async def reset_password(
+    request: Request,
+    body: ResetPasswordRequest,
+    db: AsyncSession = Depends(get_db),
+):
+    service = AuthService(db)
+    try:
+        await service.reset_password(body.code, body.new_password)
+    except ValueError as e:
+        raise HTTPException(status_code=HTTP_400_BAD_REQUEST, detail=str(e))
+    return {"message": "Contraseña actualizada correctamente"}

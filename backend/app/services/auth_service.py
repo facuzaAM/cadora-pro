@@ -1,3 +1,4 @@
+import secrets as _secrets
 from datetime import UTC, datetime, timedelta
 from uuid import UUID
 
@@ -5,6 +6,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.config import settings
 from app.models.user import User
+from app.repositories.password_reset_repository import PasswordResetRepository
 from app.repositories.refresh_token_repository import RefreshTokenRepository
 from app.repositories.user_repository import UserRepository
 from app.schemas.auth import RegisterRequest, TokenResponse, UserResponse
@@ -16,6 +18,7 @@ class AuthService:
     def __init__(self, db: AsyncSession):
         self.repo = UserRepository(db)
         self.refresh_repo = RefreshTokenRepository(db)
+        self.reset_repo = PasswordResetRepository(db)
 
     async def register(self, request: RegisterRequest) -> TokenResponse:
         existing = await self.repo.get_by_email(request.email)
@@ -76,6 +79,38 @@ class AuthService:
         if not user:
             raise ValueError("Usuario no encontrado")
         return user
+
+    async def forgot_password(self, email: str) -> bool:
+        """Generate a 6-digit reset code and email it. Always returns True."""
+        from app.services.email_service import send_reset_code
+
+        user = await self.repo.get_by_email(email)
+        if not user:
+            return True
+
+        await self.reset_repo.invalidate_all_for_user(user.id)
+
+        code = str(_secrets.randbelow(900000) + 100000)
+        expires_at = datetime.now(UTC) + timedelta(minutes=15)
+        await self.reset_repo.create(user.id, code, expires_at)
+
+        send_reset_code(user.email, code, user.name)
+        return True
+
+    async def reset_password(self, code: str, new_password: str) -> None:
+        """Reset a user's password using a valid 6-digit code."""
+        token = await self.reset_repo.get_valid_code(code)
+        if not token:
+            raise ValueError("Código inválido o expirado")
+
+        user = await self.repo.get_by_id(token.user_id)
+        if not user:
+            raise ValueError("Usuario no encontrado")
+
+        user.hashed_password = hash_password(new_password)
+        await self.repo._save(user)
+        await self.reset_repo.mark_used(token.id)
+        await self.refresh_repo.revoke_all_for_user(user.id)
 
     async def _build_token(self, user: User) -> TokenResponse:
         payload = {"sub": str(user.id), "token_version": user.token_version}
