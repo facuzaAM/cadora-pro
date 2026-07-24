@@ -152,7 +152,7 @@ export function DemoUploader() {
   const windowCount = result?.windows.length ?? 0;
 
   return (
-    <section className="py-16 lg:py-24">
+    <section id="demo" className="py-16 lg:py-24">
       <div className="mx-auto max-w-4xl px-4">
         <div className="text-center">
           <h2 className="text-3xl font-bold tracking-tight">Probá con tu plano</h2>
