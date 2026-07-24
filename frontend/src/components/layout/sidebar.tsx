@@ -12,6 +12,7 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Skeleton } from "@/components/ui/skeleton";
 import { PLANS } from "@/lib/constants";
 import { useAuth } from "@/hooks/useAuth";
+import { api } from "@/services/api";
 import { billingService } from "@/services/billing.service";
 
 const navItems = [
@@ -29,7 +30,7 @@ export function Sidebar() {
   const [plan, setPlan] = useState("free");
 
   useEffect(() => {
-    const token = localStorage.getItem("access_token") || undefined;
+    const token = api.getAccessToken();
     billingService.getSubscription(token).then((sub) => {
       setPlan(sub.plan);
     }).catch(() => {});

@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { ProjectCard } from "./project-card";
 import { EmptyProjects } from "./empty-projects";
 import { projectsService } from "@/services/projects.service";
+import { api } from "@/services/api";
 import type { Project, ProjectStatus } from "@/types";
 
 const statusMap: Record<ProjectStatus, { label: string; variant: "success" | "warning" | "secondary" | "default" }> = {
@@ -32,7 +33,7 @@ export function ProjectList() {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    const token = localStorage.getItem("access_token") || undefined;
+    const token = api.getAccessToken();
     projectsService
       .list(token)
       .then(setProjects)

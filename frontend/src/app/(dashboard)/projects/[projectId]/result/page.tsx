@@ -16,6 +16,7 @@ import { EnvironmentList } from "@/components/features/result/environment-list";
 import { projectsService } from "@/services/projects.service";
 import { cadService, type CadFormat } from "@/services/cad.service";
 import { useAuth } from "@/hooks/useAuth";
+import { api } from "@/services/api";
 import { toast } from "sonner";
 
 const DWG_PLANS = new Set(["pro", "business"]);
@@ -31,15 +32,14 @@ export default function ResultPage() {
   const canExportDwg = user && DWG_PLANS.has(user.subscription_plan);
 
   useEffect(() => {
-    const token = localStorage.getItem("access_token") || undefined;
+    const token = api.getAccessToken();
     projectsService.getById(projectId, token).then((p) => setProjectName(p.name)).catch(() => {});
   }, [projectId]);
 
   const handleDownload = async (format: CadFormat = "dxf") => {
     setDownloading(true);
     try {
-      const token = localStorage.getItem("access_token") || undefined;
-      await cadService.generate(projectId, format, token);
+      await cadService.generate(projectId, format, api.getAccessToken());
       const url = cadService.downloadUrl(projectId, format);
       window.open(url, "_blank");
       toast.success(`Archivo ${format.toUpperCase()} generado`);

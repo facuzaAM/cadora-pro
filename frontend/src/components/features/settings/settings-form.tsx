@@ -40,7 +40,7 @@ export function SettingsForm() {
   }, [user, form]);
 
   useEffect(() => {
-    const token = localStorage.getItem("access_token") || undefined;
+    const token = api.getAccessToken();
     billingService.getSubscription(token).then((sub) => {
       setPlanName(sub.plan.charAt(0).toUpperCase() + sub.plan.slice(1));
     }).catch(() => {});
@@ -49,8 +49,7 @@ export function SettingsForm() {
   const onSubmit = async (data: ProfileForm) => {
     if (!user) return;
     try {
-      const token = localStorage.getItem("access_token") || undefined;
-      await api.patch("/auth/me", { name: data.full_name }, token);
+      await api.patch("/auth/me", { name: data.full_name }, api.getAccessToken());
       await refreshUser();
       toast.success("Perfil actualizado");
     } catch {

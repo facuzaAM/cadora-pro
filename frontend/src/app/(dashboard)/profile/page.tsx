@@ -25,8 +25,7 @@ export default function ProfilePage() {
     if (!user) return;
     setSaving(true);
     try {
-      const token = localStorage.getItem("access_token") || undefined;
-      await api.patch("/auth/me", { name }, token);
+      await api.patch("/auth/me", { name }, api.getAccessToken());
       await refreshUser();
       toast.success("Perfil actualizado");
     } catch {

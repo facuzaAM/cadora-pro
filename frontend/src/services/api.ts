@@ -15,6 +15,10 @@ class ApiClient {
     this.accessToken = token;
   }
 
+  getAccessToken(): string | undefined {
+    return this.accessToken ?? undefined;
+  }
+
   async get<T>(path: string, token?: string): Promise<T> {
     const res = await fetch(`${this.baseUrl}${path}`, {
       credentials: "include",
@@ -36,10 +40,13 @@ class ApiClient {
   }
 
   async upload<T>(path: string, formData: FormData, token?: string): Promise<T> {
+    const auth = token || this.accessToken;
+    const headers: Record<string, string> = {};
+    if (auth) headers["Authorization"] = `Bearer ${auth}`;
     const res = await fetch(`${this.baseUrl}${path}`, {
       method: "POST",
       credentials: "include",
-      headers: this.headers(token),
+      headers,
       body: formData,
     });
     if (!res.ok) throw new ApiError(res.status, await res.json());
@@ -79,11 +86,17 @@ class ApiClient {
 }
 
 export class ApiError extends Error {
-  constructor(
-    public status: number,
-    public body: unknown,
-  ) {
-    super(`API Error: ${status}`);
+  public status: number;
+  public body: unknown;
+
+  constructor(status: number, body: unknown) {
+    const detail =
+      typeof body === "object" && body !== null && "detail" in body
+        ? String((body as { detail: unknown }).detail)
+        : `Error ${status}`;
+    super(detail);
+    this.status = status;
+    this.body = body;
   }
 }
 

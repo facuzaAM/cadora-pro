@@ -1,5 +1,4 @@
 import secrets
-from typing import Literal
 from urllib.parse import urlencode
 
 import httpx
@@ -13,6 +12,7 @@ from app.database import get_db
 from app.models.user import User
 from app.repositories.user_repository import UserRepository
 from app.schemas.auth import (
+    ChangePasswordRequest,
     LoginRequest,
     ProfileUpdateRequest,
     RefreshRequest,
@@ -28,8 +28,14 @@ router = APIRouter()
 
 ACCESS_COOKIE = "cadora_access"
 REFRESH_COOKIE = "cadora_refresh"
-COOKIE_SECURE = True
-COOKIE_SAMESITE: Literal["none"] = "none"
+
+
+def _cookie_secure() -> bool:
+    return settings.ENVIRONMENT == "production"
+
+
+def _cookie_samesite() -> str:
+    return "none" if settings.ENVIRONMENT == "production" else "lax"
 
 
 def _auth_response(tokens: TokenResponse, user: User) -> JSONResponse:
@@ -55,8 +61,8 @@ def _auth_response(tokens: TokenResponse, user: User) -> JSONResponse:
         key=REFRESH_COOKIE,
         value=tokens.refresh_token,
         httponly=True,
-        secure=COOKIE_SECURE,
-        samesite=COOKIE_SAMESITE,
+        secure=_cookie_secure(),
+        samesite=_cookie_samesite(),
         max_age=7 * 24 * 3600,
         path="/",
     )
@@ -148,8 +154,8 @@ async def google_callback(request: Request, db: AsyncSession = Depends(get_db)):
         key=REFRESH_COOKIE,
         value=tokens.refresh_token,
         httponly=True,
-        secure=True,
-        samesite="none",
+        secure=_cookie_secure(),
+        samesite=_cookie_samesite(),
         max_age=7 * 24 * 3600,
         path="/",
     )
@@ -157,8 +163,8 @@ async def google_callback(request: Request, db: AsyncSession = Depends(get_db)):
         key=ACCESS_COOKIE,
         value=tokens.access_token,
         httponly=False,
-        secure=True,
-        samesite="none",
+        secure=_cookie_secure(),
+        samesite=_cookie_samesite(),
         max_age=15 * 60,
         path="/",
     )
@@ -282,3 +288,29 @@ async def update_me(
         user.avatar_url = body.avatar_url
     await repo._save(user)
     return UserResponse.model_validate(user)
+
+
+@router.post("/change-password", status_code=204)
+async def change_password(
+    body: ChangePasswordRequest,
+    user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    service = AuthService(db)
+    try:
+        await service.change_password(user.id, body.current_password, body.new_password)
+    except ValueError as e:
+        raise HTTPException(status_code=HTTP_400_BAD_REQUEST, detail=str(e))
+
+
+@router.post("/logout-all", status_code=204)
+async def logout_all(
+    user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    service = AuthService(db)
+    await service.logout_all(user.id)
+    resp = JSONResponse(status_code=204, content=None)
+    resp.delete_cookie(REFRESH_COOKIE, path="/")
+    resp.delete_cookie(ACCESS_COOKIE, path="/")
+    return resp

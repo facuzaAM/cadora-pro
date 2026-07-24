@@ -16,6 +16,7 @@ import { detectionService } from "@/services/detection.service";
 import { documentsService } from "@/services/documents.service";
 import { cadService, type CadFormat } from "@/services/cad.service";
 import { useAuth } from "@/hooks/useAuth";
+import { api } from "@/services/api";
 
 interface DetectionViewerProps {
   projectId: string;
@@ -40,7 +41,7 @@ export function DetectionViewer({ projectId }: DetectionViewerProps) {
   const canExportDwg = user && DWG_PLANS.has(user.subscription_plan);
 
   useEffect(() => {
-    const token = localStorage.getItem("access_token") || undefined;
+    const token = api.getAccessToken();
     documentsService
       .getByProject(projectId, token)
       .then((docs) => {

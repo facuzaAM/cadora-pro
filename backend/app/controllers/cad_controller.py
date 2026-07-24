@@ -7,7 +7,7 @@ from pathlib import Path
 from uuid import UUID
 
 import httpx
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Request
 from fastapi.responses import FileResponse
 from sqlalchemy.ext.asyncio import AsyncSession
 from starlette.status import HTTP_400_BAD_REQUEST, HTTP_403_FORBIDDEN, HTTP_404_NOT_FOUND
@@ -32,6 +32,7 @@ from app.services.plan_config import get_plan
 from app.services.plan_enforcer import enforce_conversion_limit
 from app.services.storage_service import StorageService
 from app.utils.dependencies import get_current_user
+from app.utils.rate_limit import limiter
 
 logger = logging.getLogger(__name__)
 
@@ -183,7 +184,9 @@ def _get_user_format(user: User, requested_format: str) -> str:
 
 
 @router.post("/generate/{project_id}", response_model=CadGenerateResponse)
+@limiter.limit(settings.RATE_LIMIT_CAD)
 async def generate_cad(
+    request: Request,
     project_id: UUID,
     body: CadGenerateRequest = CadGenerateRequest(),
     user: User = Depends(enforce_conversion_limit),
@@ -281,7 +284,9 @@ async def generate_cad(
 
 
 @router.get("/download/{project_id}")
+@limiter.limit(settings.RATE_LIMIT_CAD)
 async def download_cad(
+    request: Request,
     project_id: UUID,
     format: str = "dxf",
     user: User = Depends(get_current_user),

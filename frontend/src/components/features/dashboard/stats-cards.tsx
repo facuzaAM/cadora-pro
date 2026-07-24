@@ -6,6 +6,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { cn } from "@/lib/utils";
 import { projectsService } from "@/services/projects.service";
 import { billingService } from "@/services/billing.service";
+import { api } from "@/services/api";
 
 interface Stat {
   icon: React.ElementType;
@@ -25,7 +26,7 @@ export function StatsCards() {
   ]);
 
   useEffect(() => {
-    const token = localStorage.getItem("access_token") || undefined;
+    const token = api.getAccessToken();
     Promise.all([
       projectsService.list(token).catch(() => []),
       billingService.getSubscription(token).catch(() => null),

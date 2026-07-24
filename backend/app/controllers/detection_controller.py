@@ -5,7 +5,7 @@ import uuid as _uuid
 from uuid import UUID
 
 import httpx
-from fastapi import APIRouter, Depends, HTTPException, UploadFile
+from fastapi import APIRouter, Depends, HTTPException, Request, UploadFile
 from sqlalchemy.ext.asyncio import AsyncSession
 from starlette.status import HTTP_400_BAD_REQUEST, HTTP_404_NOT_FOUND, HTTP_413_CONTENT_TOO_LARGE
 
@@ -19,6 +19,7 @@ from app.repositories.document_repository import DocumentRepository
 from app.repositories.project_repository import ProjectRepository
 from app.services.plan_enforcer import enforce_conversion_limit
 from app.services.storage_service import StorageService
+from app.utils.rate_limit import limiter
 
 logger = logging.getLogger(__name__)
 
@@ -72,7 +73,9 @@ async def _read_upload_safe(file: UploadFile) -> bytes:
 
 
 @router.post("/ocr/{project_id}", response_model=OcrResult)
+@limiter.limit(settings.RATE_LIMIT_DETECTION)
 async def ocr_document(
+    request: Request,
     project_id: UUID,
     file: UploadFile,
     language: str = "spa+eng",
@@ -107,7 +110,9 @@ async def ocr_document(
 
 
 @router.post("/ocr/uploaded/{document_id}", response_model=OcrResult)
+@limiter.limit(settings.RATE_LIMIT_DETECTION)
 async def ocr_uploaded_document(
+    request: Request,
     document_id: UUID,
     language: str = "spa+eng",
     user=Depends(enforce_conversion_limit),
@@ -147,7 +152,9 @@ async def ocr_uploaded_document(
 
 
 @router.post("/windows/{project_id}", response_model=WindowDetectionResult)
+@limiter.limit(settings.RATE_LIMIT_DETECTION)
 async def detect_windows(
+    request: Request,
     project_id: UUID,
     file: UploadFile,
     user=Depends(enforce_conversion_limit),
@@ -180,7 +187,9 @@ async def detect_windows(
 
 
 @router.post("/lines/{project_id}", response_model=LineDetectionResult)
+@limiter.limit(settings.RATE_LIMIT_DETECTION)
 async def detect_lines(
+    request: Request,
     project_id: UUID,
     file: UploadFile,
     user=Depends(enforce_conversion_limit),
@@ -213,7 +222,9 @@ async def detect_lines(
 
 
 @router.post("/doors/{project_id}", response_model=DoorDetectionResult)
+@limiter.limit(settings.RATE_LIMIT_DETECTION)
 async def detect_doors(
+    request: Request,
     project_id: UUID,
     file: UploadFile,
     user=Depends(enforce_conversion_limit),

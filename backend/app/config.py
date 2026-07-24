@@ -46,13 +46,20 @@ class Settings(BaseSettings):
     ALLOWED_EXTENSIONS: list[str] = [".pdf", ".png", ".jpg", ".jpeg", ".tiff"]
 
     # CORS (JSON array)
-    CORS_ORIGINS: list[str] = ["http://localhost:3000", "https://cadora.pro", "https://app.cadora.pro"]
+    CORS_ORIGINS: list[str] = [
+        "http://localhost:3000",
+        "https://cadora.pro",
+        "https://app.cadora.pro",
+        "https://api.cadora.pro",
+    ]
 
     # Rate limiting
     RATE_LIMIT_ENABLED: bool = True
     RATE_LIMIT_DEFAULT: str = "30/minute"
     RATE_LIMIT_AUTH: str = "10/minute"
     RATE_LIMIT_UPLOAD: str = "5/minute"
+    RATE_LIMIT_DETECTION: str = "10/minute"
+    RATE_LIMIT_CAD: str = "5/minute"
 
     # Logging
     LOG_FILE: str = ""

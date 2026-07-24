@@ -8,6 +8,7 @@ import { ProcessingStatus } from "@/components/features/projects/processing-stat
 import { DETECTION_STEPS } from "@/lib/constants";
 import { detectionService } from "@/services/detection.service";
 import { documentsService } from "@/services/documents.service";
+import { api } from "@/services/api";
 
 export default function ProcessingPage() {
   const router = useRouter();
@@ -17,7 +18,7 @@ export default function ProcessingPage() {
   const [_detectionId, setDetectionId] = useState<string | null>(null);
 
   useEffect(() => {
-    const token = localStorage.getItem("access_token") || undefined;
+    const token = api.getAccessToken();
     documentsService
       .getByProject(projectId, token)
       .then((docs) => {

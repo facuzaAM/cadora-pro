@@ -12,6 +12,7 @@ import { UploadZone } from "@/components/features/projects/upload-zone";
 import { projectsService } from "@/services/projects.service";
 import { documentsService } from "@/services/documents.service";
 import { useAuth } from "@/hooks/useAuth";
+import { api } from "@/services/api";
 import { toast } from "sonner";
 
 export default function UploadPage() {
@@ -28,7 +29,7 @@ export default function UploadPage() {
     if (!canSubmit || !file) return;
     setLoading(true);
     try {
-      const token = localStorage.getItem("access_token") || undefined;
+      const token = api.getAccessToken();
       const project = await projectsService.create(
         { name: projectName, description: description || undefined },
         token,

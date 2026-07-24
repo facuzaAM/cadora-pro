@@ -1,9 +1,13 @@
+import asyncio
+import contextlib
+import logging
 from contextlib import asynccontextmanager
 
-from fastapi import FastAPI
+from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.middleware.gzip import GZipMiddleware
 from fastapi.middleware.trustedhost import TrustedHostMiddleware
+from fastapi.responses import JSONResponse
 from slowapi import _rate_limit_exceeded_handler
 from slowapi.errors import RateLimitExceeded
 
@@ -36,7 +40,15 @@ async def lifespan(app: FastAPI):
     if settings.DEBUG:
         async with engine.begin() as conn:
             await conn.run_sync(Base.metadata.create_all)
+
+    from app.services.cleanup_service import start_cleanup_task
+    cleanup_task = await start_cleanup_task()
+
     yield
+
+    cleanup_task.cancel()
+    with contextlib.suppress(asyncio.CancelledError):
+        await cleanup_task
     await engine.dispose()
 
 
@@ -61,6 +73,23 @@ app = FastAPI(
 
 app.state.limiter = limiter
 app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)  # type: ignore
+
+logger = logging.getLogger(__name__)
+
+
+@app.exception_handler(Exception)
+async def global_exception_handler(request: Request, exc: Exception):
+    logger.exception("Unhandled exception on %s %s", request.method, request.url.path)
+    if settings.SENTRY_DSN:
+        try:
+            import sentry_sdk
+            sentry_sdk.capture_exception(exc)
+        except Exception:
+            pass
+    return JSONResponse(
+        status_code=500,
+        content={"detail": "Error interno del servidor"},
+    )
 
 trusted_hosts = [h.strip() for h in settings.TRUSTED_HOSTS.split(",") if h.strip()]
 app.add_middleware(
@@ -105,9 +134,23 @@ async def health():
     except Exception:
         pass
 
+    storage_ok = True
+    if settings.SUPABASE_URL and settings.SUPABASE_KEY:
+        try:
+            from app.utils.supabase import get_supabase
+            client = get_supabase()
+            if client:
+                client.storage.get_bucket(settings.STORAGE_BUCKET)
+            else:
+                storage_ok = False
+        except Exception:
+            storage_ok = False
+
+    status = "ok" if db_ok and storage_ok else "degraded"
     return {
-        "status": "ok" if db_ok else "degraded",
+        "status": status,
         "app": settings.APP_NAME,
         "environment": settings.ENVIRONMENT,
         "database": "connected" if db_ok else "disconnected",
+        "storage": "connected" if storage_ok else "disconnected",
     }

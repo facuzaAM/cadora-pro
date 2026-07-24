@@ -6,6 +6,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { detectionService } from "@/services/detection.service";
 import { documentsService } from "@/services/documents.service";
+import { api } from "@/services/api";
 import type { DetectionResult } from "@/types";
 
 interface EnvironmentListProps {
@@ -16,7 +17,7 @@ export function EnvironmentList({ projectId }: EnvironmentListProps) {
   const [result, setResult] = useState<DetectionResult | null>(null);
 
   useEffect(() => {
-    const token = localStorage.getItem("access_token") || undefined;
+    const token = api.getAccessToken();
     documentsService
       .getByProject(projectId, token)
       .then((docs) => {

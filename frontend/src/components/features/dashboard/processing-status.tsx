@@ -7,6 +7,7 @@ import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
 import { Separator } from "@/components/ui/separator";
 import { projectsService } from "@/services/projects.service";
+import { api } from "@/services/api";
 
 interface ActiveProcess {
   id: string;
@@ -19,7 +20,7 @@ export function ProcessingStatus() {
   const [active, setActive] = useState<ActiveProcess[]>([]);
 
   useEffect(() => {
-    const token = localStorage.getItem("access_token") || undefined;
+    const token = api.getAccessToken();
     projectsService.list(token).then((projects) => {
       const processing = projects
         .filter((p) => p.status === "processing")

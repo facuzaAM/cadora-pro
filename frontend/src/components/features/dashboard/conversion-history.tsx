@@ -23,6 +23,7 @@ import {
 import { projectsService } from "@/services/projects.service";
 import { documentsService } from "@/services/documents.service";
 import { cadService } from "@/services/cad.service";
+import { api } from "@/services/api";
 import { toast } from "sonner";
 import type { Project, ProjectStatus } from "@/types";
 
@@ -67,7 +68,7 @@ export function ConversionHistory() {
   const [reprocessing, setReprocessing] = useState<string | null>(null);
 
   useEffect(() => {
-    const token = localStorage.getItem("access_token") || undefined;
+    const token = api.getAccessToken();
     projectsService
       .list(token)
       .then(async (projects) => {
@@ -99,8 +100,8 @@ export function ConversionHistory() {
   }, []);
 
   const handleDownload = async (projectId: string) => {
-    const token = localStorage.getItem("access_token") || undefined;
     try {
+      const token = api.getAccessToken();
       await cadService.generate(projectId, "dxf", token);
       const url = cadService.downloadUrl(projectId, "dxf");
       window.open(url, "_blank");
@@ -112,8 +113,8 @@ export function ConversionHistory() {
 
   const handleReprocess = async (projectId: string) => {
     setReprocessing(projectId);
-    const token = localStorage.getItem("access_token") || undefined;
     try {
+      const token = api.getAccessToken();
       await cadService.generate(projectId, "dxf", token);
       toast.success("Proyecto reprocesado correctamente");
       setRows((prev) =>

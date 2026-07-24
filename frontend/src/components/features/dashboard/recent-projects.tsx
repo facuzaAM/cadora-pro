@@ -9,6 +9,7 @@ import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
 import { cn } from "@/lib/utils";
 import { projectsService } from "@/services/projects.service";
+import { api } from "@/services/api";
 import type { Project } from "@/types";
 
 const statusConfig: Record<string, { label: string; variant: "success" | "warning" | "secondary" | "destructive" }> = {
@@ -36,7 +37,7 @@ export function RecentProjects() {
   const [projects, setProjects] = useState<Project[]>([]);
 
   useEffect(() => {
-    const token = localStorage.getItem("access_token") || undefined;
+    const token = api.getAccessToken();
     projectsService.list(token).then(setProjects).catch(() => {});
   }, []);
 

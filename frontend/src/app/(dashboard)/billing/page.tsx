@@ -18,6 +18,7 @@ import { Separator } from "@/components/ui/separator";
 import { Skeleton } from "@/components/ui/skeleton";
 import { PLANS } from "@/lib/constants";
 import { billingService, type Subscription } from "@/services/billing.service";
+import { api } from "@/services/api";
 
 function formatBytes(bytes: number): string {
   if (bytes === 0) return "0 MB";
@@ -31,7 +32,7 @@ export default function BillingPage() {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    const token = localStorage.getItem("access_token");
+    const token = api.getAccessToken();
     if (!token) return;
     billingService.getSubscription(token).then(setSub).finally(() => setLoading(false));
   }, []);

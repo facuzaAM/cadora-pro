@@ -4,6 +4,7 @@ import hashlib
 import hmac
 import json
 import logging
+import time
 from datetime import UTC, datetime
 from uuid import UUID
 
@@ -14,6 +15,25 @@ from app.repositories.user_repository import UserRepository
 from app.services.plan_config import PLANS, get_plan
 
 logger = logging.getLogger(__name__)
+
+# In-memory deduplication for webhook events (event_id -> timestamp)
+# Prevents re-processing if Paddle retries the same event.
+_PROCESSED_EVENTS: dict[str, float] = {}
+_EVENT_TTL_SECONDS = 3600  # 1 hour
+
+
+def _is_duplicate_event(event_id: str) -> bool:
+    """Check if an event has already been processed recently."""
+    now = time.time()
+    # Cleanup old entries
+    expired = [k for k, v in _PROCESSED_EVENTS.items() if now - v > _EVENT_TTL_SECONDS]
+    for k in expired:
+        del _PROCESSED_EVENTS[k]
+
+    if event_id in _PROCESSED_EVENTS:
+        return True
+    _PROCESSED_EVENTS[event_id] = now
+    return False
 
 
 class _WebRequest:
@@ -70,6 +90,11 @@ class PaddleService:
         event = json.loads(payload)
         event_type = event.get("event_type", "")
         data = event.get("data", {})
+        event_id = event.get("event_id", "")
+
+        if event_id and _is_duplicate_event(event_id):
+            logger.info("Duplicate Paddle event ignored: %s (id=%s)", event_type, event_id)
+            return
 
         logger.info("Paddle webhook received: %s", event_type)
 

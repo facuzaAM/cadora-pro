@@ -60,6 +60,17 @@ class AuthService:
     async def logout_all(self, user_id: UUID) -> None:
         await self.refresh_repo.revoke_all_for_user(user_id)
 
+    async def change_password(
+        self, user_id: UUID, current_password: str, new_password: str
+    ) -> None:
+        user = await self.repo.get_by_id(user_id)
+        if not user:
+            raise ValueError("Usuario no encontrado")
+        if not verify_password(current_password, user.hashed_password):
+            raise ValueError("La contraseña actual es incorrecta")
+        user.hashed_password = hash_password(new_password)
+        await self.repo._save(user)
+
     async def get_user(self, user_id: UUID) -> User:
         user = await self.repo.get_by_id(user_id)
         if not user:

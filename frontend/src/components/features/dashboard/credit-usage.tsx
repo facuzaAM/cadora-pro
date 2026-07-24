@@ -6,12 +6,13 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
 import { Separator } from "@/components/ui/separator";
 import { billingService, type Subscription } from "@/services/billing.service";
+import { api } from "@/services/api";
 
 export function CreditUsage() {
   const [sub, setSub] = useState<Subscription | null>(null);
 
   useEffect(() => {
-    const token = localStorage.getItem("access_token") || undefined;
+    const token = api.getAccessToken();
     billingService.getSubscription(token).then(setSub).catch(() => {});
   }, []);
 

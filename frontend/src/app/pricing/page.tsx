@@ -7,6 +7,7 @@ import { LandingNav } from "@/components/features/landing/landing-nav";
 import { SiteFooter } from "@/components/layout/site-footer";
 import { PLANS } from "@/lib/constants";
 import { billingService } from "@/services/billing.service";
+import { api } from "@/services/api";
 
 export default function PricingPage() {
   const [userPlan, setUserPlan] = useState<string | undefined>();
@@ -14,7 +15,7 @@ export default function PricingPage() {
   const paddleReady = useRef(false);
 
   useEffect(() => {
-    const token = localStorage.getItem("access_token");
+    const token = api.getAccessToken();
     if (token) {
       setIsAuthenticated(true);
       billingService.getSubscription(token).then((sub) => {

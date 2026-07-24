@@ -9,6 +9,7 @@ import {
   User,
   Settings,
   X,
+  History,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
@@ -17,6 +18,7 @@ import { Logo } from "@/components/shared/logo";
 
 const navItems = [
   { label: "Dashboard", href: "/dashboard", icon: LayoutDashboard },
+  { label: "Historial", href: "/dashboard/history", icon: History },
   { label: "Mis Proyectos", href: "/projects", icon: FolderKanban },
   { label: "Facturación", href: "/billing", icon: CreditCard },
   { label: "Perfil", href: "/profile", icon: User },
