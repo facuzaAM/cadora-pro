@@ -1,4 +1,3 @@
-import { Hero } from "@/components/features/landing/hero";
 import { DemoUploader } from "@/components/features/landing/demo-uploader";
 import { FeaturesGrid } from "@/components/features/landing/features-grid";
 import { HowItWorks } from "@/components/features/landing/how-it-works";
@@ -11,7 +10,6 @@ export default function LandingPage() {
     <div className="flex min-h-screen flex-col">
       <LandingNav />
       <main className="flex-1">
-        <Hero />
         <DemoUploader />
         <FeaturesGrid />
         <HowItWorks />
