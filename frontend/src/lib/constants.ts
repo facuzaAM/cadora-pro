@@ -40,7 +40,7 @@ export const PLANS = [
   {
     id: "starter",
     name: "Starter",
-    price: 19,
+    price: 15,
     paddlePriceId: "price_starter_id",
     description: "Para profesionales independientes",
     features: [
@@ -60,7 +60,7 @@ export const PLANS = [
   {
     id: "pro",
     name: "Pro",
-    price: 49,
+    price: 35,
     paddlePriceId: "price_pro_id",
     description: "Para estudios y equipos pequeños",
     features: [
@@ -81,7 +81,7 @@ export const PLANS = [
   {
     id: "business",
     name: "Business",
-    price: 99,
+    price: 60,
     paddlePriceId: "price_business_id",
     description: "Para empresas con alto volumen",
     features: [
