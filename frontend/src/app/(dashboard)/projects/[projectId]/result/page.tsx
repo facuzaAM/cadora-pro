@@ -15,9 +15,12 @@ import { DetectionViewer } from "@/components/features/result/detection-viewer";
 import { EnvironmentList } from "@/components/features/result/environment-list";
 import { projectsService } from "@/services/projects.service";
 import { cadService, type CadFormat } from "@/services/cad.service";
+import { detectionService } from "@/services/detection.service";
+import { documentsService } from "@/services/documents.service";
 import { useAuth } from "@/hooks/useAuth";
 import { api } from "@/services/api";
 import { toast } from "sonner";
+import type { DetectionResult } from "@/types";
 
 const DWG_PLANS = new Set(["pro", "business"]);
 
@@ -28,12 +31,36 @@ export default function ResultPage() {
   const { user } = useAuth();
   const [projectName, setProjectName] = useState("Proyecto");
   const [downloading, setDownloading] = useState(false);
+  const [detectionResult, setDetectionResult] = useState<DetectionResult | null>(null);
 
   const canExportDwg = user && DWG_PLANS.has(user.subscription_plan);
 
   useEffect(() => {
     const token = api.getAccessToken();
-    projectsService.getById(projectId, token).then((p) => setProjectName(p.name)).catch(() => {});
+    projectsService.getById(projectId, token)
+      .then((p) => setProjectName(p.name))
+      .catch(() => toast.error("Error cargando proyecto"));
+  }, [projectId]);
+
+  useEffect(() => {
+    const token = api.getAccessToken();
+    documentsService
+      .getByProject(projectId, token)
+      .then((docs) => {
+        if (docs.length > 0) {
+          return detectionService.start(docs[0].id, token);
+        }
+        throw new Error("No documents found");
+      })
+      .then((res) => {
+        if (res) {
+          return detectionService.result(res.detection_id, token);
+        }
+      })
+      .then((data) => {
+        if (data) setDetectionResult(data);
+      })
+      .catch(() => toast.error("Error al cargar resultados de detección"));
   }, [projectId]);
 
   const handleDownload = async (format: CadFormat = "dxf") => {
@@ -113,10 +140,10 @@ export default function ResultPage() {
 
       <div className="grid gap-6 lg:grid-cols-3">
         <div className="lg:col-span-2">
-          <DetectionViewer projectId={projectId} />
+          <DetectionViewer projectId={projectId} detectionResult={detectionResult} />
         </div>
         <div>
-          <EnvironmentList projectId={projectId} />
+          <EnvironmentList detectionResult={detectionResult} />
         </div>
       </div>
     </div>

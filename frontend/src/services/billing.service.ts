@@ -1,4 +1,5 @@
 import { api } from "./api";
+import { getCached, setCache } from "@/lib/cache";
 
 export interface Plan {
   name: string;
@@ -26,8 +27,13 @@ export interface PaddleConfig {
 export const billingService = {
   getPlans: (token?: string) => api.get<Plan[]>("/billing/plans", token),
 
-  getSubscription: (token?: string) =>
-    api.get<Subscription>("/billing/subscription", token),
+  getSubscription: async (token?: string) => {
+    const cached = getCached<Subscription>("billing:subscription");
+    if (cached) return cached;
+    const result = await api.get<Subscription>("/billing/subscription", token);
+    setCache("billing:subscription", result, 30000);
+    return result;
+  },
 
   getConfig: () => api.get<PaddleConfig>("/billing/config"),
 };

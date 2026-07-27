@@ -77,13 +77,14 @@ GOOGLE_USERINFO_URL = "https://www.googleapis.com/oauth2/v2/userinfo"
 
 
 @router.get("/google")
-async def google_login():
+async def google_login(request: Request):
     """Redirect to Google OAuth consent screen."""
     if not settings.GOOGLE_CLIENT_ID:
         raise HTTPException(
             status_code=HTTP_400_BAD_REQUEST,
             detail="Google OAuth no configurado",
         )
+    state = secrets.token_urlsafe(32)
     params = {
         "client_id": settings.GOOGLE_CLIENT_ID,
         "redirect_uri": settings.GOOGLE_REDIRECT_URI,
@@ -91,15 +92,35 @@ async def google_login():
         "scope": "openid email profile",
         "access_type": "offline",
         "prompt": "consent",
+        "state": state,
     }
-    return RedirectResponse(f"{GOOGLE_AUTH_URL}?{urlencode(params)}")
+    resp = RedirectResponse(f"{GOOGLE_AUTH_URL}?{urlencode(params)}")
+    resp.set_cookie(
+        key="oauth_state",
+        value=state,
+        httponly=True,
+        secure=_cookie_secure(),
+        samesite=_cookie_samesite(),
+        max_age=600,
+        path="/",
+    )
+    return resp
 
 
 @router.get("/google/callback")
 async def google_callback(request: Request, db: AsyncSession = Depends(get_db)):
     """Handle Google OAuth callback, create/find user, return tokens."""
     code = request.query_params.get("code")
+    state = request.query_params.get("state")
     error = request.query_params.get("error")
+
+    stored_state = request.cookies.get("oauth_state")
+    if not state or not stored_state or state != stored_state:
+        return RedirectResponse("/login?error=invalid_state")
+
+    resp = RedirectResponse("/login")
+    resp.delete_cookie("oauth_state", path="/")
+
     if error:
         return RedirectResponse(f"/login?error={error}")
     if not code:

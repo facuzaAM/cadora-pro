@@ -113,7 +113,7 @@ class WindowDetector:
         lo: int, hi: int, horizontal: bool,
         threshold: float = 128.0,
     ) -> list[tuple[int, int]]:
-        candidates: set[tuple[int, int]] = {}
+        candidates: dict[tuple[int, int], bool] = {}
 
         for offset in [WALL_HALF, -WALL_HALF]:
             fc = center + offset

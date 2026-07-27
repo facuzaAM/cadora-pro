@@ -23,7 +23,6 @@ class OcrService:
     """
 
     def __init__(self):
-        self.engine = OcrEngine()
         self.classifier = TextClassifier()
         self.preprocessor = ImagePreprocessor()
 
@@ -49,16 +48,18 @@ class OcrService:
         else:
             images = [self._load_image(path)]
 
+        engine = OcrEngine(lang=opts.language or "spa+eng")
+
         all_texts = []
         raw_parts = []
         for image in images:
             processed = self.preprocessor.pipeline(image, dpi=dpi)
-            raw_elements = self.engine.extract(processed)
+            raw_elements = engine.extract(processed)
 
             page_texts = []
             for raw in raw_elements:
                 category = self._classify_with_options(raw.text, opts)
-                element = self.engine.to_domain(raw, category)
+                element = engine.to_domain(raw, category)
                 page_texts.append(element)
                 raw_parts.append(raw.text)
             all_texts.extend(page_texts)
@@ -82,14 +83,15 @@ class OcrService:
         dpi: int = 72,
     ) -> OcrResult:
         opts = request or OcrRequest()
+        engine = OcrEngine(lang=opts.language or "spa+eng")
         processed = self.preprocessor.pipeline(image, dpi=dpi)
-        raw_elements = self.engine.extract(processed)
+        raw_elements = engine.extract(processed)
 
         texts = []
         raw_parts = []
         for raw in raw_elements:
             category = self._classify_with_options(raw.text, opts)
-            texts.append(self.engine.to_domain(raw, category))
+            texts.append(engine.to_domain(raw, category))
             raw_parts.append(raw.text)
 
         raw_text = " ".join(raw_parts)

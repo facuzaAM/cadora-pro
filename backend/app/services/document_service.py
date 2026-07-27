@@ -2,10 +2,13 @@ from uuid import UUID
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.config import settings
 from app.repositories.document_repository import DocumentRepository
 from app.repositories.project_repository import ProjectRepository
 from app.schemas.document import DocumentResponse, UploadResponse
 from app.services.storage_service import StorageService
+
+IMAGE_EXTS = {"png", "jpg", "jpeg", "gif", "bmp", "webp"}
 
 
 class DocumentService:
@@ -23,11 +26,18 @@ class DocumentService:
 
         ext = filename.rsplit(".", 1)[-1].lower() if "." in filename else ""
         file_type = ext
+        if ext == "pdf":
+            content_type = "application/pdf"
+        elif ext in IMAGE_EXTS:
+            content_type = f"image/{ext}" if ext != "jpg" else "image/jpeg"
+        else:
+            content_type = "application/octet-stream"
+
         storage_path = await self.storage.upload(
-            bucket="cadora-documents",
+            bucket=settings.STORAGE_BUCKET,
             path=f"{user_id}/{project_id}/{filename}",
             data=file_data,
-            content_type=f"image/{ext}" if ext != "pdf" else "application/pdf",
+            content_type=content_type,
         )
 
         doc = await self.repo.create(
@@ -75,7 +85,7 @@ class DocumentService:
         if not project or project.user_id != user_id:
             raise ValueError("Documento no encontrado")
 
-        await self.storage.delete("cadora-documents", doc.storage_path)
+        await self.storage.delete(settings.STORAGE_BUCKET, doc.storage_path)
         await self.repo.delete(document_id)
 
         # Decrement storage usage

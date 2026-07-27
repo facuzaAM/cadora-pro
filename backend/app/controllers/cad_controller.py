@@ -58,7 +58,9 @@ async def _download_doc_to_temp(
         download_url = await storage.get_download_url(
             settings.STORAGE_BUCKET, doc.storage_path,
         )
-        response = httpx.get(download_url)
+        async with httpx.AsyncClient() as client:
+            response = await client.get(download_url)
+            response.raise_for_status()
         with open(path, "wb") as f:
             f.write(response.content)
     except Exception:
@@ -259,7 +261,7 @@ async def generate_cad(
         user_repo = UserRepository(db)
         user_db = await user_repo.get_by_id(user.id)
         if user_db:
-            user_db.conversions_used += 1
+            user_db.conversions_used = user_db.conversions_used + 1
             await user_repo._save(user_db)
 
         return CadGenerateResponse(
@@ -305,6 +307,7 @@ async def download_cad(
     cache_key = _cad_cache_path(project_id, fmt)
 
     if await storage.exists(settings.STORAGE_BUCKET, cache_key):
+        tmp = None
         try:
             file_bytes = await storage.download_bytes(settings.STORAGE_BUCKET, cache_key)
             fd, tmp = tempfile.mkstemp(suffix=f".{ext}", prefix=f"dl_{project_id}_")
@@ -317,6 +320,8 @@ async def download_cad(
                 media_type=content_type,
             )
         except Exception:
+            if tmp and os.path.exists(tmp):
+                os.remove(tmp)
             logger.warning("Error leyendo cache %s, regenerando", ext.upper())
 
     doc_repo = DocumentRepository(db)

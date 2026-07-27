@@ -5,6 +5,18 @@ from uuid import UUID
 from pydantic import BaseModel, EmailStr, field_validator
 
 
+def _validate_password_strength(v: str) -> str:
+    if len(v) < 8:
+        raise ValueError("La contraseña debe tener al menos 8 caracteres")
+    if not re.search(r"[A-Z]", v):
+        raise ValueError("La contraseña debe contener al menos una mayúscula")
+    if not re.search(r"[0-9]", v):
+        raise ValueError("La contraseña debe contener al menos un número")
+    if not re.search(r"[!@#$%^&*()_+\-=\[\]{};':\"\\|,.<>\/?]", v):
+        raise ValueError("La contraseña debe contener al menos un carácter especial")
+    return v
+
+
 class RegisterRequest(BaseModel):
     email: EmailStr
     password: str
@@ -13,15 +25,7 @@ class RegisterRequest(BaseModel):
     @field_validator("password")
     @classmethod
     def validate_password(cls, v: str) -> str:
-        if len(v) < 8:
-            raise ValueError("La contraseña debe tener al menos 8 caracteres")
-        if not re.search(r"[A-Z]", v):
-            raise ValueError("La contraseña debe contener al menos una mayúscula")
-        if not re.search(r"[0-9]", v):
-            raise ValueError("La contraseña debe contener al menos un número")
-        if not re.search(r"[!@#$%^&*()_+\-=\[\]{};':\"\\|,.<>\/?]", v):
-            raise ValueError("La contraseña debe contener al menos un carácter especial")
-        return v
+        return _validate_password_strength(v)
 
     @field_validator("name")
     @classmethod
@@ -53,15 +57,7 @@ class ChangePasswordRequest(BaseModel):
     @field_validator("new_password")
     @classmethod
     def validate_password(cls, v: str) -> str:
-        if len(v) < 8:
-            raise ValueError("La contraseña debe tener al menos 8 caracteres")
-        if not re.search(r"[A-Z]", v):
-            raise ValueError("La contraseña debe contener al menos una mayúscula")
-        if not re.search(r"[0-9]", v):
-            raise ValueError("La contraseña debe contener al menos un número")
-        if not re.search(r"[!@#$%^&*()_+\-=\[\]{};':\"\\|,.<>\/?]", v):
-            raise ValueError("La contraseña debe contener al menos un carácter especial")
-        return v
+        return _validate_password_strength(v)
 
 
 class ForgotPasswordRequest(BaseModel):
@@ -83,15 +79,7 @@ class ResetPasswordRequest(BaseModel):
     @field_validator("new_password")
     @classmethod
     def validate_password(cls, v: str) -> str:
-        if len(v) < 8:
-            raise ValueError("La contraseña debe tener al menos 8 caracteres")
-        if not re.search(r"[A-Z]", v):
-            raise ValueError("La contraseña debe contener al menos una mayúscula")
-        if not re.search(r"[0-9]", v):
-            raise ValueError("La contraseña debe contener al menos un número")
-        if not re.search(r"[!@#$%^&*()_+\-=\[\]{};':\"\\|,.<>\/?]", v):
-            raise ValueError("La contraseña debe contener al menos un carácter especial")
-        return v
+        return _validate_password_strength(v)
 
 
 class TokenResponse(BaseModel):

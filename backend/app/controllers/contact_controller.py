@@ -28,12 +28,6 @@ async def send_contact(request: Request, body: ContactRequest):
             detail="El mensaje no puede estar vacío",
         )
 
-    logger.info(
-        "Contact form submission: name=%s email=%s subject=%s",
-        body.name,
-        body.email,
-        body.subject,
-    )
-    logger.info("Contact message: %s", body.message[:500])
+    logger.info("Contact form submission received for subject: %s", body.subject)
 
     return {"ok": True, "message": "Mensaje enviado correctamente"}

@@ -26,14 +26,14 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 
 COPY --from=builder /usr/local/lib/python3.12/site-packages /usr/local/lib/python3.12/site-packages
 
-RUN groupadd -r plan2cad && useradd -r -g plan2cad -d /app plan2cad
+RUN groupadd -r cadora && useradd -r -g cadora -d /app cadora
 
-COPY --chown=plan2cad:plan2cad . .
+COPY --chown=cadora:cadora . .
 
 RUN mkdir -p /app/logs /app/uploads \
-    && chown -R plan2cad:plan2cad /app/logs /app/uploads /app/alembic
+    && chown -R cadora:cadora /app/logs /app/uploads /app/alembic
 
-USER plan2cad
+USER cadora
 
 EXPOSE 8000
 

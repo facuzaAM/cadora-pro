@@ -144,8 +144,8 @@ class DoorDetector:
         best: tuple[int, int] | None = None
         best_dist = float("inf")
         for s, e in runs:
-            w = e - s
-            if w < MIN_DOOR_W or w > MAX_DOOR_W:
+            gap_width = e - s
+            if gap_width < MIN_DOOR_W or gap_width > MAX_DOOR_W:
                 continue
             d = abs((s + e) / 2.0 - hinge_pos)
             if d < best_dist:

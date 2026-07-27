@@ -67,7 +67,7 @@ export function ProjectList() {
             status={cfg.label}
             statusVariant={cfg.variant}
             updatedAt={timeAgo(p.updated_at)}
-            documentCount={0}
+            documentCount={p.document_count ?? 0}
           />
         );
       })}

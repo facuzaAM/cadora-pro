@@ -5,7 +5,8 @@ export async function GET(request: Request) {
   const error = searchParams.get("error");
 
   if (error) {
-    return NextResponse.redirect(`${origin}/login?error=${error}`);
+    const message = error === "invalid_state" ? "Sesión expirada. Intenta de nuevo." : "Error de autenticación.";
+    return NextResponse.redirect(`${origin}/login?error=${encodeURIComponent(message)}`);
   }
 
   return NextResponse.redirect(`${origin}/login`);

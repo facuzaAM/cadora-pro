@@ -3,18 +3,22 @@
 import { useState, useEffect } from "react";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
-import { X } from "lucide-react";
 
 export function CookieConsent() {
   const [visible, setVisible] = useState(false);
 
   useEffect(() => {
-    const accepted = localStorage.getItem("cookies_accepted");
-    if (!accepted) setVisible(true);
+    const consent = localStorage.getItem("cookies_consent");
+    if (!consent) setVisible(true);
   }, []);
 
   const accept = () => {
-    localStorage.setItem("cookies_accepted", "true");
+    localStorage.setItem("cookies_consent", "accepted");
+    setVisible(false);
+  };
+
+  const reject = () => {
+    localStorage.setItem("cookies_consent", "rejected");
     setVisible(false);
   };
 
@@ -30,11 +34,11 @@ export function CookieConsent() {
           </Link>
         </p>
         <div className="flex items-center gap-2">
+          <Button variant="outline" size="sm" onClick={reject}>
+            Rechazar
+          </Button>
           <Button size="sm" onClick={accept}>
             Aceptar
-          </Button>
-          <Button variant="ghost" size="icon" onClick={accept}>
-            <X className="h-4 w-4" />
           </Button>
         </div>
       </div>

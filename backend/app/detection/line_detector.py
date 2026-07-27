@@ -290,15 +290,6 @@ class LineDetector:
         return None
 
     @staticmethod
-    def _has_nearby(
-        intersections: list[Intersection], x: float, y: float, threshold: float = 5.0,
-    ) -> bool:
-        return any(
-            math.sqrt((i.x - x) ** 2 + (i.y - y) ** 2) < threshold
-            for i in intersections
-        )
-
-    @staticmethod
     def _find_nearby(
         intersections: list[Intersection], x: float, y: float, threshold: float = 5.0,
     ) -> Intersection | None:

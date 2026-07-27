@@ -67,6 +67,7 @@ export function UploadZone({
   const removeFile = () => {
     setFile(null);
     setError(null);
+    onFileSelect(null as unknown as File);
   };
 
   return (

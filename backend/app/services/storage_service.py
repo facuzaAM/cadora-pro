@@ -1,3 +1,4 @@
+import asyncio
 from pathlib import Path
 
 from app.config import settings
@@ -18,7 +19,9 @@ class StorageService:
         content_type: str = "application/octet-stream",
     ) -> str:
         if settings.SUPABASE_URL and settings.SUPABASE_KEY:
-            return self._upload_supabase(bucket, path, data, content_type)
+            return await asyncio.to_thread(
+                self._upload_supabase, bucket, path, data, content_type
+            )
         return self._upload_local(bucket, path, data)
 
     def _upload_local(self, bucket: str, path: str, data: bytes) -> str:

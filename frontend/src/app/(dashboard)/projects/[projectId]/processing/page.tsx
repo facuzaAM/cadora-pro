@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useRef, useCallback } from "react";
 import { useRouter, useParams } from "next/navigation";
 import { ArrowLeft } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -9,16 +9,32 @@ import { DETECTION_STEPS } from "@/lib/constants";
 import { detectionService } from "@/services/detection.service";
 import { documentsService } from "@/services/documents.service";
 import { api } from "@/services/api";
+import { toast } from "sonner";
+
+const POLL_INTERVAL = 3000;
+const MAX_POLLS = 120;
 
 export default function ProcessingPage() {
   const router = useRouter();
   const params = useParams();
   const projectId = params.projectId as string;
   const [currentStep, setCurrentStep] = useState(0);
-  const [_detectionId, setDetectionId] = useState<string | null>(null);
+  const currentStepRef = useRef(0);
+  const [completed, setCompleted] = useState(false);
+  const pollCount = useRef(0);
+  const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
+
+  const cleanup = useCallback(() => {
+    if (intervalRef.current) {
+      clearInterval(intervalRef.current);
+      intervalRef.current = null;
+    }
+  }, []);
 
   useEffect(() => {
     const token = api.getAccessToken();
+    let detectionId: string | null = null;
+
     documentsService
       .getByProject(projectId, token)
       .then((docs) => {
@@ -27,28 +43,67 @@ export default function ProcessingPage() {
         }
         throw new Error("No documents found");
       })
-      .then((res) => setDetectionId(res.detection_id))
-      .catch(() => {});
-  }, [projectId]);
+      .then((res) => {
+        if (!res) throw new Error("No detection started");
+        detectionId = res.detection_id;
+        setCurrentStep(1);
+        currentStepRef.current = 1;
+
+        intervalRef.current = setInterval(async () => {
+          if (!detectionId) return;
+          pollCount.current += 1;
+
+          if (pollCount.current > MAX_POLLS) {
+            cleanup();
+            toast.error("El procesamiento está tomando más de lo esperado");
+            router.push(`/projects/${projectId}/result`);
+            return;
+          }
+
+          try {
+            const status = await detectionService.status(detectionId, token);
+            const statusMap: Record<string, number> = {
+              preprocessing: 0,
+              lines: 1,
+              doors_windows: 2,
+              rooms: 3,
+              text: 4,
+              dimensions: 5,
+              cad: 6,
+              completed: 7,
+            };
+            const stepIdx = statusMap[status.status] ?? 0;
+            const newStep = Math.max(currentStepRef.current, stepIdx);
+            currentStepRef.current = newStep;
+            setCurrentStep(newStep);
+
+            if (status.status === "completed" || status.status === "error") {
+              cleanup();
+              if (status.status === "completed") {
+                setCompleted(true);
+              } else {
+                toast.error("Error durante el procesamiento");
+              }
+            }
+          } catch {
+            pollCount.current += 1;
+          }
+        }, POLL_INTERVAL);
+      })
+      .catch(() => {
+        toast.error("Error al iniciar el procesamiento");
+        router.push(`/projects/${projectId}/result`);
+      });
+
+    return cleanup;
+  }, [projectId, router, cleanup]);
 
   useEffect(() => {
-    if (currentStep >= DETECTION_STEPS.length) return;
-
-    const timeouts = [2500, 3000, 3500, 4000, 3000, 3500, 2000];
-    const timer = setTimeout(
-      () => setCurrentStep((prev) => prev + 1),
-      timeouts[currentStep],
-    );
-
-    return () => clearTimeout(timer);
-  }, [currentStep]);
-
-  useEffect(() => {
-    if (currentStep === DETECTION_STEPS.length) {
+    if (completed) {
       const t = setTimeout(() => router.push(`/projects/${projectId}/result`), 1500);
       return () => clearTimeout(t);
     }
-  }, [currentStep, router, projectId]);
+  }, [completed, router, projectId]);
 
   const progress = Math.round(
     (Math.min(currentStep, DETECTION_STEPS.length) / DETECTION_STEPS.length) * 100,

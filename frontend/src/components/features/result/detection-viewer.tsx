@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { Eye, EyeOff, Download, ChevronDown } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -12,14 +12,13 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { detectionService } from "@/services/detection.service";
-import { documentsService } from "@/services/documents.service";
 import { cadService, type CadFormat } from "@/services/cad.service";
 import { useAuth } from "@/hooks/useAuth";
-import { api } from "@/services/api";
+import type { DetectionResult } from "@/types";
 
 interface DetectionViewerProps {
   projectId: string;
+  detectionResult: DetectionResult | null;
 }
 
 const defaultLayers = [
@@ -33,34 +32,12 @@ const defaultLayers = [
 
 const DWG_PLANS = new Set(["pro", "business"]);
 
-export function DetectionViewer({ projectId }: DetectionViewerProps) {
+export function DetectionViewer({ projectId, detectionResult }: DetectionViewerProps) {
   const { user } = useAuth();
   const [layerState, setLayerState] = useState(defaultLayers);
-  const [wallCount, setWallCount] = useState(0);
 
   const canExportDwg = user && DWG_PLANS.has(user.subscription_plan);
-
-  useEffect(() => {
-    const token = api.getAccessToken();
-    documentsService
-      .getByProject(projectId, token)
-      .then((docs) => {
-        if (docs.length > 0) {
-          return detectionService.start(docs[0].id, token);
-        }
-      })
-      .then((res) => {
-        if (res) {
-          return detectionService.result(res.detection_id, token);
-        }
-      })
-      .then((result) => {
-        if (result) {
-          setWallCount(result.walls?.length ?? 0);
-        }
-      })
-      .catch(() => {});
-  }, [projectId]);
+  const wallCount = detectionResult?.walls?.length ?? 0;
 
   const toggleLayer = (id: string) => {
     setLayerState((prev) =>

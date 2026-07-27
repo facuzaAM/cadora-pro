@@ -134,7 +134,9 @@ async def ocr_uploaded_document(
         download_url = await storage.get_download_url(
             settings.STORAGE_BUCKET, doc.storage_path
         )
-        response = httpx.get(download_url)
+        async with httpx.AsyncClient() as client:
+            response = await client.get(download_url)
+            response.raise_for_status()
         with open(temp_path, "wb") as f:
             f.write(response.content)
 
