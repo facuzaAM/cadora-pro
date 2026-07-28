@@ -101,7 +101,7 @@ export function DemoUploader() {
       formData.append("file", file);
 
       const apiBase = process.env.NEXT_PUBLIC_API_URL || "";
-      const res = await fetch(`${apiBase}/api/v1/demo/process`, {
+      const res = await fetch(`${apiBase}/demo/process`, {
         method: "POST",
         body: formData,
       });

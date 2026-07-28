@@ -30,7 +30,7 @@ services:
       context: ./frontend
       dockerfile: Dockerfile
       args:
-        NEXT_PUBLIC_API_URL: /api
+        NEXT_PUBLIC_API_URL: /api/v1
     environment:
       NODE_ENV: production
       HOSTNAME: "0.0.0.0"
