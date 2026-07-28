@@ -11,7 +11,8 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Skeleton } from "@/components/ui/skeleton";
 import { ThemeToggle } from "@/components/shared/theme-toggle";
 import { toast } from "sonner";
-import { Camera, Lock, Eye, EyeOff } from "lucide-react";
+import { Camera, Lock, Eye, EyeOff, AlertCircle } from "lucide-react";
+import { validatePassword } from "@/lib/password";
 
 export default function ProfilePage() {
   const { user, loading, refreshUser } = useAuth();
@@ -24,6 +25,7 @@ export default function ProfilePage() {
   const [newPassword, setNewPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
   const [changingPassword, setChangingPassword] = useState(false);
+  const [passwordError, setPasswordError] = useState<string | null>(null);
   const [showCurrent, setShowCurrent] = useState(false);
   const [showNew, setShowNew] = useState(false);
 
@@ -81,10 +83,12 @@ export default function ProfilePage() {
       toast.error("Las contraseñas no coinciden");
       return;
     }
-    if (newPassword.length < 8) {
-      toast.error("La contraseña debe tener al menos 8 caracteres");
+    const err = validatePassword(newPassword);
+    if (err) {
+      setPasswordError(err);
       return;
     }
+    setPasswordError(null);
 
     setChangingPassword(true);
     try {
@@ -221,7 +225,7 @@ export default function ProfilePage() {
                 id="new-password"
                 type={showNew ? "text" : "password"}
                 value={newPassword}
-                onChange={(e) => setNewPassword(e.target.value)}
+                onChange={(e) => { setNewPassword(e.target.value); setPasswordError(null); }}
                 placeholder="••••••••"
               />
               <button
@@ -232,6 +236,12 @@ export default function ProfilePage() {
                 {showNew ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
               </button>
             </div>
+            {passwordError && (
+              <p className="flex items-center gap-1 text-xs text-destructive">
+                <AlertCircle className="h-3 w-3" />
+                {passwordError}
+              </p>
+            )}
           </div>
           <div className="space-y-2">
             <Label htmlFor="confirm-password">Confirmar Contraseña</Label>

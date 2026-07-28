@@ -10,6 +10,8 @@ import { Separator } from "@/components/ui/separator";
 import { cn } from "@/lib/utils";
 import { projectsService } from "@/services/projects.service";
 import { api } from "@/services/api";
+import * as Sentry from "@sentry/nextjs";
+import { EmptyDashboard } from "./empty-dashboard";
 import type { Project } from "@/types";
 
 const statusConfig: Record<string, { label: string; variant: "success" | "warning" | "secondary" | "destructive" }> = {
@@ -38,10 +40,11 @@ export function RecentProjects() {
 
   useEffect(() => {
     const token = api.getAccessToken();
-    projectsService.list(token).then(setProjects).catch(() => {});
+    projectsService.list(token).then(setProjects).catch((err) => { Sentry.captureException(err); });
   }, []);
 
   return (
+    projects.length === 0 ? <EmptyDashboard /> : (
     <Card className="overflow-hidden">
       <CardHeader className="flex flex-row items-center justify-between px-5 py-4">
         <CardTitle className="text-sm font-medium">Últimos Proyectos</CardTitle>
@@ -54,13 +57,8 @@ export function RecentProjects() {
       </CardHeader>
       <Separator />
       <CardContent className="p-0">
-        {projects.length === 0 ? (
-          <div className="px-5 py-8 text-center text-sm text-muted-foreground">
-            No hay proyectos aún. Sube tu primer plano.
-          </div>
-        ) : (
-          <div className="divide-y">
-            {projects.slice(0, 5).map((p) => {
+        <div className="divide-y">
+          {projects.slice(0, 5).map((p) => {
               const cfg = statusConfig[p.status] || statusConfig.created;
               const Icon = FileText;
               return (
@@ -94,8 +92,8 @@ export function RecentProjects() {
               );
             })}
           </div>
-        )}
-      </CardContent>
-    </Card>
+        </CardContent>
+      </Card>
+    )
   );
 }

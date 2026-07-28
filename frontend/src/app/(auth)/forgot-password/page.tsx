@@ -22,7 +22,11 @@ export default function ForgotPasswordPage() {
     try {
       await api.post("/auth/forgot-password", { email });
       setSubmitted(true);
-    } catch {
+    } catch (err) {
+      if (err instanceof TypeError) {
+        toast.error("Error de conexión. Revisá tu conexión a internet e intentá de nuevo.");
+        return;
+      }
       setSubmitted(true);
     } finally {
       setLoading(false);

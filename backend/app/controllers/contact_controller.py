@@ -4,6 +4,7 @@ from fastapi import APIRouter, HTTPException, Request
 from pydantic import BaseModel, EmailStr
 from starlette.status import HTTP_400_BAD_REQUEST
 
+from app.services.email_service import send_email
 from app.utils.rate_limit import limiter
 
 logger = logging.getLogger(__name__)
@@ -21,13 +22,25 @@ class ContactRequest(BaseModel):
 @router.post("")
 @limiter.limit("3/hour")
 async def send_contact(request: Request, body: ContactRequest):
-    """Receive a contact form submission and log it."""
+    """Receive a contact form submission and forward it via email."""
     if not body.message.strip():
         raise HTTPException(
             status_code=HTTP_400_BAD_REQUEST,
             detail="El mensaje no puede estar vacío",
         )
 
-    logger.info("Contact form submission received for subject: %s", body.subject)
+    html = (
+        f"<h2>Nuevo mensaje de contacto</h2>"
+        f"<p><strong>Nombre:</strong> {body.name}</p>"
+        f"<p><strong>Email:</strong> {body.email}</p>"
+        f"<p><strong>Asunto:</strong> {body.subject}</p>"
+        f"<hr><p>{body.message}</p>"
+    )
+    sent = send_email("hello@cadora.pro", f"Contacto: {body.subject}", html)
+
+    if sent:
+        logger.info("Contact form forwarded: %s <%s>", body.name, body.email)
+    else:
+        logger.warning("Contact form received but email delivery failed: %s", body.subject)
 
     return {"ok": True, "message": "Mensaje enviado correctamente"}

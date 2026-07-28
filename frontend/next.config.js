@@ -1,3 +1,5 @@
+const { withSentryConfig } = require("@sentry/nextjs");
+
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   output: "standalone",
@@ -33,11 +35,11 @@ const nextConfig = {
             key: "Content-Security-Policy",
             value: [
               "default-src 'self'",
-              "script-src 'self' 'unsafe-inline' https://*.supabase.co https://*.paddle.com",
+              "script-src 'self' 'unsafe-inline' https://*.supabase.co https://*.paddle.com https://*.googletagmanager.com https://*.google-analytics.com",
               "style-src 'self' 'unsafe-inline'",
-              "img-src 'self' data: blob: https://*.supabase.co https://lh3.googleusercontent.com",
+              "img-src 'self' data: blob: https://*.supabase.co https://lh3.googleusercontent.com https://*.google-analytics.com https://*.googletagmanager.com",
               "font-src 'self'",
-              "connect-src 'self' https://*.supabase.co https://*.paddle.com",
+              "connect-src 'self' https://*.supabase.co https://*.paddle.com https://*.google-analytics.com https://*.googletagmanager.com",
               "frame-src https://*.paddle.com",
               "base-uri 'self'",
             ].join("; "),
@@ -48,4 +50,10 @@ const nextConfig = {
   },
 };
 
-module.exports = nextConfig;
+module.exports = withSentryConfig(nextConfig, {
+  org: process.env.SENTRY_ORG,
+  project: process.env.SENTRY_PROJECT,
+  silent: true,
+  widenClientFileUpload: true,
+  tunnelRoute: "/monitoring",
+});

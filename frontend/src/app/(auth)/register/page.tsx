@@ -9,7 +9,8 @@ import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { useAuth } from "@/hooks/useAuth";
 import { toast } from "sonner";
-import { Eye, EyeOff } from "lucide-react";
+import { Eye, EyeOff, AlertCircle } from "lucide-react";
+import { validatePassword } from "@/lib/password";
 
 export default function RegisterPage() {
   const { signUp, signInWithGoogle } = useAuth();
@@ -20,9 +21,16 @@ export default function RegisterPage() {
   const [acceptedTerms, setAcceptedTerms] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [googleLoading, setGoogleLoading] = useState(false);
+  const [passwordError, setPasswordError] = useState<string | null>(null);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    const err = validatePassword(password);
+    if (err) {
+      setPasswordError(err);
+      return;
+    }
+    setPasswordError(null);
     setSubmitting(true);
     try {
       await signUp(email, password, name);
@@ -108,7 +116,7 @@ export default function RegisterPage() {
                   type={showPassword ? "text" : "password"}
                   placeholder="Mín. 8 caracteres, 1 mayúscula, 1 número, 1 especial"
                   value={password}
-                  onChange={(e) => setPassword(e.target.value)}
+                  onChange={(e) => { setPassword(e.target.value); setPasswordError(null); }}
                   required
                   minLength={8}
                   className="pr-10"
@@ -122,6 +130,12 @@ export default function RegisterPage() {
                   {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
                 </button>
               </div>
+              {passwordError && (
+                <p className="flex items-center gap-1 text-xs text-destructive">
+                  <AlertCircle className="h-3 w-3" />
+                  {passwordError}
+                </p>
+              )}
             </div>
             <div className="flex items-start gap-2">
               <input

@@ -24,7 +24,7 @@ export default function TerminosPage() {
             <h2 className="text-lg font-semibold text-foreground">1. Aceptación de los términos</h2>
             <div className="mt-2 space-y-2">
               <p>Al acceder y usar Cadora (en adelante, &quot;el Servicio&quot;), aceptás cumplir con estos Términos del Servicio. Si no estás de acuerdo con alguno de estos términos, no uses el Servicio.</p>
-              <p>Estos términos constituyen un acuerdo legal entre vos y [EMPRESA LEGAL] (en adelante, &quot;Cadora&quot;, &quot;nosotros&quot;).</p>
+              <p>Estos términos constituyen un acuerdo legal entre vos y Cadora (en adelante, &quot;Cadora&quot;, &quot;nosotros&quot;).</p>
             </div>
           </section>
 
@@ -81,7 +81,7 @@ export default function TerminosPage() {
             <div className="mt-2 space-y-2">
               <p><strong className="text-foreground">Tus archivos:</strong> sos el único propietario de los planos que subís y de los archivos DXF/DWG que se generan. Cadora no reclama ningún derecho de propiedad sobre ellos.</p>
               <p><strong className="text-foreground">Licencia de uso:</strong> al subir un plano, nos otorgás una licencia limitada, no exclusiva y temporal para procesarlo y generar el resultado correspondiente. Esta licencia se extingue cuando eliminás el archivo o tu cuenta.</p>
-              <p><strong className="text-foreground">Propiedad de Cadora:</strong> la plataforma, el software, los modelos de detección y el diseño de la interfaz son propiedad de [EMPRESA LEGAL] y están protegidos por las leyes de propiedad intelectual de [JURISDICCIÓN].</p>
+              <p><strong className="text-foreground">Propiedad de Cadora:</strong> la plataforma, el software, los modelos de detección y el diseño de la interfaz son propiedad de Cadora y están protegidos por las leyes de propiedad intelectual de la República Argentina.</p>
             </div>
           </section>
 
@@ -90,7 +90,7 @@ export default function TerminosPage() {
             <div className="mt-2 space-y-2">
               <p><strong className="text-foreground">Precisión de la detección:</strong> Cadora utiliza inteligencia artificial y visión por computadora para detectar elementos arquitectónicos de forma automática. Si bien buscamos ofrecer resultados precisos, la detección automática no es infalible. El usuario es responsable de revisar y verificar los archivos generados antes de usarlos en proyectos profesionales.</p>
               <p><strong className="text-foreground">Garantía:</strong> el Servicio se proporciona &quot;tal cual&quot; y &quot;según disponibilidad&quot;, sin garantías explícitas o implícitas de exactitud, idoneidad para un fin particular o no infracción.</p>
-              <p><strong className="text-foreground">Daños:</strong> en ningún caso [EMPRESA LEGAL] será responsable por daños indirectos, incidentales, especiales o consecuentes que resulten del uso o imposibilidad de uso del Servicio.</p>
+              <p><strong className="text-foreground">Daños:</strong> en ningún caso Cadora será responsable por daños indirectos, incidentales, especiales o consecuentes que resulten del uso o imposibilidad de uso del Servicio.</p>
             </div>
           </section>
 
@@ -111,7 +111,7 @@ export default function TerminosPage() {
           <section>
             <h2 className="text-lg font-semibold text-foreground">11. Ley aplicable y jurisdicción</h2>
             <div className="mt-2">
-              <p>Estos términos se rigen por las leyes de [JURISDICCIÓN]. Cualquier controversia derivada de estos términos o del uso del Servicio será sometida a la jurisdicción de los tribunales de [JURISDICCIÓN].</p>
+              <p>Estos términos se rigen por las leyes de la República Argentina. Cualquier controversia derivada de estos términos o del uso del Servicio será sometida a la jurisdicción de los tribunales de la República Argentina.</p>
             </div>
           </section>
 
@@ -119,7 +119,7 @@ export default function TerminosPage() {
             <h2 className="text-lg font-semibold text-foreground">12. Contacto</h2>
             <div className="mt-2">
               <p>Para consultas sobre estos términos: <a href="mailto:legal@cadora.pro" className="text-primary underline-offset-4 hover:underline">legal@cadora.pro</a>.</p>
-              <p className="mt-1">[EMPRESA LEGAL] — [DIRECCIÓN] — [JURISDICCIÓN]</p>
+              <p className="mt-1">Cadora — Av. de la Innovación 1234 — la República Argentina</p>
             </div>
           </section>
         </div>

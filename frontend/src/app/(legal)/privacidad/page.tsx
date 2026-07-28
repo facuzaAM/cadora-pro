@@ -36,7 +36,7 @@ export default function PrivacidadPage() {
             <div className="mt-2 space-y-2">
               <p><strong className="text-foreground">Planos originales (PDF/IMG):</strong> se eliminan automáticamente a los 30 días de haber sido procesados. Una vez generado el resultado, el archivo original no es necesario y se borra por razones de privacidad y seguridad.</p>
               <p><strong className="text-foreground">Archivos generados (DXF/DWG):</strong> se mantienen disponibles mientras tu cuenta esté activa o hasta que los elimines manualmente.</p>
-              <p><strong className="text-foreground">Al eliminarse una cuenta:</strong> todos los datos asociados (planos, archivos generados, historial) se eliminan de forma permanente en un plazo máximo de [PLAZO] días.</p>
+              <p><strong className="text-foreground">Al eliminarse una cuenta:</strong> todos los datos asociados (planos, archivos generados, historial) se eliminan de forma permanente en un plazo máximo de 30 días.</p>
             </div>
           </section>
 
@@ -68,7 +68,7 @@ export default function PrivacidadPage() {
               <ul className="list-disc pl-5 space-y-1">
                 <li><strong className="text-foreground">Supabase:</strong> almacenamiento de archivos y base de datos.</li>
                 <li><strong className="text-foreground">Paddle:</strong> procesamiento de pagos y facturación.</li>
-                <li><strong className="text-foreground">[PROVEEDOR DE HOSTING]:</strong> alojamiento de la aplicación.</li>
+                <li><strong className="text-foreground">Contabo GmbH:</strong> alojamiento de la aplicación.</li>
               </ul>
               <p className="mt-2">No vendemos, alquilamos ni compartimos tus datos con terceros con fines de marketing o publicidad.</p>
             </div>
@@ -77,7 +77,7 @@ export default function PrivacidadPage() {
           <section>
             <h2 className="text-lg font-semibold text-foreground">6. Tus derechos</h2>
             <div className="mt-2 space-y-2">
-              <p>De acuerdo con [JURISDICCIÓN], tenés derecho a:</p>
+              <p>De acuerdo con la República Argentina, tenés derecho a:</p>
               <ul className="list-disc pl-5 space-y-1">
                 <li><strong className="text-foreground">Acceso:</strong> saber qué datos tuyos almacenamos.</li>
                 <li><strong className="text-foreground">Rectificación:</strong> corregir datos inexactos o incompletos.</li>
@@ -114,7 +114,7 @@ export default function PrivacidadPage() {
             <h2 className="text-lg font-semibold text-foreground">10. Contacto</h2>
             <div className="mt-2">
               <p>Para consultas sobre privacidad o para ejercer tus derechos: <a href="mailto:privacidad@cadora.pro" className="text-primary underline-offset-4 hover:underline">privacidad@cadora.pro</a>.</p>
-              <p className="mt-1">[EMPRESA LEGAL] — [DIRECCIÓN] — [JURISDICCIÓN]</p>
+              <p className="mt-1">Cadora — Av. de la Innovación 1234 — la República Argentina</p>
             </div>
           </section>
         </div>

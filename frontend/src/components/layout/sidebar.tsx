@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useEffect, useState } from "react";
+import * as Sentry from "@sentry/nextjs";
 import { LayoutDashboard, FolderKanban, CreditCard, User, Settings, Plus, History } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
@@ -33,7 +34,7 @@ export function Sidebar() {
     const token = api.getAccessToken();
     billingService.getSubscription(token).then((sub) => {
       setPlan(sub.plan);
-    }).catch(() => {});
+    }).catch((err) => { Sentry.captureException(err); });
   }, []);
 
   const planInfo = PLANS.find((p) => p.id === plan);

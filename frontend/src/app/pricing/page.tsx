@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
+import * as Sentry from "@sentry/nextjs";
 import Script from "next/script";
 import { PricingCard } from "@/components/features/pricing/pricing-card";
 import { LandingNav } from "@/components/features/landing/landing-nav";
@@ -21,7 +22,7 @@ export default function PricingPage() {
       setIsAuthenticated(true);
       billingService.getSubscription(token).then((sub) => {
         setUserPlan(sub.plan);
-      }).catch(() => {});
+      }).catch((err) => { Sentry.captureException(err); });
     }
   }, []);
 
@@ -34,8 +35,8 @@ export default function PricingPage() {
         environment: config.environment === "sandbox" ? "sandbox" : "production",
       });
       paddleReady.current = true;
-    } catch {
-      // Paddle init failed
+    } catch (err) {
+      Sentry.captureException(err);
     }
   }, []);
 

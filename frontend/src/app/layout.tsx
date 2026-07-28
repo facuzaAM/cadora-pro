@@ -3,6 +3,7 @@ import { Inter } from "next/font/google";
 import { ThemeProvider } from "@/providers/theme-provider";
 import { Toaster } from "sonner";
 import { AuthProvider } from "@/hooks/useAuth";
+import { GoogleAnalytics } from "@/components/shared/google-analytics";
 import { CookieConsent } from "@/components/features/landing/cookie-consent";
 import { PageTransition } from "@/components/shared/page-transition";
 import "./globals.css";
@@ -70,6 +71,7 @@ export default function RootLayout({
         >
           <AuthProvider>
             <PageTransition>{children}</PageTransition>
+            <GoogleAnalytics />
             <CookieConsent />
             <Toaster richColors closeButton position="bottom-right" />
           </AuthProvider>

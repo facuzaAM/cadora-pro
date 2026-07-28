@@ -173,7 +173,7 @@ async def google_callback(request: Request, db: AsyncSession = Depends(get_db)):
     service = AuthService(db)
     tokens = await service._build_token(user)
 
-    frontend_url = str(request.base_url).rstrip("/")
+    frontend_url = str(request.url).replace(str(request.url.path), "").rstrip("/")
     resp = RedirectResponse(f"{frontend_url}/login")
     resp.set_cookie(
         key=REFRESH_COOKIE,

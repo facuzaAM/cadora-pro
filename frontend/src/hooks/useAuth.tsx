@@ -22,7 +22,7 @@ interface AuthUser {
 interface AuthState {
   user: AuthUser | null;
   loading: boolean;
-  signIn: (email: string, password: string) => Promise<void>;
+  signIn: (email: string, password: string, redirectTo?: string) => Promise<void>;
   signUp: (email: string, password: string, name: string) => Promise<void>;
   signInWithGoogle: () => Promise<void>;
   signOut: () => Promise<void>;
@@ -98,13 +98,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     return () => clearRefreshTimer();
   }, [fetchUser, clearRefreshTimer]);
 
-  const signIn = async (email: string, password: string) => {
+  const signIn = async (email: string, password: string, redirectTo?: string) => {
     const data = await api.post<TokenData>("/auth/login", { email, password });
     accessTokenRef.current = data.access_token;
     api.setAccessToken(data.access_token);
     setUser(data.user);
     scheduleRefresh();
-    router.push("/dashboard");
+    router.push(redirectTo || "/dashboard");
   };
 
   const signUp = async (email: string, password: string, name: string) => {

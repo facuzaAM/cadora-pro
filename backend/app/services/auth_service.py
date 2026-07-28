@@ -1,3 +1,4 @@
+import asyncio
 import secrets as _secrets
 from datetime import UTC, datetime, timedelta
 from uuid import UUID
@@ -94,7 +95,7 @@ class AuthService:
         expires_at = datetime.now(UTC) + timedelta(minutes=15)
         await self.reset_repo.create(user.id, code, expires_at)
 
-        send_reset_code(user.email, code, user.name)
+        await asyncio.to_thread(send_reset_code, user.email, code, user.name)
         return True
 
     async def reset_password(self, code: str, new_password: str) -> None:

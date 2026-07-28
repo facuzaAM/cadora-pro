@@ -31,6 +31,12 @@ export function LandingNav() {
           >
             Precios
           </Link>
+          <Link
+            href="/contacto"
+            className="text-sm font-medium text-muted-foreground transition-colors hover:text-foreground"
+          >
+            Contacto
+          </Link>
         </nav>
         <div className="flex items-center gap-2">
           <ThemeToggle />

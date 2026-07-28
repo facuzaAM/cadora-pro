@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, use } from "react";
 import Link from "next/link";
 import { Logo } from "@/components/shared/logo";
 import { Button } from "@/components/ui/button";
@@ -11,19 +11,24 @@ import { useAuth } from "@/hooks/useAuth";
 import { toast } from "sonner";
 import { Eye, EyeOff } from "lucide-react";
 
-export default function LoginPage() {
+export default function LoginPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ redirect?: string }>;
+}) {
   const { signIn, signInWithGoogle } = useAuth();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [googleLoading, setGoogleLoading] = useState(false);
+  const params = use(searchParams);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setSubmitting(true);
     try {
-      await signIn(email, password);
+      await signIn(email, password, params.redirect);
     } catch (err: unknown) {
       const message = err instanceof Error ? err.message : "Error al iniciar sesión";
       toast.error(message);

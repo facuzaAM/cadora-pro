@@ -1,6 +1,7 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
+import Script from "next/script";
 import {
   CreditCard,
   HardDrive,
@@ -30,6 +31,8 @@ function formatBytes(bytes: number): string {
 export default function BillingPage() {
   const [sub, setSub] = useState<Subscription | null>(null);
   const [loading, setLoading] = useState(true);
+  const [paddleLoaded, setPaddleLoaded] = useState(false);
+  const paddleReady = useRef(false);
 
   useEffect(() => {
     const token = api.getAccessToken();
@@ -37,11 +40,30 @@ export default function BillingPage() {
     billingService.getSubscription(token).then(setSub).finally(() => setLoading(false));
   }, []);
 
+  const initPaddle = useCallback(async () => {
+    if (paddleReady.current || typeof window === "undefined" || !window.Paddle) return;
+    try {
+      const config = await billingService.getConfig();
+      window.Paddle.Initialize({
+        token: config.client_token,
+        environment: config.environment === "sandbox" ? "sandbox" : "production",
+      });
+      paddleReady.current = true;
+    } catch {
+      // Paddle init failed
+    }
+  }, []);
+
+  useEffect(() => {
+    if (paddleLoaded) initPaddle();
+  }, [paddleLoaded, initPaddle]);
+
   const handleManage = useCallback(async () => {
+    if (!paddleReady.current) await initPaddle();
     if (typeof window !== "undefined" && window.Paddle) {
       window.Paddle.CustomerPortal.open();
     }
-  }, []);
+  }, [initPaddle]);
 
   const planInfo = PLANS.find((p) => p.id === sub?.plan);
 
@@ -54,7 +76,13 @@ export default function BillingPage() {
     : 0;
 
   return (
-    <div className="space-y-6">
+    <>
+      <Script
+        src="https://cdn.paddle.com/paddle/v2/paddle.js"
+        strategy="afterInteractive"
+        onLoad={() => setPaddleLoaded(true)}
+      />
+      <div className="space-y-6">
       <PageHeader
         title="Facturación"
         description="Administra tu suscripción y límites de uso"
@@ -209,5 +237,6 @@ export default function BillingPage() {
         </Card>
       )}
     </div>
+    </>
   );
 }

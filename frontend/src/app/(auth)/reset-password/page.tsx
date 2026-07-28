@@ -9,8 +9,9 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { toast } from "sonner";
-import { ArrowLeft, Eye, EyeOff, CheckCircle } from "lucide-react";
+import { ArrowLeft, Eye, EyeOff, CheckCircle, AlertCircle } from "lucide-react";
 import { api } from "@/services/api";
+import { validatePassword } from "@/lib/password";
 
 export default function ResetPasswordPage() {
   const router = useRouter();
@@ -20,6 +21,7 @@ export default function ResetPasswordPage() {
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
   const [success, setSuccess] = useState(false);
+  const [passwordError, setPasswordError] = useState<string | null>(null);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -27,6 +29,12 @@ export default function ResetPasswordPage() {
       toast.error("Las contraseñas no coinciden");
       return;
     }
+    const err = validatePassword(password);
+    if (err) {
+      setPasswordError(err);
+      return;
+    }
+    setPasswordError(null);
     setLoading(true);
     try {
       await api.post("/auth/reset-password", { code, new_password: password });
@@ -99,25 +107,31 @@ export default function ResetPasswordPage() {
             <div className="space-y-2">
               <Label htmlFor="password">Nueva contraseña</Label>
               <div className="relative">
-                <Input
-                  id="password"
-                  type={showPassword ? "text" : "password"}
-                  placeholder="Mín. 8 caracteres, 1 mayúscula, 1 número, 1 especial"
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
-                  required
-                  minLength={8}
-                  className="pr-10"
-                />
-                <button
-                  type="button"
-                  onClick={() => setShowPassword(!showPassword)}
-                  className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
-                  tabIndex={-1}
-                >
-                  {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
-                </button>
-              </div>
+                  <Input
+                    id="password"
+                    type={showPassword ? "text" : "password"}
+                    placeholder="Mín. 8 caracteres, 1 mayúscula, 1 número, 1 especial"
+                    value={password}
+                    onChange={(e) => { setPassword(e.target.value); setPasswordError(null); }}
+                    required
+                    minLength={8}
+                    className="pr-10"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowPassword(!showPassword)}
+                    className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+                    tabIndex={-1}
+                  >
+                    {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                  </button>
+                </div>
+                {passwordError && (
+                  <p className="flex items-center gap-1 text-xs text-destructive">
+                    <AlertCircle className="h-3 w-3" />
+                    {passwordError}
+                  </p>
+                )}
             </div>
             <div className="space-y-2">
               <Label htmlFor="confirmPassword">Confirmar contraseña</Label>
