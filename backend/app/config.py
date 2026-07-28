@@ -26,7 +26,10 @@ class Settings(BaseSettings):
     JWT_EXPIRATION_HOURS: int = 24
 
     # Trusted hosts (comma-separated, for TrustedHostMiddleware)
-    TRUSTED_HOSTS: str = "localhost,127.0.0.1,api,nginx,cadora.pro,app.cadora.pro,api.cadora.pro,www.cadora.pro"
+    TRUSTED_HOSTS: str = (
+        "localhost,127.0.0.1,api,nginx,"
+        "cadora.pro,app.cadora.pro,api.cadora.pro,www.cadora.pro"
+    )
 
     # Database pool
     DB_POOL_SIZE: int = 10
