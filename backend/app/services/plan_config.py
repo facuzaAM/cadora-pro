@@ -28,7 +28,7 @@ PLANS: dict[str, Plan] = {
     ),
     "starter": Plan(
         name="Starter",
-        price=19,
+        price=15,
         conversions_limit=50,
         storage_limit=1 * 1024 * 1024 * 1024,
         priority_processing=False,
@@ -38,7 +38,7 @@ PLANS: dict[str, Plan] = {
     ),
     "pro": Plan(
         name="Pro",
-        price=49,
+        price=35,
         conversions_limit=200,
         storage_limit=5 * 1024 * 1024 * 1024,
         priority_processing=True,
@@ -48,7 +48,7 @@ PLANS: dict[str, Plan] = {
     ),
     "business": Plan(
         name="Business",
-        price=99,
+        price=60,
         conversions_limit=0,  # unlimited
         storage_limit=25 * 1024 * 1024 * 1024,
         priority_processing=True,
