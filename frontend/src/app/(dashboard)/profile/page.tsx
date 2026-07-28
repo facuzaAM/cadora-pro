@@ -1,9 +1,9 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useAuth } from "@/hooks/useAuth";
 import { api } from "@/services/api";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -11,11 +11,21 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Skeleton } from "@/components/ui/skeleton";
 import { ThemeToggle } from "@/components/shared/theme-toggle";
 import { toast } from "sonner";
+import { Camera, Lock, Eye, EyeOff } from "lucide-react";
 
 export default function ProfilePage() {
   const { user, loading, refreshUser } = useAuth();
   const [name, setName] = useState("");
   const [saving, setSaving] = useState(false);
+  const [uploading, setUploading] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
+  const [currentPassword, setCurrentPassword] = useState("");
+  const [newPassword, setNewPassword] = useState("");
+  const [confirmPassword, setConfirmPassword] = useState("");
+  const [changingPassword, setChangingPassword] = useState(false);
+  const [showCurrent, setShowCurrent] = useState(false);
+  const [showNew, setShowNew] = useState(false);
 
   useEffect(() => {
     if (user) setName(user.name);
@@ -32,6 +42,62 @@ export default function ProfilePage() {
       toast.error("Error al guardar");
     }
     setSaving(false);
+  };
+
+  const handleAvatarUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    const allowed = ["image/jpeg", "image/png", "image/webp"];
+    if (!allowed.includes(file.type)) {
+      toast.error("Formato no soportado. Usa JPG, PNG o WebP.");
+      return;
+    }
+    if (file.size > 5 * 1024 * 1024) {
+      toast.error("La imagen no puede superar 5 MB.");
+      return;
+    }
+
+    setUploading(true);
+    try {
+      const formData = new FormData();
+      formData.append("file", file);
+      await api.upload<{ avatar_url: string }>("/auth/avatar", formData, api.getAccessToken());
+      await refreshUser();
+      toast.success("Foto de perfil actualizada");
+    } catch {
+      toast.error("Error al subir la imagen");
+    }
+    setUploading(false);
+    if (fileInputRef.current) fileInputRef.current.value = "";
+  };
+
+  const handleChangePassword = async () => {
+    if (!currentPassword || !newPassword) {
+      toast.error("Completá todos los campos");
+      return;
+    }
+    if (newPassword !== confirmPassword) {
+      toast.error("Las contraseñas no coinciden");
+      return;
+    }
+    if (newPassword.length < 8) {
+      toast.error("La contraseña debe tener al menos 8 caracteres");
+      return;
+    }
+
+    setChangingPassword(true);
+    try {
+      await api.post("/auth/change-password", { current_password: currentPassword, new_password: newPassword }, api.getAccessToken());
+      toast.success("Contraseña actualizada");
+      setCurrentPassword("");
+      setNewPassword("");
+      setConfirmPassword("");
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : "Error al cambiar contraseña";
+      toast.error(msg);
+    }
+    setChangingPassword(false);
   };
 
   if (loading) {
@@ -69,16 +135,35 @@ export default function ProfilePage() {
       <Card>
         <CardHeader>
           <CardTitle>Foto de Perfil</CardTitle>
+          <CardDescription>Hacé clic en tu avatar para cambiarlo</CardDescription>
         </CardHeader>
         <CardContent className="flex items-center gap-4">
-          <Avatar className="h-20 w-20">
-            <AvatarImage src={avatarUrl} alt={nameDisplay} />
-            <AvatarFallback className="text-lg">{initials}</AvatarFallback>
-          </Avatar>
+          <button
+            type="button"
+            className="group relative cursor-pointer"
+            onClick={() => fileInputRef.current?.click()}
+            disabled={uploading}
+          >
+            <Avatar className="h-20 w-20">
+              <AvatarImage src={avatarUrl} alt={nameDisplay} />
+              <AvatarFallback className="text-lg">{initials}</AvatarFallback>
+            </Avatar>
+            <div className="absolute inset-0 flex items-center justify-center rounded-full bg-black/50 opacity-0 transition-opacity group-hover:opacity-100">
+              <Camera className="h-5 w-5 text-white" />
+            </div>
+          </button>
           <div>
             <p className="font-medium">{nameDisplay}</p>
             <p className="text-sm text-muted-foreground">{email}</p>
+            {uploading && <p className="text-xs text-muted-foreground mt-1">Subiendo...</p>}
           </div>
+          <input
+            ref={fileInputRef}
+            type="file"
+            accept="image/jpeg,image/png,image/webp"
+            className="hidden"
+            onChange={handleAvatarUpload}
+          />
         </CardContent>
       </Card>
 
@@ -98,6 +183,68 @@ export default function ProfilePage() {
           </div>
           <Button onClick={handleSave} disabled={saving}>
             {saving ? "Guardando..." : "Guardar Cambios"}
+          </Button>
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <Lock className="h-4 w-4" />
+            Cambiar Contraseña
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <div className="space-y-2">
+            <Label htmlFor="current-password">Contraseña Actual</Label>
+            <div className="relative">
+              <Input
+                id="current-password"
+                type={showCurrent ? "text" : "password"}
+                value={currentPassword}
+                onChange={(e) => setCurrentPassword(e.target.value)}
+                placeholder="••••••••"
+              />
+              <button
+                type="button"
+                className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+                onClick={() => setShowCurrent(!showCurrent)}
+              >
+                {showCurrent ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+              </button>
+            </div>
+          </div>
+          <div className="space-y-2">
+            <Label htmlFor="new-password">Nueva Contraseña</Label>
+            <div className="relative">
+              <Input
+                id="new-password"
+                type={showNew ? "text" : "password"}
+                value={newPassword}
+                onChange={(e) => setNewPassword(e.target.value)}
+                placeholder="••••••••"
+              />
+              <button
+                type="button"
+                className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+                onClick={() => setShowNew(!showNew)}
+              >
+                {showNew ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+              </button>
+            </div>
+          </div>
+          <div className="space-y-2">
+            <Label htmlFor="confirm-password">Confirmar Contraseña</Label>
+            <Input
+              id="confirm-password"
+              type="password"
+              value={confirmPassword}
+              onChange={(e) => setConfirmPassword(e.target.value)}
+              placeholder="••••••••"
+            />
+          </div>
+          <Button onClick={handleChangePassword} disabled={changingPassword}>
+            {changingPassword ? "Cambiando..." : "Cambiar Contraseña"}
           </Button>
         </CardContent>
       </Card>

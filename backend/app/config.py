@@ -26,7 +26,7 @@ class Settings(BaseSettings):
     JWT_EXPIRATION_HOURS: int = 24
 
     # Trusted hosts (comma-separated, for TrustedHostMiddleware)
-    TRUSTED_HOSTS: str = "localhost,127.0.0.1,api,nginx,cadora.pro,app.cadora.pro,api.cadora.pro"
+    TRUSTED_HOSTS: str = "localhost,127.0.0.1,api,nginx,cadora.pro,app.cadora.pro,api.cadora.pro,www.cadora.pro"
 
     # Database pool
     DB_POOL_SIZE: int = 10
@@ -49,6 +49,7 @@ class Settings(BaseSettings):
     CORS_ORIGINS: list[str] = [
         "http://localhost:3000",
         "https://cadora.pro",
+        "https://www.cadora.pro",
         "https://app.cadora.pro",
         "https://api.cadora.pro",
     ]

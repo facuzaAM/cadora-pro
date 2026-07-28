@@ -1,9 +1,10 @@
 import secrets
+import uuid
 from typing import Literal
 from urllib.parse import urlencode
 
 import httpx
-from fastapi import APIRouter, Depends, HTTPException, Request
+from fastapi import APIRouter, Depends, File, HTTPException, Request, UploadFile
 from fastapi.responses import JSONResponse, RedirectResponse
 from sqlalchemy.ext.asyncio import AsyncSession
 from starlette.status import HTTP_400_BAD_REQUEST, HTTP_401_UNAUTHORIZED
@@ -325,6 +326,34 @@ async def change_password(
         await service.change_password(user.id, body.current_password, body.new_password)
     except ValueError as e:
         raise HTTPException(status_code=HTTP_400_BAD_REQUEST, detail=str(e))
+
+
+@router.post("/avatar")
+async def upload_avatar(
+    file: UploadFile = File(...),
+    user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    allowed = {"image/jpeg", "image/png", "image/webp"}
+    if file.content_type not in allowed:
+        raise HTTPException(status_code=400, detail="Formato no soportado. Usa JPG, PNG o WebP.")
+
+    data = await file.read()
+    if len(data) > 5 * 1024 * 1024:
+        raise HTTPException(status_code=400, detail="La imagen no puede superar 5 MB.")
+
+    ext = file.content_type.rsplit("/", 1)[-1]
+    path = f"avatars/{user.id}/{uuid.uuid4().hex}.{ext}"
+
+    from app.services.storage_service import StorageService
+    storage = StorageService()
+    url = await storage.upload(settings.STORAGE_BUCKET, path, data, file.content_type)
+
+    user.avatar_url = url
+    repo = UserRepository(db)
+    await repo._save(user)
+
+    return {"avatar_url": url}
 
 
 @router.post("/logout-all", status_code=204)
