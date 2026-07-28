@@ -18,7 +18,7 @@ def test_free_plan_limits():
 
 def test_pro_plan_limits():
     pro = PLANS["pro"]
-    assert pro.price == 49
+    assert pro.price == 35
     assert pro.conversions_limit == 200
     assert pro.priority_processing is True
     assert pro.dwg_enabled is True
