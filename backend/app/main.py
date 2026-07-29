@@ -77,7 +77,7 @@ async def lifespan(app: FastAPI):
     await engine.dispose()
 
 
-async def rate_limit_handler(request: Request, exc: RateLimitExceeded) -> JSONResponse:
+async def rate_limit_handler(request: Request, exc: Exception) -> JSONResponse:
     return JSONResponse(
         status_code=429,
         content={
