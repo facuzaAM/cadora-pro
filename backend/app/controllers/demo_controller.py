@@ -4,20 +4,22 @@ import tempfile
 import uuid as _uuid
 
 from fastapi import APIRouter, HTTPException, Request, UploadFile
-from starlette.status import HTTP_400_BAD_REQUEST, HTTP_413_CONTENT_TOO_LARGE
+from starlette.status import (
+    HTTP_400_BAD_REQUEST,
+    HTTP_413_CONTENT_TOO_LARGE,
+    HTTP_429_TOO_MANY_REQUESTS,
+)
 
-from app.detection.service import DetectionService
-from app.ocr.service import OcrService
 from app.utils.rate_limit import limiter
 
 logger = logging.getLogger(__name__)
 
 router = APIRouter()
-detection_service = DetectionService()
-ocr_service = OcrService()
 
 DEMO_MAX_SIZE_MB = 10
 DEMO_ALLOWED_EXTENSIONS = {".pdf", ".png", ".jpg", ".jpeg", ".tiff"}
+
+_demo_sessions: set[str] = set()
 
 
 def _validate_demo_file(file: UploadFile) -> str:
@@ -27,7 +29,7 @@ def _validate_demo_file(file: UploadFile) -> str:
     if f".{ext}" not in DEMO_ALLOWED_EXTENSIONS:
         raise HTTPException(
             status_code=HTTP_400_BAD_REQUEST,
-            detail=f"Formato .{ext} no soportado en demo. Usa: PDF, PNG, JPG o TIFF.",
+            detail=f"Formato .{ext} no soportado en demo. Usá: PDF, PNG, JPG o TIFF.",
         )
     return ext
 
@@ -55,6 +57,13 @@ async def process_demo(
     file: UploadFile,
 ):
     """Process a floor plan without authentication. Returns detection results only (no DXF)."""
+    session_token = request.headers.get("X-Demo-Session", "")
+    if session_token and session_token in _demo_sessions:
+        raise HTTPException(
+            status_code=HTTP_429_TOO_MANY_REQUESTS,
+            detail="Ya usaste la demo. Registrate para seguir usando la plataforma.",
+        )
+
     _validate_demo_file(file)
     content = await _read_with_limit(file)
 
@@ -68,10 +77,23 @@ async def process_demo(
         with open(temp_path, "wb") as f:
             f.write(content)
 
-        lines_result = await detection_service.process_file(temp_path)
-        doors_result = await detection_service.process_file_doors(temp_path)
-        windows_result = await detection_service.process_file_windows(temp_path)
-        ocr_result = await ocr_service.process_file(temp_path)
+        try:
+            from app.detection.service import DetectionService
+            from app.ocr.service import OcrService
+
+            detection_service = DetectionService()
+            ocr_service = OcrService()
+
+            lines_result = await detection_service.process_file(temp_path)
+            doors_result = await detection_service.process_file_doors(temp_path)
+            windows_result = await detection_service.process_file_windows(temp_path)
+            ocr_result = await ocr_service.process_file(temp_path)
+        except Exception:
+            logger.exception("Error en pipeline de detección OCR")
+            raise HTTPException(
+                status_code=HTTP_400_BAD_REQUEST,
+                detail="No pudimos leer el plano. Verificá que sea legible e intentá de nuevo.",
+            )
 
         image_width = (
             lines_result.image_width
@@ -83,6 +105,9 @@ async def process_demo(
             or doors_result.image_height
             or windows_result.image_height
         )
+
+        if session_token:
+            _demo_sessions.add(session_token)
 
         return {
             "walls": [wall.model_dump(mode="json") for wall in lines_result.lines],
@@ -97,7 +122,7 @@ async def process_demo(
     except HTTPException:
         raise
     except Exception:
-        logger.exception("Error procesando demo")
+        logger.exception("Error inesperado procesando demo")
         raise HTTPException(
             status_code=HTTP_400_BAD_REQUEST,
             detail="Error al procesar el archivo. Intentá con otro plano.",

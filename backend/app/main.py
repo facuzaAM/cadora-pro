@@ -8,8 +8,8 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.middleware.gzip import GZipMiddleware
 from fastapi.middleware.trustedhost import TrustedHostMiddleware
 from fastapi.responses import JSONResponse
-from slowapi import _rate_limit_exceeded_handler
 from slowapi.errors import RateLimitExceeded
+from sqlalchemy import text
 
 from app.config import settings
 from app.controllers.auth_controller import router as auth_router
@@ -20,7 +20,7 @@ from app.controllers.demo_controller import router as demo_router
 from app.controllers.detection_controller import router as detection_router
 from app.controllers.document_controller import router as document_router
 from app.controllers.project_controller import router as project_router
-from app.database import Base, engine
+from app.database import Base, async_session_factory, engine
 from app.utils.logging import setup_logging
 from app.utils.rate_limit import limiter
 
@@ -33,10 +33,35 @@ if settings.SENTRY_DSN:
         traces_sample_rate=0.2,
     )
 
+logger = logging.getLogger(__name__)
+
+
+async def _wait_for_db(max_retries: int = 10, delay: float = 3.0) -> None:
+    for attempt in range(1, max_retries + 1):
+        try:
+            async with async_session_factory() as session:
+                await session.execute(text("SELECT 1"))
+            logger.info("Conexión a la base de datos establecida")
+            return
+        except Exception as exc:
+            if attempt < max_retries:
+                logger.warning(
+                    "Intento %d/%d de conexión a DB falló: %s. Reintentando en %.0fs...",
+                    attempt, max_retries, exc, delay,
+                )
+                await asyncio.sleep(delay)
+            else:
+                logger.error(
+                    "No se pudo conectar a la DB tras %d intentos. Continuando...",
+                    max_retries,
+                )
+
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     setup_logging()
+    await _wait_for_db()
+
     if settings.DEBUG:
         async with engine.begin() as conn:
             await conn.run_sync(Base.metadata.create_all)
@@ -50,6 +75,17 @@ async def lifespan(app: FastAPI):
     with contextlib.suppress(asyncio.CancelledError):
         await cleanup_task
     await engine.dispose()
+
+
+async def rate_limit_handler(request: Request, exc: RateLimitExceeded) -> JSONResponse:
+    return JSONResponse(
+        status_code=429,
+        content={
+            "error": "demasiadas_solicitudes",
+            "message": "Demasiadas solicitudes. Intentá de nuevo en un momento.",
+            "retry_after": 1,
+        },
+    )
 
 
 app = FastAPI(
@@ -72,9 +108,7 @@ app = FastAPI(
 )
 
 app.state.limiter = limiter
-app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)  # type: ignore
-
-logger = logging.getLogger(__name__)
+app.add_exception_handler(RateLimitExceeded, rate_limit_handler)
 
 
 @app.exception_handler(Exception)
@@ -90,6 +124,7 @@ async def global_exception_handler(request: Request, exc: Exception):
         status_code=500,
         content={"detail": "Error interno del servidor"},
     )
+
 
 trusted_hosts = [h.strip() for h in settings.TRUSTED_HOSTS.split(",") if h.strip()]
 app.add_middleware(
@@ -122,10 +157,6 @@ app.include_router(contact_router, prefix="/api/v1/contact", tags=["contact"])
 
 @app.get("/api/v1/health", tags=["health"])
 async def health():
-    from sqlalchemy import text
-
-    from app.database import async_session_factory
-
     db_ok = False
     try:
         async with async_session_factory() as session:
@@ -154,3 +185,18 @@ async def health():
         "database": "connected" if db_ok else "disconnected",
         "storage": "connected" if storage_ok else "disconnected",
     }
+
+
+@app.get("/api/v1/readyz", tags=["health"])
+async def readyz():
+    db_ok = False
+    try:
+        async with async_session_factory() as session:
+            await session.execute(text("SELECT 1"))
+            db_ok = True
+    except Exception:
+        pass
+
+    if not db_ok:
+        return JSONResponse(status_code=503, content={"status": "not_ready"})
+    return {"status": "ready"}

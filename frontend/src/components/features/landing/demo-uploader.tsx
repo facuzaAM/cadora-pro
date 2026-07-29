@@ -50,6 +50,7 @@ export function DemoUploader() {
   const [showAuthModal, setShowAuthModal] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const stepTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const demoSessionRef = useRef<string>(`demo_${crypto.randomUUID()}`);
 
   useEffect(() => {
     if (sessionStorage.getItem(SESSION_KEY)) {
@@ -103,6 +104,7 @@ export function DemoUploader() {
       const apiBase = process.env.NEXT_PUBLIC_API_URL || "";
       const res = await fetch(`${apiBase}/demo/process`, {
         method: "POST",
+        headers: { "X-Demo-Session": demoSessionRef.current },
         body: formData,
       });
 

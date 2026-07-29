@@ -12,10 +12,13 @@ export default function LandingPage() {
       <main className="flex-1">
         <DemoUploader />
         <div className="relative">
-          <div className="absolute inset-0 bg-grid-pattern-subtle pointer-events-none" />
+          <div className="absolute inset-x-0 -top-32 h-32 bg-gradient-to-b from-background via-background to-transparent pointer-events-none z-10" />
           <FeaturesGrid />
         </div>
-        <HowItWorks />
+        <div className="relative">
+          <div className="absolute inset-x-0 -top-24 h-24 bg-gradient-to-b from-background to-transparent pointer-events-none z-10" />
+          <HowItWorks />
+        </div>
         <div className="relative">
           <div className="absolute -left-32 top-1/2 h-72 w-72 -translate-y-1/2 rounded-full bg-primary/5 blur-3xl pointer-events-none" />
           <div className="absolute -right-32 top-1/2 h-72 w-72 -translate-y-1/2 rounded-full bg-emerald-500/5 blur-3xl pointer-events-none" />

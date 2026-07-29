@@ -32,12 +32,16 @@ export default function DashboardPage() {
 
       <StatsCards />
 
-      <div className="grid gap-6 lg:grid-cols-3">
-        <div className="lg:col-span-2">
-          <RecentProjects />
-        </div>
-        <div>
-          <ProcessingStatus />
+      <div className="relative">
+        <div className="absolute inset-0 bg-dot-pattern-sm opacity-40 pointer-events-none" />
+        <div className="absolute inset-0 bg-gradient-to-b from-transparent via-background/80 to-transparent pointer-events-none" />
+        <div className="relative grid gap-6 lg:grid-cols-3">
+          <div className="lg:col-span-2">
+            <RecentProjects />
+          </div>
+          <div>
+            <ProcessingStatus />
+          </div>
         </div>
       </div>
 

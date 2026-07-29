@@ -35,7 +35,7 @@ const features = [
 
 export function FeaturesGrid() {
   return (
-    <section className="relative py-16 lg:py-24">
+    <section className="relative py-16 lg:py-24 bg-section-alt">
       <div className="mx-auto max-w-6xl px-4">
         <div className="text-center">
           <h2 className="text-3xl font-bold tracking-tight">Todo lo que necesitas</h2>

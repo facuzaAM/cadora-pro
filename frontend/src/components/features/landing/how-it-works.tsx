@@ -24,8 +24,7 @@ const steps = [
 export function HowItWorks() {
   return (
     <section className="relative overflow-hidden py-16 lg:py-24">
-      <div className="absolute inset-0 bg-dot-pattern-sm pointer-events-none" />
-      <div className="absolute inset-0 bg-gradient-to-b from-transparent via-background/50 to-transparent pointer-events-none" />
+      <div className="absolute inset-0 bg-grid-pattern-subtle pointer-events-none" />
       <div className="mx-auto max-w-6xl px-4">
         <div className="text-center">
           <h2 className="text-3xl font-bold tracking-tight">Cómo funciona</h2>
@@ -41,10 +40,10 @@ export function HowItWorks() {
                   {s.step}
                 </div>
                 {i < steps.length - 1 && (
-                  <div className="absolute left-full top-1/2 hidden h-px w-[calc(100%-4rem)] -translate-y-1/2 bg-gradient-to-r from-primary/40 to-transparent sm:block" />
+                  <div className="absolute left-full top-1/2 hidden h-[2px] w-[calc(100%-4rem)] -translate-y-1/2 bg-gradient-to-r from-primary/60 via-primary/20 to-transparent sm:block" />
                 )}
               </div>
-              <div className="mt-6 flex h-10 w-10 items-center justify-center rounded-lg bg-primary/10">
+              <div className="mt-6 flex h-10 w-10 items-center justify-center rounded-lg bg-gradient-to-br from-primary/10 to-primary/5">
                 <s.icon className="h-5 w-5 text-primary" />
               </div>
               <h3 className="mt-3 font-semibold">{s.title}</h3>
