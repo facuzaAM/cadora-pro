@@ -51,6 +51,11 @@ class User(Base):
     priority_processing: Mapped[bool] = mapped_column(
         nullable=False, default=False
     )
+    email_verified: Mapped[bool] = mapped_column(nullable=False, default=False)
+    email_verification_code: Mapped[str | None] = mapped_column(String(6), nullable=True)
+    email_verification_expires_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )
     token_version: Mapped[int] = mapped_column(nullable=False, default=0)
 
     created_at: Mapped[datetime] = mapped_column(

@@ -9,6 +9,7 @@ interface AuthUser {
   email: string;
   name: string;
   avatar_url: string | null;
+  email_verified: boolean;
   subscription_plan: string;
   subscription_status: string;
   conversions_used: number;

@@ -1,4 +1,5 @@
 import asyncio
+import logging
 import secrets as _secrets
 from datetime import UTC, datetime, timedelta
 from uuid import UUID
@@ -13,6 +14,8 @@ from app.repositories.user_repository import UserRepository
 from app.schemas.auth import RegisterRequest, TokenResponse, UserResponse
 from app.utils.jwt import create_access_token, create_refresh_token, decode_refresh_token
 from app.utils.security import hash_password, verify_password
+
+logger = logging.getLogger(__name__)
 
 
 class AuthService:
@@ -81,6 +84,48 @@ class AuthService:
             raise ValueError("Usuario no encontrado")
         return user
 
+    async def _send_code(
+        self, user: User, subject: str, email_fn, log_action: str
+    ) -> bool:
+        code = str(_secrets.randbelow(900000) + 100000)
+        expires_at = datetime.now(UTC) + timedelta(minutes=15)
+        user.email_verification_code = code
+        user.email_verification_expires_at = expires_at
+        await self.repo._save(user)
+        sent = await asyncio.to_thread(email_fn, user.email, code, user.name)
+        if not sent:
+            logger.error(
+                "Failed to send %s email to %s (user %s)",
+                log_action, user.email, user.id,
+            )
+        return sent
+
+    async def send_verification_email(self, user: User) -> bool:
+        from app.services.email_service import send_verification_code
+
+        if user.email_verified:
+            return True
+        return await self._send_code(
+            user,
+            "Verificá tu email",
+            send_verification_code,
+            "verification",
+        )
+
+    async def verify_email(self, user: User, code: str) -> None:
+        if user.email_verified:
+            raise ValueError("El email ya está verificado")
+        if not user.email_verification_code or not user.email_verification_expires_at:
+            raise ValueError("No hay código de verificación pendiente")
+        if user.email_verification_expires_at.replace(tzinfo=UTC) < datetime.now(UTC):
+            raise ValueError("El código expiró. Solicitá uno nuevo.")
+        if user.email_verification_code != code:
+            raise ValueError("Código incorrecto")
+        user.email_verified = True
+        user.email_verification_code = None
+        user.email_verification_expires_at = None
+        await self.repo._save(user)
+
     async def forgot_password(self, email: str) -> bool:
         """Generate a 6-digit reset code and email it. Always returns True."""
         from app.services.email_service import send_reset_code
@@ -94,6 +139,14 @@ class AuthService:
         code = str(_secrets.randbelow(900000) + 100000)
         expires_at = datetime.now(UTC) + timedelta(minutes=15)
         await self.reset_repo.create(user.id, code, expires_at)
+
+        sent = await asyncio.to_thread(send_reset_code, user.email, code, user.name)
+        if not sent:
+            logger.error(
+                "Failed to send password reset email to %s (user %s)",
+                user.email, user.id,
+            )
+        return True
 
         await asyncio.to_thread(send_reset_code, user.email, code, user.name)
         return True

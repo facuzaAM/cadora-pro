@@ -23,6 +23,7 @@ from app.schemas.auth import (
     ResetPasswordRequest,
     TokenResponse,
     UserResponse,
+    VerifyEmailRequest,
 )
 from app.services.auth_service import AuthService
 from app.utils.dependencies import get_current_user
@@ -224,6 +225,7 @@ async def register(
             status_code=HTTP_400_BAD_REQUEST,
             detail="Error creando usuario",
         )
+    await service.send_verification_email(user)
     return _auth_response(result, user)
 
 
@@ -401,3 +403,36 @@ async def reset_password(
     except ValueError as e:
         raise HTTPException(status_code=HTTP_400_BAD_REQUEST, detail=str(e))
     return {"message": "Contraseña actualizada correctamente"}
+
+
+@router.post("/send-verification")
+@limiter.limit("3/minute")
+async def send_verification(
+    request: Request,
+    user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    service = AuthService(db)
+    if user.email_verified:
+        return {"message": "El email ya está verificado"}
+    sent = await service.send_verification_email(user)
+    if not sent:
+        return JSONResponse(
+            status_code=500,
+            content={"detail": "No pudimos enviar el código. Intentá de nuevo más tarde."},
+        )
+    return {"message": "Código enviado a tu email"}
+
+
+@router.post("/verify-email")
+async def verify_email(
+    body: VerifyEmailRequest,
+    user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    service = AuthService(db)
+    try:
+        await service.verify_email(user, body.code)
+    except ValueError as e:
+        raise HTTPException(status_code=HTTP_400_BAD_REQUEST, detail=str(e))
+    return {"message": "Email verificado correctamente"}

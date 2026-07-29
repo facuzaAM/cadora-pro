@@ -1,9 +1,3 @@
-"""Email service for sending password reset codes and notifications.
-
-In development, emails are logged instead of sent.
-Configure SMTP_HOST, SMTP_PORT, SMTP_USER, SMTP_PASSWORD in .env for production.
-"""
-
 import logging
 import smtplib
 from email.mime.multipart import MIMEMultipart
@@ -41,13 +35,54 @@ def send_email(to: str, subject: str, html_body: str) -> bool:
         return True
     except Exception:
         logger.exception("Failed to send email to %s", to)
+        if settings.SENTRY_DSN:
+            try:
+                import sentry_sdk
+                sentry_sdk.capture_exception()
+            except Exception:
+                pass
         return False
 
 
 def send_reset_code(email: str, code: str, name: str) -> bool:
     subject = "Cadora — Código de recuperación de contraseña"
-    html_body = _build_reset_email(name, code)  # noqa: E501
+    html_body = _build_reset_email(name, code)
     return send_email(email, subject, html_body)
+
+
+def send_verification_code(email: str, code: str, name: str) -> bool:
+    subject = "Cadora — Verificá tu email"
+    html_body = _build_verification_email(name, code)
+    return send_email(email, subject, html_body)
+
+
+def _build_verification_email(name: str, code: str) -> str:
+    return (
+        '<div style="font-family:Arial,sans-serif;max-width:480px;'
+        'margin:0 auto;padding:24px;">'
+        '<h2 style="color:#1a1a1a;margin-bottom:16px;">'
+        "Verificá tu email</h2>"
+        '<p style="color:#555;line-height:1.6;">'
+        f"Hola {name}, "
+        "gracias por registrarte en Cadora. "
+        "Usá el siguiente código para verificar tu email.</p>"
+        '<div style="background:#f4f4f5;border-radius:8px;'
+        'padding:20px;text-align:center;margin:24px 0;">'
+        '<p style="color:#555;margin:0 0 8px 0;font-size:14px;">'
+        "Tu código de verificación es:</p>"
+        '<p style="font-size:32px;font-weight:bold;'
+        'letter-spacing:8px;color:#1a1a1a;margin:0;">'
+        f"{code}</p></div>"
+        '<p style="color:#555;line-height:1.6;font-size:14px;">'
+        "Este código expira en <strong>15 minutos</strong>. "
+        "Si no te registraste en Cadora, "
+        "podés ignorar este email.</p>"
+        '<hr style="border:none;'
+        'border-top:1px solid #e5e5e5;margin:24px 0;" />'
+        '<p style="color:#999;font-size:12px;'
+        'text-align:center;">Cadora — cadora.pro</p>'
+        "</div>"
+    )
 
 
 def _build_reset_email(name: str, code: str) -> str:

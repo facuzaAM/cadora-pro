@@ -94,6 +94,7 @@ class UserResponse(BaseModel):
     email: str
     name: str
     avatar_url: str | None
+    email_verified: bool = False
     subscription_plan: str = "free"
     subscription_status: str = "inactive"
     conversions_used: int = 0
@@ -104,3 +105,15 @@ class UserResponse(BaseModel):
     created_at: datetime
 
     model_config = {"from_attributes": True}
+
+
+class VerifyEmailRequest(BaseModel):
+    code: str
+
+    @field_validator("code")
+    @classmethod
+    def validate_code(cls, v: str) -> str:
+        v = v.strip()
+        if not v.isdigit() or len(v) != 6:
+            raise ValueError("El código debe ser de 6 dígitos")
+        return v

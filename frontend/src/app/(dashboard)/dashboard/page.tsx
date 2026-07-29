@@ -9,6 +9,7 @@ import { RecentProjects } from "@/components/features/dashboard/recent-projects"
 import { ProcessingStatus } from "@/components/features/dashboard/processing-status";
 import { ProcessingHistory } from "@/components/features/dashboard/processing-history";
 import { CreditUsage } from "@/components/features/dashboard/credit-usage";
+import { EmailVerificationBanner } from "@/components/features/dashboard/email-verification-banner";
 import { useAuth } from "@/hooks/useAuth";
 
 export default function DashboardPage() {
@@ -17,6 +18,7 @@ export default function DashboardPage() {
 
   return (
     <div className="space-y-6">
+      <EmailVerificationBanner />
       <PageHeader
         title="Dashboard"
         description={`Bienvenido de nuevo, ${name}`}
