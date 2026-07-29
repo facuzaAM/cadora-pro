@@ -13,6 +13,26 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
+FROM python:3.12-slim AS libredwg
+
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    build-essential \
+    autoconf \
+    libtool \
+    pkg-config \
+    texinfo \
+    wget \
+    ca-certificates \
+    && rm -rf /var/lib/apt/lists/* \
+    && wget -qO /tmp/libredwg.tar.gz \
+       https://ftp.gnu.org/gnu/libredwg/libredwg-0.13.tar.gz \
+    && tar xzf /tmp/libredwg.tar.gz -C /tmp \
+    && cd /tmp/libredwg-0.13 \
+    && ./configure --prefix=/usr --disable-static --disable-rust \
+    && make -j$(nproc) \
+    && make install \
+    && rm -rf /tmp/libredwg*
+
 FROM python:3.12-slim AS runner
 
 WORKDIR /app
@@ -22,10 +42,11 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     libglib2.0-0 \
     tesseract-ocr \
     poppler-utils \
-    libredwg-dev \
     && rm -rf /var/lib/apt/lists/*
 
 COPY --from=builder /usr/local/lib/python3.12/site-packages /usr/local/lib/python3.12/site-packages
+COPY --from=libredwg /usr/bin/dxf2dwg /usr/bin/dxf2dwg
+COPY --from=libredwg /usr/lib/libredwg.so* /usr/lib/
 
 RUN groupadd -r cadora && useradd -r -g cadora -d /app cadora
 
