@@ -148,9 +148,6 @@ class AuthService:
             )
         return True
 
-        await asyncio.to_thread(send_reset_code, user.email, code, user.name)
-        return True
-
     async def reset_password(self, code: str, new_password: str) -> None:
         """Reset a user's password using a valid 6-digit code."""
         token = await self.reset_repo.get_valid_code(code)

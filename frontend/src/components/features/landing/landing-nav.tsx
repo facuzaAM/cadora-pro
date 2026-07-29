@@ -8,11 +8,11 @@ import { UserButton } from "@/components/features/auth/user-button";
 export function LandingNav() {
   return (
     <header className="sticky top-0 z-50 border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
-      <div className="mx-auto flex h-14 max-w-6xl items-center justify-between px-4">
+      <div className="mx-auto flex h-14 max-w-6xl items-center px-4 sm:grid sm:grid-cols-3">
         <Link href="/">
           <Logo />
         </Link>
-        <nav className="hidden items-center gap-6 sm:flex">
+        <nav className="hidden items-center justify-center gap-6 sm:flex">
           <Link
             href="/"
             className="text-sm font-medium text-muted-foreground transition-colors hover:text-foreground"
@@ -38,7 +38,7 @@ export function LandingNav() {
             Contacto
           </Link>
         </nav>
-        <div className="flex items-center gap-2">
+        <div className="flex items-center justify-end gap-2">
           <ThemeToggle />
           <UserButton />
         </div>

@@ -17,6 +17,7 @@ from app.ocr.schemas import OcrRequest, OcrResult
 from app.ocr.service import OcrService
 from app.repositories.document_repository import DocumentRepository
 from app.repositories.project_repository import ProjectRepository
+from app.repositories.user_repository import UserRepository
 from app.services.plan_enforcer import enforce_conversion_limit
 from app.services.storage_service import StorageService
 from app.utils.rate_limit import limiter
@@ -31,6 +32,14 @@ def _capture_sentry() -> None:
             sentry_sdk.capture_exception()
         except Exception:
             pass
+
+
+async def _increment_conversion(user, db: AsyncSession) -> None:
+    repo = UserRepository(db)
+    user_db = await repo.get_by_id(user.id)
+    if user_db:
+        user_db.conversions_used += 1
+        await repo._save(user_db)
 
 
 router = APIRouter()
@@ -121,6 +130,7 @@ async def ocr_document(
         if os.path.exists(temp_path):
             os.remove(temp_path)
 
+    await _increment_conversion(user, db)
     return result
 
 
@@ -170,6 +180,8 @@ async def ocr_uploaded_document(
     finally:
         if os.path.exists(temp_path):
             os.remove(temp_path)
+
+    await _increment_conversion(user, db)
     return result
 
 
@@ -210,6 +222,7 @@ async def detect_windows(
         if os.path.exists(temp_path):
             os.remove(temp_path)
 
+    await _increment_conversion(user, db)
     return result
 
 
@@ -250,6 +263,7 @@ async def detect_lines(
         if os.path.exists(temp_path):
             os.remove(temp_path)
 
+    await _increment_conversion(user, db)
     return result
 
 
@@ -290,4 +304,5 @@ async def detect_doors(
         if os.path.exists(temp_path):
             os.remove(temp_path)
 
+    await _increment_conversion(user, db)
     return result

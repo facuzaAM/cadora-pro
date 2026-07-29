@@ -1,13 +1,13 @@
 from __future__ import annotations
 
-import hashlib
-import hmac
 import json
 import logging
 import time
 from datetime import UTC, datetime
 from uuid import UUID
 
+from paddle_billing.Notifications.Secret import Secret
+from paddle_billing.Notifications.Verifier import Verifier
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.config import settings
@@ -16,35 +16,24 @@ from app.services.plan_config import PLANS, get_plan
 
 logger = logging.getLogger(__name__)
 
-# In-memory deduplication for webhook events (event_id -> timestamp)
-# Prevents re-processing if Paddle retries the same event.
 _PROCESSED_EVENTS: dict[str, float] = {}
-_EVENT_TTL_SECONDS = 3600  # 1 hour
+_EVENT_TTL_SECONDS = 3600
 
 
-def _is_duplicate_event(event_id: str) -> bool:
-    """Check if an event has already been processed recently."""
-    now = time.time()
-    # Cleanup old entries
-    expired = [k for k, v in _PROCESSED_EVENTS.items() if now - v > _EVENT_TTL_SECONDS]
-    for k in expired:
-        del _PROCESSED_EVENTS[k]
-
-    if event_id in _PROCESSED_EVENTS:
-        return True
-    _PROCESSED_EVENTS[event_id] = now
-    return False
-
-
-class _WebRequest:
-    """Adapter for Paddle SDK Verifier — wraps raw bytes + headers."""
-
-    def __init__(self, body: bytes, headers: dict[str, str]):
+class _WebhookRequest:
+    def __init__(self, body: bytes):
         self._body = body
-        self.headers = headers
 
     @property
-    def body(self) -> bytes:
+    def body(self) -> bytes | None:
+        return self._body
+
+    @property
+    def content(self) -> bytes | None:
+        return self._body
+
+    @property
+    def data(self) -> bytes | None:
         return self._body
 
 
@@ -54,33 +43,22 @@ class PaddleService:
 
     @staticmethod
     def verify_signature(payload: bytes, paddle_signature: str) -> bool:
-        """Verify Paddle webhook signature using HMAC-SHA256.
-
-        Paddle-Signature format: "ts=<timestamp>;h1=<signature>"
-        """
         if not settings.PADDLE_WEBHOOK_SECRET or not paddle_signature:
             return False
 
-        parts = {}
-        for part in paddle_signature.split(";"):
-            if "=" in part:
-                k, v = part.split("=", 1)
-                parts[k] = v
+        raw_secret: bytes | str = settings.PADDLE_WEBHOOK_SECRET
+        if isinstance(raw_secret, str):
+            raw_secret = raw_secret.encode("utf-8")
 
-        ts = parts.get("ts", "")
-        h1 = parts.get("h1", "")
-
-        if not ts or not h1:
+        try:
+            secret = Secret(raw_secret)
+            verifier = Verifier()
+            request = _WebhookRequest(payload)
+            verifier.verify(request, secrets=[secret], verify_time_drift=True)
+            return True
+        except Exception:
+            logger.exception("Paddle webhook signature verification failed")
             return False
-
-        signed_payload = f"{ts}:{payload.decode('utf-8')}"
-        expected = hmac.new(
-            settings.PADDLE_WEBHOOK_SECRET.encode("utf-8"),
-            signed_payload.encode("utf-8"),
-            hashlib.sha256,
-        ).hexdigest()
-
-        return hmac.compare_digest(expected, h1)
 
     @staticmethod
     async def handle_webhook(payload: bytes, paddle_signature: str) -> None:
@@ -235,6 +213,7 @@ class PaddleService:
     @staticmethod
     async def _handle_subscription_paused(data: dict) -> None:
         paddle_subscription_id = data.get("id", "")
+
         from app.database import async_session_factory
 
         async with async_session_factory() as db:
@@ -278,8 +257,19 @@ class PaddleService:
             await db.commit()
 
 
+def _is_duplicate_event(event_id: str) -> bool:
+    now = time.time()
+    expired = [k for k, v in _PROCESSED_EVENTS.items() if now - v > _EVENT_TTL_SECONDS]
+    for k in expired:
+        del _PROCESSED_EVENTS[k]
+
+    if event_id in _PROCESSED_EVENTS:
+        return True
+    _PROCESSED_EVENTS[event_id] = now
+    return False
+
+
 def _map_paddle_status(paddle_status: str) -> str:
-    """Map Paddle subscription status to our internal status."""
     mapping = {
         "active": "active",
         "canceled": "canceled",
