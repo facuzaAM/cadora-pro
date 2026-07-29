@@ -9,5 +9,5 @@ export const documentsService = {
   },
 
   getByProject: (projectId: string, token?: string) =>
-    api.get<Document[]>(`/documents/project/${projectId}`, token),
+    api.get<Document[]>(`/documents/${projectId}`, token),
 };

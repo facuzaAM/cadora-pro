@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { useRouter, useParams } from "next/navigation";
+import { useRouter, useParams, useSearchParams } from "next/navigation";
 import { ArrowLeft, Download, Share2, Loader2, ChevronDown } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
@@ -22,11 +22,12 @@ const DWG_PLANS = new Set(["pro", "business"]);
 export default function ResultPage() {
   const router = useRouter();
   const params = useParams();
+  const searchParams = useSearchParams();
   const projectId = params.projectId as string;
   const { user } = useAuth();
   const [projectName, setProjectName] = useState("Proyecto");
   const [downloading, setDownloading] = useState(false);
-  const [cadReady, setCadReady] = useState(false);
+  const [cadReady, setCadReady] = useState(searchParams.has("ready"));
 
   const canExportDwg = user && DWG_PLANS.has(user.subscription_plan);
 
@@ -42,7 +43,7 @@ export default function ResultPage() {
     if (cadReady) return;
     cadService.generate(projectId, "dxf", token)
       .then(() => setCadReady(true))
-      .catch(() => {});
+      .catch(() => toast.error("Error al generar el archivo CAD"));
   }, [projectId, cadReady]);
 
   const handleDownload = async (format: CadFormat = "dxf") => {

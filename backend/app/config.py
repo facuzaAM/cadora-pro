@@ -54,7 +54,6 @@ class Settings(BaseSettings):
         "https://cadora.pro",
         "https://www.cadora.pro",
         "https://app.cadora.pro",
-        "https://api.cadora.pro",
     ]
 
     # Rate limiting
@@ -75,7 +74,7 @@ class Settings(BaseSettings):
     # Google OAuth
     GOOGLE_CLIENT_ID: str = ""
     GOOGLE_CLIENT_SECRET: str = ""
-    GOOGLE_REDIRECT_URI: str = "http://localhost:8000/api/v1/auth/google/callback"
+    GOOGLE_REDIRECT_URI: str = ""
 
     # SMTP (email)
     SMTP_HOST: str = ""

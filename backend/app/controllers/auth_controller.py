@@ -77,6 +77,11 @@ GOOGLE_TOKEN_URL = "https://oauth2.googleapis.com/token"
 GOOGLE_USERINFO_URL = "https://www.googleapis.com/oauth2/v2/userinfo"
 
 
+def _derive_google_redirect_uri(request: Request) -> str:
+    base = str(request.url).replace(str(request.url.path), "").rstrip("/")
+    return f"{base}/api/v1/auth/google/callback"
+
+
 @router.get("/google")
 async def google_login(request: Request):
     """Redirect to Google OAuth consent screen."""
@@ -85,10 +90,11 @@ async def google_login(request: Request):
             status_code=HTTP_400_BAD_REQUEST,
             detail="Google OAuth no configurado",
         )
+    redirect_uri = settings.GOOGLE_REDIRECT_URI or _derive_google_redirect_uri(request)
     state = secrets.token_urlsafe(32)
     params = {
         "client_id": settings.GOOGLE_CLIENT_ID,
-        "redirect_uri": settings.GOOGLE_REDIRECT_URI,
+        "redirect_uri": redirect_uri,
         "response_type": "code",
         "scope": "openid email profile",
         "access_type": "offline",
@@ -127,6 +133,8 @@ async def google_callback(request: Request, db: AsyncSession = Depends(get_db)):
     if not code:
         return RedirectResponse("/login?error=no_code")
 
+    redirect_uri = settings.GOOGLE_REDIRECT_URI or _derive_google_redirect_uri(request)
+
     async with httpx.AsyncClient() as client:
         token_resp = await client.post(
             GOOGLE_TOKEN_URL,
@@ -134,7 +142,7 @@ async def google_callback(request: Request, db: AsyncSession = Depends(get_db)):
                 "code": code,
                 "client_id": settings.GOOGLE_CLIENT_ID,
                 "client_secret": settings.GOOGLE_CLIENT_SECRET,
-                "redirect_uri": settings.GOOGLE_REDIRECT_URI,
+                "redirect_uri": redirect_uri,
                 "grant_type": "authorization_code",
             },
         )

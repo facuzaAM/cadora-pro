@@ -49,9 +49,17 @@ export default function PricingPage() {
     const plan = PLANS.find((p) => p.id === planId);
     if (!plan?.paddlePriceId) return;
 
+    const token = api.getAccessToken();
+    let userId: string | undefined;
+    if (token) {
+      try {
+        const payload = JSON.parse(atob(token.split(".")[1]));
+        userId = payload.sub;
+      } catch {}
+    }
     window.Paddle.Checkout.open({
       items: [{ priceId: plan.paddlePriceId, quantity: 1 }],
-      customData: { plan: planId },
+      customData: { plan: planId, user_id: userId },
       settings: {
         displayMode: "overlay",
         theme: "light",

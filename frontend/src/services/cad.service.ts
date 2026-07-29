@@ -13,6 +13,4 @@ export const cadService = {
   downloadUrl: (projectId: string, format: CadFormat = "dxf") =>
     `${api.getBaseUrl()}/cad/download/${projectId}?format=${format}`,
 
-  getByProject: (projectId: string, token?: string) =>
-    api.get(`/cad/project/${projectId}`, token),
 };
