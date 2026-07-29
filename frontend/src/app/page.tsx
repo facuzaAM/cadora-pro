@@ -11,9 +11,16 @@ export default function LandingPage() {
       <LandingNav />
       <main className="flex-1">
         <DemoUploader />
-        <FeaturesGrid />
+        <div className="relative">
+          <div className="absolute inset-0 bg-grid-pattern-subtle pointer-events-none" />
+          <FeaturesGrid />
+        </div>
         <HowItWorks />
-        <Cta />
+        <div className="relative">
+          <div className="absolute -left-32 top-1/2 h-72 w-72 -translate-y-1/2 rounded-full bg-primary/5 blur-3xl pointer-events-none" />
+          <div className="absolute -right-32 top-1/2 h-72 w-72 -translate-y-1/2 rounded-full bg-emerald-500/5 blur-3xl pointer-events-none" />
+          <Cta />
+        </div>
       </main>
       <SiteFooter />
     </div>

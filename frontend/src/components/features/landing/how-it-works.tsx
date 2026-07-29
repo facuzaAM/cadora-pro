@@ -23,7 +23,9 @@ const steps = [
 
 export function HowItWorks() {
   return (
-    <section className="py-16 lg:py-24 bg-muted/50">
+    <section className="relative overflow-hidden py-16 lg:py-24">
+      <div className="absolute inset-0 bg-dot-pattern-sm pointer-events-none" />
+      <div className="absolute inset-0 bg-gradient-to-b from-transparent via-background/50 to-transparent pointer-events-none" />
       <div className="mx-auto max-w-6xl px-4">
         <div className="text-center">
           <h2 className="text-3xl font-bold tracking-tight">Cómo funciona</h2>
@@ -32,12 +34,17 @@ export function HowItWorks() {
           </p>
         </div>
         <div className="mt-12 grid gap-8 sm:grid-cols-3">
-          {steps.map((s) => (
+          {steps.map((s, i) => (
             <div key={s.step} className="relative flex flex-col items-center text-center">
-              <div className="flex h-16 w-16 items-center justify-center rounded-full bg-primary text-2xl font-bold text-primary-foreground">
-                {s.step}
+              <div className="relative">
+                <div className="flex h-16 w-16 items-center justify-center rounded-full bg-gradient-to-br from-primary to-blue-600 text-2xl font-bold text-primary-foreground shadow-lg shadow-primary/25">
+                  {s.step}
+                </div>
+                {i < steps.length - 1 && (
+                  <div className="absolute left-full top-1/2 hidden h-px w-[calc(100%-4rem)] -translate-y-1/2 bg-gradient-to-r from-primary/40 to-transparent sm:block" />
+                )}
               </div>
-              <div className="mt-4 flex h-10 w-10 items-center justify-center rounded-lg bg-primary/10">
+              <div className="mt-6 flex h-10 w-10 items-center justify-center rounded-lg bg-primary/10">
                 <s.icon className="h-5 w-5 text-primary" />
               </div>
               <h3 className="mt-3 font-semibold">{s.title}</h3>

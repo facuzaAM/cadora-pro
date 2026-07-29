@@ -47,10 +47,14 @@ export default function LoginPage({
   };
 
   return (
-    <div className="flex min-h-screen flex-col items-center justify-center p-4">
-      <Link href="/" className="mb-8">
-        <Logo />
-      </Link>
+    <div className="relative flex min-h-screen flex-col items-center justify-center overflow-hidden bg-gradient-to-b from-primary/[0.03] via-background to-background p-4">
+      <div className="absolute inset-0 bg-dot-pattern-sm opacity-50 pointer-events-none" />
+      <div className="absolute -left-32 -top-32 h-64 w-64 animate-blob rounded-full bg-primary/10 blur-3xl pointer-events-none" />
+      <div className="absolute -bottom-32 -right-32 h-64 w-64 animate-blob-delayed rounded-full bg-blue-500/10 blur-3xl pointer-events-none" />
+      <div className="relative">
+        <Link href="/" className="mb-8 flex justify-center">
+          <Logo />
+        </Link>
       <Card className="w-full max-w-sm">
         <CardHeader className="text-center">
           <CardTitle>Iniciar Sesión</CardTitle>
@@ -132,6 +136,7 @@ export default function LoginPage({
           </p>
         </CardContent>
       </Card>
+      </div>
     </div>
   );
 }

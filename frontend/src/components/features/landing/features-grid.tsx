@@ -35,7 +35,7 @@ const features = [
 
 export function FeaturesGrid() {
   return (
-    <section className="py-16 lg:py-24">
+    <section className="relative py-16 lg:py-24">
       <div className="mx-auto max-w-6xl px-4">
         <div className="text-center">
           <h2 className="text-3xl font-bold tracking-tight">Todo lo que necesitas</h2>
@@ -47,12 +47,15 @@ export function FeaturesGrid() {
           {features.map((f) => {
             const Icon = f.icon;
             return (
-              <div key={f.title} className="group rounded-xl border bg-card p-6 transition-colors hover:border-primary/50">
-                <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-primary/10 group-hover:bg-primary/20 transition-colors">
-                  <Icon className="h-5 w-5 text-primary" />
+              <div key={f.title} className="group relative overflow-hidden rounded-xl border bg-card p-6 transition-all duration-300 hover:shadow-lg hover:border-primary/50 hover:-translate-y-0.5">
+                <div className="absolute right-0 top-0 h-20 w-20 translate-x-6 -translate-y-6 rounded-full bg-primary/[0.04] transition-all duration-300 group-hover:scale-150" />
+                <div className="relative">
+                  <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-gradient-to-br from-primary/10 to-primary/5 group-hover:from-primary/20 group-hover:to-primary/10 transition-all duration-300">
+                    <Icon className="h-5 w-5 text-primary" />
+                  </div>
+                  <h3 className="mt-4 font-semibold">{f.title}</h3>
+                  <p className="mt-1 text-sm text-muted-foreground">{f.desc}</p>
                 </div>
-                <h3 className="mt-4 font-semibold">{f.title}</h3>
-                <p className="mt-1 text-sm text-muted-foreground">{f.desc}</p>
               </div>
             );
           })}

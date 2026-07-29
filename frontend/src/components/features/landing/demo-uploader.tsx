@@ -154,7 +154,11 @@ export function DemoUploader() {
 
   return (
     <>
-      <section className="relative flex min-h-[85vh] items-center justify-center overflow-hidden bg-gradient-to-b from-primary/[0.03] via-background to-background pt-14">
+      <section className="relative flex min-h-[85vh] items-center justify-center overflow-hidden bg-gradient-to-b from-primary/[0.06] via-background to-background pt-14">
+        <div className="absolute -left-24 top-1/4 h-64 w-64 animate-blob rounded-full bg-primary/10 blur-3xl pointer-events-none" />
+        <div className="absolute -right-24 top-1/3 h-64 w-64 animate-blob-delayed rounded-full bg-blue-500/10 blur-3xl pointer-events-none" />
+        <div className="absolute left-1/2 top-1/2 h-48 w-48 -translate-x-1/2 -translate-y-1/2 animate-blob-slow rounded-full bg-emerald-500/10 blur-3xl pointer-events-none" />
+
         <div className="mx-auto max-w-4xl px-4 text-center">
           <div className="mb-6 inline-flex items-center gap-2 rounded-full border border-primary/20 bg-primary/5 px-4 py-1.5 text-sm text-primary">
             <span className="inline-block h-2 w-2 rounded-full bg-primary animate-pulse" />
