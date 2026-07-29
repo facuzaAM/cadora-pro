@@ -14,6 +14,12 @@ async def enforce_conversion_limit(
     user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ) -> User:
+    if not user.email_verified:
+        raise HTTPException(
+            status_code=HTTP_403_FORBIDDEN,
+            detail="Verificá tu email antes de usar el servicio. "
+                   "Revisá tu bandeja de entrada o solicitá un nuevo código.",
+        )
     if _maybe_reset_monthly(user):
         repo = UserRepository(db)
         await repo._save(user)

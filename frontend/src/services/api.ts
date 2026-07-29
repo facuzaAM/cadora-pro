@@ -7,6 +7,12 @@ class ApiClient {
   private baseUrl = API_BASE_URL || "";
   private accessToken: string | null = null;
 
+  constructor() {
+    if (typeof window !== "undefined") {
+      this.accessToken = readCookie("cadora_access");
+    }
+  }
+
   getBaseUrl(): string {
     return this.baseUrl;
   }
@@ -24,8 +30,7 @@ class ApiClient {
       credentials: "include",
       headers: this.headers(token),
     });
-    if (!res.ok) throw new ApiError(res.status, await res.json());
-    return res.json();
+    return this.handleResponse<T>(res);
   }
 
   async post<T>(path: string, body: unknown, token?: string): Promise<T> {
@@ -35,8 +40,7 @@ class ApiClient {
       headers: this.headers(token),
       body: JSON.stringify(body),
     });
-    if (!res.ok) throw new ApiError(res.status, await res.json());
-    return res.json();
+    return this.handleResponse<T>(res);
   }
 
   async upload<T>(path: string, formData: FormData, token?: string): Promise<T> {
@@ -49,8 +53,7 @@ class ApiClient {
       headers,
       body: formData,
     });
-    if (!res.ok) throw new ApiError(res.status, await res.json());
-    return res.json();
+    return this.handleResponse<T>(res);
   }
 
   async patch<T>(path: string, body: unknown, token?: string): Promise<T> {
@@ -60,8 +63,7 @@ class ApiClient {
       headers: this.headers(token),
       body: JSON.stringify(body),
     });
-    if (!res.ok) throw new ApiError(res.status, await res.json());
-    return res.json();
+    return this.handleResponse<T>(res);
   }
 
   async delete<T>(path: string, token?: string): Promise<T> {
@@ -70,8 +72,16 @@ class ApiClient {
       credentials: "include",
       headers: this.headers(token),
     });
-    if (!res.ok) throw new ApiError(res.status, await res.json());
     if (res.status === 204) return undefined as T;
+    return this.handleResponse<T>(res);
+  }
+
+  private async handleResponse<T>(res: Response): Promise<T> {
+    if (res.status === 402 && typeof window !== "undefined") {
+      window.location.href = "/pricing?reason=limit_reached";
+      throw new ApiError(402, { detail: "Límite alcanzado. Redirigiendo..." });
+    }
+    if (!res.ok) throw new ApiError(res.status, await res.json());
     return res.json();
   }
 
@@ -83,6 +93,12 @@ class ApiClient {
     if (auth) headers["Authorization"] = `Bearer ${auth}`;
     return headers;
   }
+}
+
+function readCookie(name: string): string | null {
+  if (typeof document === "undefined") return null;
+  const match = document.cookie.match(new RegExp(`(^| )${name}=([^;]+)`));
+  return match ? decodeURIComponent(match[2]) : null;
 }
 
 export class ApiError extends Error {

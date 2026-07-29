@@ -23,6 +23,16 @@ from app.utils.rate_limit import limiter
 
 logger = logging.getLogger(__name__)
 
+
+def _capture_sentry() -> None:
+    if settings.SENTRY_DSN:
+        try:
+            import sentry_sdk
+            sentry_sdk.capture_exception()
+        except Exception:
+            pass
+
+
 router = APIRouter()
 ocr_service = OcrService()
 detection_service = DetectionService()
@@ -101,7 +111,12 @@ async def ocr_document(
         raise
     except Exception:
         logger.exception("Error procesando OCR en documento")
-        raise HTTPException(status_code=HTTP_400_BAD_REQUEST, detail="Error interno del servidor")
+        _capture_sentry()
+        raise HTTPException(
+            status_code=HTTP_400_BAD_REQUEST,
+            detail="No pudimos leer el texto del plano. Verificá que la imagen sea nítida "
+                   "y que el archivo no esté dañado. Probá con otro archivo.",
+        )
     finally:
         if os.path.exists(temp_path):
             os.remove(temp_path)
@@ -146,7 +161,12 @@ async def ocr_uploaded_document(
         raise
     except Exception:
         logger.exception("Error procesando OCR en documento subido")
-        raise HTTPException(status_code=HTTP_400_BAD_REQUEST, detail="Error interno del servidor")
+        _capture_sentry()
+        raise HTTPException(
+            status_code=HTTP_400_BAD_REQUEST,
+            detail="No pudimos leer el texto del plano. Verificá que la imagen sea nítida "
+                   "y que el archivo no esté dañado.",
+        )
     finally:
         if os.path.exists(temp_path):
             os.remove(temp_path)
@@ -180,7 +200,12 @@ async def detect_windows(
         raise
     except Exception:
         logger.exception("Error detectando ventanas")
-        raise HTTPException(status_code=HTTP_400_BAD_REQUEST, detail="Error interno del servidor")
+        _capture_sentry()
+        raise HTTPException(
+            status_code=HTTP_400_BAD_REQUEST,
+            detail="No pudimos detectar ventanas en el plano. "
+                   "Asegurate de que el archivo sea un plano arquitectónico legible.",
+        )
     finally:
         if os.path.exists(temp_path):
             os.remove(temp_path)
@@ -215,7 +240,12 @@ async def detect_lines(
         raise
     except Exception:
         logger.exception("Error detectando lineas")
-        raise HTTPException(status_code=HTTP_400_BAD_REQUEST, detail="Error interno del servidor")
+        _capture_sentry()
+        raise HTTPException(
+            status_code=HTTP_400_BAD_REQUEST,
+            detail="No pudimos detectar las líneas del plano. "
+                   "Probá con un archivo de mayor calidad o resolución.",
+        )
     finally:
         if os.path.exists(temp_path):
             os.remove(temp_path)
@@ -250,7 +280,12 @@ async def detect_doors(
         raise
     except Exception:
         logger.exception("Error detectando puertas")
-        raise HTTPException(status_code=HTTP_400_BAD_REQUEST, detail="Error interno del servidor")
+        _capture_sentry()
+        raise HTTPException(
+            status_code=HTTP_400_BAD_REQUEST,
+            detail="No pudimos detectar puertas en el plano. "
+                   "Asegurate de que el archivo sea un plano arquitectónico legible.",
+        )
     finally:
         if os.path.exists(temp_path):
             os.remove(temp_path)
