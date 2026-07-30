@@ -79,7 +79,9 @@ GOOGLE_USERINFO_URL = "https://www.googleapis.com/oauth2/v2/userinfo"
 
 
 def _derive_google_redirect_uri(request: Request) -> str:
-    base = str(request.url).replace(str(request.url.path), "").rstrip("/")
+    base = settings.FRONTEND_URL or str(request.url).replace(
+        str(request.url.path), ""
+    ).rstrip("/")
     return f"{base}/api/v1/auth/google/callback"
 
 
@@ -182,8 +184,10 @@ async def google_callback(request: Request, db: AsyncSession = Depends(get_db)):
     service = AuthService(db)
     tokens = await service._build_token(user)
 
-    frontend_url = str(request.url).replace(str(request.url.path), "").rstrip("/")
-    resp = RedirectResponse(f"{frontend_url}/login")
+    base_url = settings.FRONTEND_URL or str(request.url).replace(
+        str(request.url.path), ""
+    ).rstrip("/")
+    resp = RedirectResponse(f"{base_url}/auth/callback")
     resp.set_cookie(
         key=REFRESH_COOKIE,
         value=tokens.refresh_token,
@@ -199,7 +203,7 @@ async def google_callback(request: Request, db: AsyncSession = Depends(get_db)):
         httponly=False,
         secure=_cookie_secure(),
         samesite=_cookie_samesite(),
-        max_age=15 * 60,
+        max_age=settings.JWT_ACCESS_EXPIRATION_MINUTES * 60,
         path="/",
     )
     return resp

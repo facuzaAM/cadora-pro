@@ -14,7 +14,7 @@ export default function PricingPage() {
   const [userPlan, setUserPlan] = useState<string | undefined>();
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [paddleLoaded, setPaddleLoaded] = useState(false);
-  const paddleReady = useRef(false);
+  const [paddleReady, setPaddleReady] = useState(false);
 
   useEffect(() => {
     const token = api.getAccessToken();
@@ -27,14 +27,14 @@ export default function PricingPage() {
   }, []);
 
   const initPaddle = useCallback(async () => {
-    if (paddleReady.current || typeof window === "undefined" || !window.Paddle) return;
+    if (typeof window === "undefined" || !window.Paddle) return;
     try {
       const config = await billingService.getConfig();
       window.Paddle.Initialize({
         token: config.client_token,
         environment: config.environment === "sandbox" ? "sandbox" : "production",
       });
-      paddleReady.current = true;
+      setPaddleReady(true);
     } catch (err) {
       Sentry.captureException(err);
     }
@@ -45,7 +45,7 @@ export default function PricingPage() {
   }, [paddleLoaded, initPaddle]);
 
   const handleSubscribe = useCallback(async (planId: string) => {
-    if (!window.Paddle || !paddleReady.current) return;
+    if (!window.Paddle || !paddleReady) return;
     const plan = PLANS.find((p) => p.id === planId);
     if (!plan?.paddlePriceId) return;
 

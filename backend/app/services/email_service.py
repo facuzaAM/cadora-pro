@@ -1,3 +1,4 @@
+import html
 import logging
 import smtplib
 from email.mime.multipart import MIMEMultipart
@@ -63,7 +64,7 @@ def _build_verification_email(name: str, code: str) -> str:
         '<h2 style="color:#1a1a1a;margin-bottom:16px;">'
         "Verificá tu email</h2>"
         '<p style="color:#555;line-height:1.6;">'
-        f"Hola {name}, "
+                f"Hola {html.escape(name)}, "
         "gracias por registrarte en Cadora. "
         "Usá el siguiente código para verificar tu email.</p>"
         '<div style="background:#f4f4f5;border-radius:8px;'
@@ -92,7 +93,7 @@ def _build_reset_email(name: str, code: str) -> str:
         '<h2 style="color:#1a1a1a;margin-bottom:16px;">'
         "Recuperar contraseña</h2>"
         '<p style="color:#555;line-height:1.6;">'
-        f"Hola {name}, "
+                f"Hola {html.escape(name)}, "
         "recibimos una solicitud para restablecer "
         "tu contraseña en Cadora.</p>"
         '<div style="background:#f4f4f5;border-radius:8px;'

@@ -1,8 +1,10 @@
 import logging
 import os
 import tempfile
+import time
 import uuid as _uuid
 
+from cachetools import TTLCache
 from fastapi import APIRouter, HTTPException, Request, UploadFile
 from starlette.status import (
     HTTP_400_BAD_REQUEST,
@@ -19,7 +21,7 @@ router = APIRouter()
 DEMO_MAX_SIZE_MB = 10
 DEMO_ALLOWED_EXTENSIONS = {".pdf", ".png", ".jpg", ".jpeg", ".tiff"}
 
-_demo_sessions: set[str] = set()
+_demo_sessions: TTLCache = TTLCache(maxsize=1000, ttl=3600)
 
 
 def _validate_demo_file(file: UploadFile) -> str:
@@ -51,7 +53,7 @@ async def _read_with_limit(file: UploadFile) -> bytes:
 
 
 @router.post("/process")
-@limiter.limit("1/60seconds")
+@limiter.limit("1/minute")
 async def process_demo(
     request: Request,
     file: UploadFile,
@@ -107,7 +109,7 @@ async def process_demo(
         )
 
         if session_token:
-            _demo_sessions.add(session_token)
+            _demo_sessions[session_token] = time.time()
 
         return {
             "walls": [wall.model_dump(mode="json") for wall in lines_result.lines],

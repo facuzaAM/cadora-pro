@@ -1,18 +1,16 @@
-#!/bin/sh
-set -e
+#!/bin/bash
+set -euo pipefail
 
 BACKUP_DIR="/backups"
-RETENTION_DAYS=7
+TIMESTAMP=$(date +%Y%m%d_%H%M%S)
+DB_NAME="${POSTGRES_DB:-cadora}"
+DB_USER="${POSTGRES_USER:-postgres}"
 
-echo "$(date +%Y\-%m\-%d\ %H:%M:%S) — Starting PostgreSQL backup..."
+mkdir -p "$BACKUP_DIR"
 
-FILENAME="cadora_$(date +%Y%m%d_%H%M%S).sql.gz"
-pg_dump -h db -U "${POSTGRES_USER:-cadora}" -d "${POSTGRES_DB:-cadora}" | gzip > "${BACKUP_DIR}/${FILENAME}"
+pg_dump -U "$DB_USER" -d "$DB_NAME" -F c -f "$BACKUP_DIR/${DB_NAME}_${TIMESTAMP}.dump"
 
-echo "$(date +%Y\-%m\-%d\ %H:%M:%S) — Backup saved: ${FILENAME}"
+# Keep only last 30 backups
+ls -t "$BACKUP_DIR"/*.dump 2>/dev/null | tail -n +31 | xargs -r rm
 
-# Remove backups older than retention period
-find "${BACKUP_DIR}" -name "cadora_*.sql.gz" -mtime +${RETENTION_DAYS} -delete
-
-echo "$(date +%Y\-%m\-%d\ %H:%M:%S) — Cleanup done. Backups remaining:"
-ls -lh "${BACKUP_DIR}"/cadora_*.sql.gz 2>/dev/null || echo "  (none)"
+echo "Backup complete: ${BACKUP_DIR}/${DB_NAME}_${TIMESTAMP}.dump"

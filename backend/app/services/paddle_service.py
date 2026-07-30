@@ -12,7 +12,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.config import settings
 from app.repositories.user_repository import UserRepository
-from app.services.plan_config import PLANS, get_plan
+from app.services.plan_config import get_plan
 
 logger = logging.getLogger(__name__)
 
@@ -153,18 +153,18 @@ class PaddleService:
             items = data.get("items", [])
             price_id = items[0].get("price", {}).get("id", "") if items else ""
 
-            plan_name = "free"
-            for name, p in PLANS.items():
-                if getattr(settings, p.paddle_price_id, "") == price_id:
-                    plan_name = name
-                    break
-            else:
-                if price_id:
-                    logger.warning(
-                        "Paddle price_id %s no matchea ningun plan. "
-                        "Degradando a 'free' para subscription %s",
-                        price_id, paddle_subscription_id,
-                    )
+            _price_to_plan = {
+                settings.PADDLE_PRICE_STARTER: "starter",
+                settings.PADDLE_PRICE_PRO: "pro",
+                settings.PADDLE_PRICE_BUSINESS: "business",
+            }
+            plan_name = _price_to_plan.get(price_id, "free")
+            if plan_name == "free" and price_id:
+                logger.warning(
+                    "Paddle price_id %s no matchea ningun plan. "
+                    "Degradando a 'free' para subscription %s",
+                    price_id, paddle_subscription_id,
+                )
 
             plan = get_plan(plan_name)
             user.subscription_plan = plan_name

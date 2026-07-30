@@ -1,3 +1,4 @@
+import asyncio
 import logging
 
 from fastapi import APIRouter, HTTPException, Request
@@ -36,11 +37,15 @@ async def send_contact(request: Request, body: ContactRequest):
         f"<p><strong>Asunto:</strong> {body.subject}</p>"
         f"<hr><p>{body.message}</p>"
     )
-    sent = send_email("hello@cadora.pro", f"Contacto: {body.subject}", html)
+    sent = await asyncio.to_thread(
+        send_email, "hello@cadora.pro", f"Contacto: {body.subject}", html,
+    )
 
     if sent:
         logger.info("Contact form forwarded: %s <%s>", body.name, body.email)
-    else:
-        logger.warning("Contact form received but email delivery failed: %s", body.subject)
-
-    return {"ok": True, "message": "Mensaje enviado correctamente"}
+        return {"ok": True, "message": "Mensaje enviado correctamente"}
+    logger.warning("Contact form received but email delivery failed: %s", body.subject)
+    raise HTTPException(
+        status_code=500,
+        detail="No pudimos enviar tu mensaje. Intentá de nuevo más tarde.",
+    )

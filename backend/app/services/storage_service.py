@@ -58,7 +58,7 @@ class StorageService:
             client = get_supabase()
             if client:
                 return client.storage.from_(bucket).get_public_url(path)
-        return f"/uploads/{path}"
+        return f"/uploads/{bucket}/{path}"
 
     async def exists(self, bucket: str, path: str) -> bool:
         if settings.SUPABASE_URL and settings.SUPABASE_KEY:

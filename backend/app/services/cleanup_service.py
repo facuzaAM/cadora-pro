@@ -11,6 +11,7 @@ from datetime import UTC, datetime, timedelta
 
 from sqlalchemy import delete, select
 
+from app.config import settings
 from app.database import async_session_factory
 from app.models.document import Document
 from app.models.refresh_token import RefreshToken
@@ -35,7 +36,7 @@ async def _cleanup_old_documents() -> int:
 
         for doc in docs:
             try:
-                await storage.delete("cadora-documents", doc.storage_path)
+                await storage.delete(settings.STORAGE_BUCKET, doc.storage_path)
             except Exception as e:
                 logger.warning("Failed to delete storage file %s: %s", doc.storage_path, e)
 

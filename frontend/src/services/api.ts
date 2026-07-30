@@ -25,8 +25,21 @@ class ApiClient {
     return this.accessToken ?? undefined;
   }
 
+  private _fetchTimeout = 30000;
+
+  private async _fetch(input: RequestInfo, init?: RequestInit): Promise<Response> {
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), this._fetchTimeout);
+    try {
+      const res = await fetch(input, { ...init, signal: controller.signal });
+      return res;
+    } finally {
+      clearTimeout(timer);
+    }
+  }
+
   async get<T>(path: string, token?: string): Promise<T> {
-    const res = await fetch(`${this.baseUrl}${path}`, {
+    const res = await this._fetch(`${this.baseUrl}${path}`, {
       credentials: "include",
       headers: this.headers(token),
     });
@@ -34,7 +47,7 @@ class ApiClient {
   }
 
   async post<T>(path: string, body: unknown, token?: string): Promise<T> {
-    const res = await fetch(`${this.baseUrl}${path}`, {
+    const res = await this._fetch(`${this.baseUrl}${path}`, {
       method: "POST",
       credentials: "include",
       headers: this.headers(token),
@@ -47,7 +60,7 @@ class ApiClient {
     const auth = token || this.accessToken;
     const headers: Record<string, string> = {};
     if (auth) headers["Authorization"] = `Bearer ${auth}`;
-    const res = await fetch(`${this.baseUrl}${path}`, {
+    const res = await this._fetch(`${this.baseUrl}${path}`, {
       method: "POST",
       credentials: "include",
       headers,
@@ -57,7 +70,7 @@ class ApiClient {
   }
 
   async patch<T>(path: string, body: unknown, token?: string): Promise<T> {
-    const res = await fetch(`${this.baseUrl}${path}`, {
+    const res = await this._fetch(`${this.baseUrl}${path}`, {
       method: "PATCH",
       credentials: "include",
       headers: this.headers(token),
@@ -67,7 +80,7 @@ class ApiClient {
   }
 
   async delete<T>(path: string, token?: string): Promise<T> {
-    const res = await fetch(`${this.baseUrl}${path}`, {
+    const res = await this._fetch(`${this.baseUrl}${path}`, {
       method: "DELETE",
       credentials: "include",
       headers: this.headers(token),
@@ -81,7 +94,11 @@ class ApiClient {
       window.location.href = "/pricing?reason=limit_reached";
       throw new ApiError(402, { detail: "Límite alcanzado. Redirigiendo..." });
     }
-    if (!res.ok) throw new ApiError(res.status, await res.json());
+    if (!res.ok) {
+      let body: unknown;
+      try { body = await res.json(); } catch { body = { detail: `Error ${res.status}` }; }
+      throw new ApiError(res.status, body);
+    }
     return res.json();
   }
 

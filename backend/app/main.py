@@ -78,12 +78,13 @@ async def lifespan(app: FastAPI):
 
 
 async def rate_limit_handler(request: Request, exc: Exception) -> JSONResponse:
+    retry_after = getattr(exc, "retry_after", None) or 1
     return JSONResponse(
         status_code=429,
         content={
             "error": "demasiadas_solicitudes",
             "message": "Demasiadas solicitudes. Intentá de nuevo en un momento.",
-            "retry_after": 1,
+            "retry_after": retry_after,
         },
     )
 
@@ -107,8 +108,9 @@ app = FastAPI(
     },
 )
 
-app.state.limiter = limiter
-app.add_exception_handler(RateLimitExceeded, rate_limit_handler)
+if settings.RATE_LIMIT_ENABLED:
+    app.state.limiter = limiter
+    app.add_exception_handler(RateLimitExceeded, rate_limit_handler)
 
 
 @app.exception_handler(Exception)

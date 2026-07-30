@@ -25,11 +25,11 @@ from app.utils.rate_limit import limiter
 logger = logging.getLogger(__name__)
 
 
-def _capture_sentry() -> None:
+def _capture_sentry(exc: Exception | None = None) -> None:
     if settings.SENTRY_DSN:
         try:
             import sentry_sdk
-            sentry_sdk.capture_exception()
+            sentry_sdk.capture_exception(exc)
         except Exception:
             pass
 

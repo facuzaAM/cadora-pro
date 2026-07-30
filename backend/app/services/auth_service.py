@@ -76,7 +76,9 @@ class AuthService:
         if not verify_password(current_password, user.hashed_password):
             raise ValueError("La contraseña actual es incorrecta")
         user.hashed_password = hash_password(new_password)
+        user.token_version += 1
         await self.repo._save(user)
+        await self.refresh_repo.revoke_all_for_user(user.id)
 
     async def get_user(self, user_id: UUID) -> User:
         user = await self.repo.get_by_id(user_id)
@@ -159,6 +161,7 @@ class AuthService:
             raise ValueError("Usuario no encontrado")
 
         user.hashed_password = hash_password(new_password)
+        user.token_version += 1
         await self.repo._save(user)
         await self.reset_repo.mark_used(token.id)
         await self.refresh_repo.revoke_all_for_user(user.id)

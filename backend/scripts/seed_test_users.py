@@ -87,6 +87,7 @@ async def main():
                     storage_used=0,
                     storage_limit=u["storage_limit"],
                     priority_processing=u["priority_processing"],
+                    email_verified=True,
                 )
                 db.add(user)
                 print(f"  ✓ Created {u['email']} ({u['plan']})")

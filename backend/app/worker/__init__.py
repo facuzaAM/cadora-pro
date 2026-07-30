@@ -29,7 +29,8 @@ async def process_detection(document_id: str, project_id: str) -> dict:
         )
 
         import httpx
-        response = httpx.get(download_url)
+        async with httpx.AsyncClient() as client:
+            response = await client.get(download_url)
         with open(temp_path, "wb") as f:
             f.write(response.content)
 
