@@ -5,10 +5,9 @@ import Script from "next/script";
 
 const gaId = process.env.NEXT_PUBLIC_GA_ID;
 
-export function GoogleAnalytics() {
-  if (!gaId) return null;
-
+function DisableIfNoConsent() {
   useEffect(() => {
+    if (!gaId) return;
     let consent = false;
     try {
       const stored = localStorage.getItem("cadora_cookie_consent");
@@ -19,9 +18,15 @@ export function GoogleAnalytics() {
       (window as any)[`ga-disable-${gaId}`] = true;
     }
   }, []);
+  return null;
+}
+
+export function GoogleAnalytics() {
+  if (!gaId) return null;
 
   return (
     <>
+      <DisableIfNoConsent />
       <Script
         src={`https://www.googletagmanager.com/gtag/js?id=${gaId}`}
         strategy="afterInteractive"

@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import * as Sentry from "@sentry/nextjs";
 import Script from "next/script";
 import { PricingCard } from "@/components/features/pricing/pricing-card";
@@ -65,7 +65,7 @@ export default function PricingPage() {
         theme: "light",
       },
     });
-  }, []);
+  }, [paddleReady]);
 
   return (
     <div className="flex min-h-screen flex-col">
