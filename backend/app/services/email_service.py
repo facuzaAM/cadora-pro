@@ -1,3 +1,4 @@
+import contextlib
 import html
 import logging
 import smtplib
@@ -23,8 +24,8 @@ def send_email(to: str, subject: str, html_body: str) -> bool:
     msg["Subject"] = subject
     msg.attach(MIMEText(html_body, "html"))
 
+    server: smtplib.SMTP | smtplib.SMTP_SSL | None = None
     try:
-        server: smtplib.SMTP | smtplib.SMTP_SSL
         if settings.SMTP_PORT == 465:
             server = smtplib.SMTP_SSL(settings.SMTP_HOST, settings.SMTP_PORT)
         else:
@@ -47,6 +48,10 @@ def send_email(to: str, subject: str, html_body: str) -> bool:
             except Exception:
                 pass
         return False
+    finally:
+        if server:
+            with contextlib.suppress(Exception):
+                server.quit()
 
 
 def send_reset_code(email: str, code: str, name: str) -> bool:

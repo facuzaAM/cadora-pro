@@ -27,7 +27,7 @@ export default function ForgotPasswordPage() {
         toast.error("Error de conexión. Revisá tu conexión a internet e intentá de nuevo.");
         return;
       }
-      setSubmitted(true);
+      toast.error("Error al enviar el código. Intentalo de nuevo más tarde.");
     } finally {
       setLoading(false);
     }

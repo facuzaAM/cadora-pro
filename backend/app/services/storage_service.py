@@ -9,7 +9,12 @@ UPLOAD_DIR.mkdir(exist_ok=True)
 
 
 class StorageService:
-    """Local file storage with optional Supabase fallback."""
+    """Local file storage with optional Supabase fallback.
+
+    All methods accept a bucket and a relative path (e.g. ``user_id/project/file.pdf``).
+    ``upload()`` always returns the relative path. ``get_download_url()``
+    returns an HTTP-accessible URL regardless of backend.
+    """
 
     async def upload(
         self,
@@ -19,29 +24,28 @@ class StorageService:
         content_type: str = "application/octet-stream",
     ) -> str:
         if settings.SUPABASE_URL and settings.SUPABASE_KEY:
-            return await asyncio.to_thread(
-                self._upload_supabase, bucket, path, data, content_type
-            )
-        return self._upload_local(bucket, path, data)
+            client = get_supabase()
+            if client:
+                await asyncio.to_thread(
+                    self._upload_supabase, client, bucket, path, data, content_type,
+                )
+                return path
+        self._upload_local(bucket, path, data)
+        return path
 
-    def _upload_local(self, bucket: str, path: str, data: bytes) -> str:
+    def _upload_local(self, bucket: str, path: str, data: bytes) -> None:
         full_path = UPLOAD_DIR / bucket / path
         full_path.parent.mkdir(parents=True, exist_ok=True)
         full_path.write_bytes(data)
-        return str(full_path)
 
     def _upload_supabase(
-        self, bucket: str, path: str, data: bytes, content_type: str
-    ) -> str:
-        client = get_supabase()
-        if not client:
-            return self._upload_local(bucket, path, data)
+        self, client, bucket: str, path: str, data: bytes, content_type: str,
+    ) -> None:
         client.storage.from_(bucket).upload(
             path=path,
             file=data,
             file_options={"content-type": content_type, "upsert": "true"},
         )
-        return client.storage.from_(bucket).get_public_url(path)
 
     async def delete(self, bucket: str, path: str) -> None:
         if settings.SUPABASE_URL and settings.SUPABASE_KEY:
@@ -49,7 +53,7 @@ class StorageService:
             if client:
                 await asyncio.to_thread(client.storage.from_(bucket).remove, [path])
                 return
-        full_path = Path(path)
+        full_path = UPLOAD_DIR / bucket / path
         if full_path.exists():
             full_path.unlink()
 
@@ -67,7 +71,6 @@ class StorageService:
             client = get_supabase()
             if client:
                 try:
-                    await asyncio.to_thread(client.storage.from_(bucket).get_public_url, path)
                     files = await asyncio.to_thread(
                         client.storage.from_(bucket).list, (path.rsplit("/", 1)[0] or ""),
                     )

@@ -377,7 +377,8 @@ async def upload_avatar(
 
     from app.services.storage_service import StorageService
     storage = StorageService()
-    url = await storage.upload(settings.STORAGE_BUCKET, path, data, file.content_type)
+    await storage.upload(settings.STORAGE_BUCKET, path, data, file.content_type)
+    url = await storage.get_download_url(settings.STORAGE_BUCKET, path)
 
     user.avatar_url = url
     repo = UserRepository(db)

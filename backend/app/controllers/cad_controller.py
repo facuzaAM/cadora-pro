@@ -6,7 +6,6 @@ import uuid as _uuid
 from pathlib import Path
 from uuid import UUID
 
-import httpx
 from fastapi import APIRouter, Depends, HTTPException, Request
 from fastapi.responses import FileResponse
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -55,14 +54,11 @@ async def _download_doc_to_temp(
     )
     os.close(fd)
     try:
-        download_url = await storage.get_download_url(
+        content = await storage.download_bytes(
             settings.STORAGE_BUCKET, doc.storage_path,
         )
-        async with httpx.AsyncClient() as client:
-            response = await client.get(download_url)
-            response.raise_for_status()
         with open(path, "wb") as f:
-            f.write(response.content)
+            f.write(content)
     except Exception:
         if os.path.exists(path):
             os.remove(path)

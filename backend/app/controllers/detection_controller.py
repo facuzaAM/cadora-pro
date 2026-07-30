@@ -4,7 +4,6 @@ import tempfile
 import uuid as _uuid
 from uuid import UUID
 
-import httpx
 from fastapi import APIRouter, Depends, HTTPException, Request, UploadFile
 from sqlalchemy.ext.asyncio import AsyncSession
 from starlette.status import HTTP_400_BAD_REQUEST, HTTP_404_NOT_FOUND, HTTP_413_CONTENT_TOO_LARGE
@@ -156,14 +155,11 @@ async def ocr_uploaded_document(
 
     temp_path = _safe_temp_path(user.id, document_id, doc.filename)
     try:
-        download_url = await storage.get_download_url(
-            settings.STORAGE_BUCKET, doc.storage_path
+        content = await storage.download_bytes(
+            settings.STORAGE_BUCKET, doc.storage_path,
         )
-        async with httpx.AsyncClient() as client:
-            response = await client.get(download_url)
-            response.raise_for_status()
         with open(temp_path, "wb") as f:
-            f.write(response.content)
+            f.write(content)
 
         ocr_request = OcrRequest(language=language)
         result = await ocr_service.process_file(temp_path, request=ocr_request)

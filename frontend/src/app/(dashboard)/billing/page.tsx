@@ -60,7 +60,7 @@ export default function BillingPage() {
 
   const handleManage = useCallback(async () => {
     if (!paddleReady.current) await initPaddle();
-    if (typeof window !== "undefined" && window.Paddle) {
+    if (paddleReady.current && typeof window !== "undefined" && window.Paddle) {
       window.Paddle.CustomerPortal.open();
     }
   }, [initPaddle]);

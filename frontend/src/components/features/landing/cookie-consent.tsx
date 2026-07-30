@@ -8,17 +8,17 @@ export function CookieConsent() {
   const [visible, setVisible] = useState(false);
 
   useEffect(() => {
-    const consent = localStorage.getItem("cookies_consent");
+    const consent = localStorage.getItem("cadora_cookie_consent");
     if (!consent) setVisible(true);
   }, []);
 
   const accept = () => {
-    localStorage.setItem("cookies_consent", "accepted");
+    localStorage.setItem("cadora_cookie_consent", "accepted");
     setVisible(false);
   };
 
   const reject = () => {
-    localStorage.setItem("cookies_consent", "rejected");
+    localStorage.setItem("cadora_cookie_consent", "rejected");
     setVisible(false);
   };
 
