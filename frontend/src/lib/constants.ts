@@ -41,7 +41,7 @@ export const PLANS = [
     id: "starter",
     name: "Starter",
     price: 15,
-    paddlePriceId: "price_starter_id",
+    paddlePriceId: "",
     description: "Para profesionales independientes",
     features: [
       "50 conversiones/mes",
@@ -61,7 +61,7 @@ export const PLANS = [
     id: "pro",
     name: "Pro",
     price: 35,
-    paddlePriceId: "price_pro_id",
+    paddlePriceId: "",
     description: "Para estudios y equipos pequeños",
     features: [
       "200 conversiones/mes",
@@ -82,7 +82,7 @@ export const PLANS = [
     id: "business",
     name: "Business",
     price: 60,
-    paddlePriceId: "price_business_id",
+    paddlePriceId: "",
     description: "Para empresas con alto volumen",
     features: [
       "Conversiones ilimitadas",

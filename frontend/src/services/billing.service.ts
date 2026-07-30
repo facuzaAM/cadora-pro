@@ -2,11 +2,13 @@ import { api } from "./api";
 import { getCached, setCache } from "@/lib/cache";
 
 export interface Plan {
+  id: string;
   name: string;
   price: number;
   conversions_limit: number;
   storage_limit: number;
   priority_processing: boolean;
+  paddle_price_id: string;
 }
 
 export interface Subscription {

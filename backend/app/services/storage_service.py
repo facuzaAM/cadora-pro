@@ -47,7 +47,7 @@ class StorageService:
         if settings.SUPABASE_URL and settings.SUPABASE_KEY:
             client = get_supabase()
             if client:
-                client.storage.from_(bucket).remove([path])
+                await asyncio.to_thread(client.storage.from_(bucket).remove, [path])
                 return
         full_path = Path(path)
         if full_path.exists():
@@ -57,7 +57,9 @@ class StorageService:
         if settings.SUPABASE_URL and settings.SUPABASE_KEY:
             client = get_supabase()
             if client:
-                return client.storage.from_(bucket).get_public_url(path)
+                return await asyncio.to_thread(
+                    client.storage.from_(bucket).get_public_url, path,
+                )
         return f"/uploads/{bucket}/{path}"
 
     async def exists(self, bucket: str, path: str) -> bool:
@@ -65,8 +67,10 @@ class StorageService:
             client = get_supabase()
             if client:
                 try:
-                    client.storage.from_(bucket).get_public_url(path)
-                    files = client.storage.from_(bucket).list(path.rsplit("/", 1)[0] or "")
+                    await asyncio.to_thread(client.storage.from_(bucket).get_public_url, path)
+                    files = await asyncio.to_thread(
+                        client.storage.from_(bucket).list, (path.rsplit("/", 1)[0] or ""),
+                    )
                     filename = path.rsplit("/", 1)[-1]
                     return any(f.get("name") == filename for f in files)
                 except Exception:
@@ -78,6 +82,6 @@ class StorageService:
         if settings.SUPABASE_URL and settings.SUPABASE_KEY:
             client = get_supabase()
             if client:
-                return client.storage.from_(bucket).download(path)
+                return await asyncio.to_thread(client.storage.from_(bucket).download, path)
         full_path = UPLOAD_DIR / bucket / path
         return full_path.read_bytes()

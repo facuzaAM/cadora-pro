@@ -16,16 +16,19 @@ router = APIRouter()
 
 @router.get("/plans", response_model=list[PlanResponse])
 async def list_plans():
-    return [
-        PlanResponse(
+    result = []
+    for plan_id, p in PLANS.items():
+        price_id = getattr(settings, p.paddle_price_id, "") if p.paddle_price_id else ""
+        result.append(PlanResponse(
+            id=plan_id,
             name=p.name,
             price=p.price,
             conversions_limit=p.conversions_limit,
             storage_limit=p.storage_limit,
             priority_processing=p.priority_processing,
-        )
-        for p in PLANS.values()
-    ]
+            paddle_price_id=price_id,
+        ))
+    return result
 
 
 @router.get("/subscription", response_model=SubscriptionResponse)

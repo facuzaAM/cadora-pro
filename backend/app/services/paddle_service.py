@@ -151,7 +151,13 @@ class PaddleService:
                 return
 
             items = data.get("items", [])
-            price_id = items[0].get("price", {}).get("id", "") if items else ""
+            if not items:
+                logger.warning(
+                    "subscription.updated sin items para %s",
+                    paddle_subscription_id,
+                )
+                return
+            price_id = items[0].get("price", {}).get("id", "")
 
             _price_to_plan = {
                 settings.PADDLE_PRICE_STARTER: "starter",
@@ -247,6 +253,20 @@ class PaddleService:
 
             items = data.get("items", [])
             if items:
+                price_id = items[0].get("price", {}).get("id", "")
+                _price_to_plan = {
+                    settings.PADDLE_PRICE_STARTER: "starter",
+                    settings.PADDLE_PRICE_PRO: "pro",
+                    settings.PADDLE_PRICE_BUSINESS: "business",
+                }
+                plan_name = _price_to_plan.get(price_id, "free")
+                if plan_name != "free":
+                    plan = get_plan(plan_name)
+                    user.subscription_plan = plan_name
+                    user.conversions_limit = plan.conversions_limit
+                    user.storage_limit = plan.storage_limit
+                    user.priority_processing = plan.priority_processing
+
                 period_end = items[0].get("next_transaction", {}).get("created_at")
                 if period_end:
                     user.subscription_end = datetime.fromisoformat(

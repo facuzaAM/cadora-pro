@@ -71,6 +71,15 @@ def _auth_response(tokens: TokenResponse, user: User) -> JSONResponse:
         max_age=7 * 24 * 3600,
         path="/",
     )
+    resp.set_cookie(
+        key=ACCESS_COOKIE,
+        value=tokens.access_token,
+        httponly=False,
+        secure=_cookie_secure(),
+        samesite=_cookie_samesite(),
+        max_age=settings.JWT_ACCESS_EXPIRATION_MINUTES * 60,
+        path="/",
+    )
     return resp
 
 GOOGLE_AUTH_URL = "https://accounts.google.com/o/oauth2/v2/auth"
@@ -79,9 +88,12 @@ GOOGLE_USERINFO_URL = "https://www.googleapis.com/oauth2/v2/userinfo"
 
 
 def _derive_google_redirect_uri(request: Request) -> str:
-    base = settings.FRONTEND_URL or str(request.url).replace(
-        str(request.url.path), ""
-    ).rstrip("/")
+    if settings.FRONTEND_URL:
+        base = settings.FRONTEND_URL
+    else:
+        scheme = request.headers.get("X-Forwarded-Proto", "https")
+        host = request.headers.get("Host", "api.cadora.pro")
+        base = f"{scheme}://{host}"
     return f"{base}/api/v1/auth/google/callback"
 
 
@@ -229,7 +241,11 @@ async def register(
             status_code=HTTP_400_BAD_REQUEST,
             detail="Error creando usuario",
         )
-    await service.send_verification_email(user)
+    if settings.ENVIRONMENT != "production":
+        user.email_verified = True
+        await service.repo._save(user)
+    else:
+        await service.send_verification_email(user)
     return _auth_response(result, user)
 
 

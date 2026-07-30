@@ -6,15 +6,20 @@ import Script from "next/script";
 import { PricingCard } from "@/components/features/pricing/pricing-card";
 import { LandingNav } from "@/components/features/landing/landing-nav";
 import { SiteFooter } from "@/components/layout/site-footer";
-import { PLANS } from "@/lib/constants";
-import { billingService } from "@/services/billing.service";
+import { PLANS as DISPLAY_PLANS } from "@/lib/constants";
+import { billingService, type Plan } from "@/services/billing.service";
 import { api } from "@/services/api";
 
 export default function PricingPage() {
+  const [plans, setPlans] = useState<Plan[]>([]);
   const [userPlan, setUserPlan] = useState<string | undefined>();
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [paddleLoaded, setPaddleLoaded] = useState(false);
   const [paddleReady, setPaddleReady] = useState(false);
+
+  useEffect(() => {
+    billingService.getPlans().then(setPlans).catch(() => {});
+  }, []);
 
   useEffect(() => {
     const token = api.getAccessToken();
@@ -46,8 +51,8 @@ export default function PricingPage() {
 
   const handleSubscribe = useCallback(async (planId: string) => {
     if (!window.Paddle || !paddleReady) return;
-    const plan = PLANS.find((p) => p.id === planId);
-    if (!plan?.paddlePriceId) return;
+    const plan = plans.find((p) => p.id === planId);
+    if (!plan?.paddle_price_id) return;
 
     const token = api.getAccessToken();
     let userId: string | undefined;
@@ -58,14 +63,14 @@ export default function PricingPage() {
       } catch {}
     }
     window.Paddle.Checkout.open({
-      items: [{ priceId: plan.paddlePriceId, quantity: 1 }],
+      items: [{ priceId: plan.paddle_price_id, quantity: 1 }],
       customData: { plan: planId, user_id: userId },
       settings: {
         displayMode: "overlay",
         theme: "light",
       },
     });
-  }, [paddleReady]);
+  }, [paddleReady, plans]);
 
   return (
     <div className="flex min-h-screen flex-col">
@@ -87,10 +92,10 @@ export default function PricingPage() {
           </div>
 
           <div className="mt-12 grid gap-8 lg:grid-cols-4">
-            {PLANS.map((plan) => (
+            {DISPLAY_PLANS.map((display) => (
               <PricingCard
-                key={plan.id}
-                {...plan}
+                key={display.id}
+                {...display}
                 userPlan={userPlan}
                 isAuthenticated={isAuthenticated}
                 onSubscribe={handleSubscribe}

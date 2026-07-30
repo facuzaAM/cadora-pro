@@ -4,6 +4,7 @@ from fastapi import Depends, HTTPException
 from sqlalchemy.ext.asyncio import AsyncSession
 from starlette.status import HTTP_402_PAYMENT_REQUIRED, HTTP_403_FORBIDDEN
 
+from app.config import settings
 from app.database import get_db
 from app.models.user import User
 from app.repositories.user_repository import UserRepository
@@ -14,7 +15,7 @@ async def enforce_conversion_limit(
     user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ) -> User:
-    if not user.email_verified:
+    if settings.ENVIRONMENT == "production" and not user.email_verified:
         raise HTTPException(
             status_code=HTTP_403_FORBIDDEN,
             detail="Verificá tu email antes de usar el servicio. "

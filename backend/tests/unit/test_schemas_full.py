@@ -23,11 +23,13 @@ def test_login_request():
 
 def test_plan_response():
     resp = PlanResponse(
+        id="pro",
         name="Pro",
         price=49,
         conversions_limit=200,
         storage_limit=5 * 1024 * 1024 * 1024,
         priority_processing=True,
+        paddle_price_id="pri_pro_test",
     )
     assert resp.name == "Pro"
     assert resp.price == 49
