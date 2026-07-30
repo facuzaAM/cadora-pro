@@ -5,7 +5,7 @@ from fastapi import APIRouter, HTTPException, Request
 from pydantic import BaseModel, EmailStr
 from starlette.status import HTTP_400_BAD_REQUEST
 
-from app.core.config import settings
+from app.config import settings
 from app.services.email_service import send_email
 from app.utils.rate_limit import limiter
 
