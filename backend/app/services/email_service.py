@@ -3,7 +3,6 @@ import logging
 import smtplib
 from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
-from typing import Union
 
 from app.config import settings
 
@@ -25,7 +24,7 @@ def send_email(to: str, subject: str, html_body: str) -> bool:
     msg.attach(MIMEText(html_body, "html"))
 
     try:
-        server: Union[smtplib.SMTP, smtplib.SMTP_SSL]
+        server: smtplib.SMTP | smtplib.SMTP_SSL
         if settings.SMTP_PORT == 465:
             server = smtplib.SMTP_SSL(settings.SMTP_HOST, settings.SMTP_PORT)
         else:
