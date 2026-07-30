@@ -34,7 +34,12 @@ export default function ResultPage() {
   useEffect(() => {
     const token = api.getAccessToken();
     projectsService.getById(projectId, token)
-      .then((p) => setProjectName(p.name))
+      .then((p) => {
+        setProjectName(p.name);
+        if (p.status === "cad_generated" || p.status === "detection_completed") {
+          setCadReady(true);
+        }
+      })
       .catch(() => toast.error("Error cargando proyecto"));
   }, [projectId]);
 

@@ -43,7 +43,7 @@ export function SettingsForm() {
     const token = api.getAccessToken();
     billingService.getSubscription(token).then((sub) => {
       setPlanName(sub.plan.charAt(0).toUpperCase() + sub.plan.slice(1));
-    }).catch(() => {});
+    }).catch(() => toast.error("Error al cargar información del plan"));
   }, []);
 
   const onSubmit = async (data: ProfileForm) => {

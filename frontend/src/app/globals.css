@@ -59,18 +59,26 @@
     @apply bg-background text-foreground;
     min-height: 100vh;
     background-image:
+      linear-gradient(to right, hsl(var(--border) / 0.25) 1px, transparent 1px),
+      linear-gradient(to bottom, hsl(var(--border) / 0.25) 1px, transparent 1px),
       radial-gradient(ellipse 80% 60% at 50% -20%, hsl(var(--primary) / 0.08) 0%, transparent 60%),
       radial-gradient(ellipse 60% 50% at 80% 40%, hsl(var(--primary) / 0.03) 0%, transparent 50%),
       radial-gradient(ellipse 50% 40% at 20% 60%, hsl(var(--primary) / 0.02) 0%, transparent 50%);
+    background-size: 40px 40px, 40px 40px, auto, auto, auto;
+    background-repeat: repeat, repeat, no-repeat, no-repeat, no-repeat;
     background-attachment: fixed;
   }
 
   .dark body,
   body.dark {
     background-image:
+      linear-gradient(to right, hsl(var(--border) / 0.15) 1px, transparent 1px),
+      linear-gradient(to bottom, hsl(var(--border) / 0.15) 1px, transparent 1px),
       radial-gradient(ellipse 80% 50% at 50% -15%, hsl(var(--primary) / 0.12) 0%, transparent 60%),
       radial-gradient(ellipse 50% 40% at 80% 30%, hsl(199 89% 58% / 0.06) 0%, transparent 50%),
       radial-gradient(ellipse 40% 35% at 20% 50%, hsl(199 89% 58% / 0.04) 0%, transparent 50%);
+    background-size: 40px 40px, 40px 40px, auto, auto, auto;
+    background-repeat: repeat, repeat, no-repeat, no-repeat, no-repeat;
   }
 }
 

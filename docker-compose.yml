@@ -7,7 +7,7 @@ services:
       - "80:80"
       - "443:443"
     volumes:
-      - ./nginx/letsencrypt:/etc/letsencrypt:ro
+      - ./nginx/letsencrypt:/etc/letsencrypt
       - certbot-www:/var/www/certbot:ro
     depends_on:
       api:
@@ -33,7 +33,7 @@ services:
         NEXT_PUBLIC_API_URL: /api/v1
         NEXT_PUBLIC_GA_ID: ${GA_ID}
         NEXT_PUBLIC_SENTRY_DSN: ${SENTRY_DSN}
-        NEXT_PUBLIC_SITE_URL: https://cadora.pro
+        NEXT_PUBLIC_SITE_URL: ${SITE_URL:-https://cadora.pro}
         NEXT_PUBLIC_SUPABASE_URL: ${SUPABASE_URL}
         NEXT_PUBLIC_SUPABASE_KEY: ${SUPABASE_KEY}
     environment:

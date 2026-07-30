@@ -5,6 +5,7 @@ import { ProjectCard } from "./project-card";
 import { EmptyProjects } from "./empty-projects";
 import { projectsService } from "@/services/projects.service";
 import { api } from "@/services/api";
+import { toast } from "sonner";
 import type { Project, ProjectStatus } from "@/types";
 
 const statusMap: Record<ProjectStatus, { label: string; variant: "success" | "warning" | "secondary" | "default" }> = {
@@ -37,7 +38,7 @@ export function ProjectList() {
     projectsService
       .list(token)
       .then(setProjects)
-      .catch(() => {})
+      .catch(() => toast.error("Error al cargar proyectos"))
       .finally(() => setLoading(false));
   }, []);
 

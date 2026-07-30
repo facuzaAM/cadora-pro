@@ -18,7 +18,7 @@ export default function PricingPage() {
   const [paddleReady, setPaddleReady] = useState(false);
 
   useEffect(() => {
-    billingService.getPlans().then(setPlans).catch(() => {});
+    billingService.getPlans().then(setPlans).catch((err) => { Sentry.captureException(err); });
   }, []);
 
   useEffect(() => {

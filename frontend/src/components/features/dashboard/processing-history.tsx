@@ -11,6 +11,7 @@ import { cn } from "@/lib/utils";
 import { projectsService } from "@/services/projects.service";
 import { api } from "@/services/api";
 import type { Project } from "@/types";
+import { toast } from "sonner";
 
 interface HistoryItem {
   id: string;
@@ -77,7 +78,7 @@ export function ProcessingHistory() {
         .slice(0, 6)
         .map(projectToHistory);
       setHistory(sorted);
-    }).catch(() => {});
+    }).catch(() => toast.error("Error al cargar historial"));
   }, []);
 
   return (

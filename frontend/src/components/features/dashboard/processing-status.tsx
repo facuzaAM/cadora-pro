@@ -8,6 +8,7 @@ import { Progress } from "@/components/ui/progress";
 import { Separator } from "@/components/ui/separator";
 import { projectsService } from "@/services/projects.service";
 import { api } from "@/services/api";
+import { toast } from "sonner";
 
 interface ActiveProcess {
   id: string;
@@ -31,7 +32,7 @@ export function ProcessingStatus() {
           progress: Math.min(20 + i * 25, 80),
         }));
       setActive(processing);
-    }).catch(() => {});
+    }).catch(() => toast.error("Error al cargar estado de procesamiento"));
   }, []);
 
   return (

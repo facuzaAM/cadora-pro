@@ -7,13 +7,14 @@ import { Progress } from "@/components/ui/progress";
 import { Separator } from "@/components/ui/separator";
 import { billingService, type Subscription } from "@/services/billing.service";
 import { api } from "@/services/api";
+import { toast } from "sonner";
 
 export function CreditUsage() {
   const [sub, setSub] = useState<Subscription | null>(null);
 
   useEffect(() => {
     const token = api.getAccessToken();
-    billingService.getSubscription(token).then(setSub).catch(() => {});
+    billingService.getSubscription(token).then(setSub).catch(() => toast.error("Error al cargar consumo de créditos"));
   }, []);
 
   const used = sub?.conversions_used ?? 0;

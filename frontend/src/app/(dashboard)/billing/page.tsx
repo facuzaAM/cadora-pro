@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import Script from "next/script";
+import { toast } from "sonner";
 import {
   CreditCard,
   HardDrive,
@@ -50,7 +51,7 @@ export default function BillingPage() {
       });
       paddleReady.current = true;
     } catch {
-      // Paddle init failed
+      toast.error("Error al inicializar Paddle. Recargá la página o contactanos.");
     }
   }, []);
 

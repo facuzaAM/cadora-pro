@@ -34,14 +34,15 @@ async def upload_document(
             detail=f"Formato .{ext} no soportado. Usa: {', '.join(settings.ALLOWED_EXTENSIONS)}",
         )
 
+    await check_storage_limit(user, file.size or settings.MAX_FILE_SIZE_MB * 1024 * 1024)
+
     content = await file.read()
-    if len(content) > settings.MAX_FILE_SIZE_MB * 1024 * 1024:
+    max_bytes = settings.MAX_FILE_SIZE_MB * 1024 * 1024
+    if len(content) > max_bytes:
         raise HTTPException(
             status_code=HTTP_400_BAD_REQUEST,
             detail=f"El archivo excede el límite de {settings.MAX_FILE_SIZE_MB} MB",
         )
-
-    await check_storage_limit(user, len(content))
 
     service = DocumentService(db)
     try:

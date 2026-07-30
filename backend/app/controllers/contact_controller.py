@@ -5,6 +5,7 @@ from fastapi import APIRouter, HTTPException, Request
 from pydantic import BaseModel, EmailStr
 from starlette.status import HTTP_400_BAD_REQUEST
 
+from app.core.config import settings
 from app.services.email_service import send_email
 from app.utils.rate_limit import limiter
 
@@ -38,7 +39,7 @@ async def send_contact(request: Request, body: ContactRequest):
         f"<hr><p>{body.message}</p>"
     )
     sent = await asyncio.to_thread(
-        send_email, "hello@cadora.pro", f"Contacto: {body.subject}", html,
+        send_email, settings.EMAIL_FROM, f"Contacto: {body.subject}", html,
     )
 
     if sent:

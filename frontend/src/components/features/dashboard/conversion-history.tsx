@@ -95,7 +95,7 @@ export function ConversionHistory() {
 
         setRows(rowsWithDocs);
       })
-      .catch(() => {})
+      .catch(() => toast.error("Error al cargar historial de conversiones"))
       .finally(() => setLoading(false));
   }, []);
 
