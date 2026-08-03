@@ -4,6 +4,13 @@ set -e
 DOMAIN="${DOMAIN:-cadora.pro}"
 EMAIL="${CERTBOT_EMAIL:-hello@cadora.pro}"
 MARKER="/etc/letsencrypt/.issued"
+RENEWAL_CONF="/etc/letsencrypt/renewal/$DOMAIN.conf"
+
+# A broken/empty renewal config would break every future renewal, so force a
+# fresh issuance (which also rewrites the renewal metadata) when it is missing.
+if [ ! -s "$RENEWAL_CONF" ]; then
+    rm -f "$MARKER"
+fi
 
 # Only force a reissue while no real certificate exists yet.
 # nginx generates a self-signed placeholder in the same directory so it can
