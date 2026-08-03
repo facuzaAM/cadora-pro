@@ -31,7 +31,7 @@ services:
         max-file: "5"
 
   certbot:
-    image: certbot/certbot:2.12.1
+    image: certbot/certbot:v5.7.0
     volumes:
       - ./nginx/letsencrypt:/etc/letsencrypt
       - certbot-www:/var/www/certbot
