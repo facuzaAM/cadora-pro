@@ -10,6 +10,12 @@ on:
 env:
   DEPLOY_BRANCH: main
 
+# Only one deploy at a time: a manual dispatch and the automatic trigger would
+# otherwise run `docker compose up` concurrently and race on container names.
+concurrency:
+  group: deploy-production
+  cancel-in-progress: false
+
 jobs:
   deploy:
     name: Deploy to production
