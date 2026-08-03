@@ -22,21 +22,21 @@ class TestParseScaleText:
         ppm = _parse_scale_text("1:100", 4000)
         assert ppm is not None
         assert ppm > 0
-        expected = (300 / 2.54) * 100 * 100
+        expected = (300 / 2.54) * 100 * (1 / 100)
         assert abs(ppm - expected) < 1.0
 
     def test_slash_50(self):
         ppm = _parse_scale_text("1/50", 4000)
         assert ppm is not None
         assert ppm > 0
-        expected = (300 / 2.54) * 100 * 50
+        expected = (300 / 2.54) * 100 * (1 / 50)
         assert abs(ppm - expected) < 1.0
 
     def test_esc_prefix(self):
         ppm = _parse_scale_text("ESC. 1:200", 4000)
         assert ppm is not None
         assert ppm > 0
-        expected = (300 / 2.54) * 100 * 200
+        expected = (300 / 2.54) * 100 * (1 / 200)
         assert abs(ppm - expected) < 1.0
 
     def test_escala_prefix(self):

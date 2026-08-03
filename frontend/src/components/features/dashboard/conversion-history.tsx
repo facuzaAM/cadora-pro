@@ -66,6 +66,7 @@ export function ConversionHistory() {
   const [rows, setRows] = useState<ConversionRow[]>([]);
   const [loading, setLoading] = useState(true);
   const [reprocessing, setReprocessing] = useState<string | null>(null);
+  const [downloadingId, setDownloadingId] = useState<string | null>(null);
 
   useEffect(() => {
     const token = api.getAccessToken();
@@ -100,22 +101,25 @@ export function ConversionHistory() {
   }, []);
 
   const handleDownload = async (projectId: string) => {
+    if (downloadingId) return;
+    setDownloadingId(projectId);
     try {
-      const token = api.getAccessToken();
-      await cadService.generate(projectId, "dxf", token);
       const url = cadService.downloadUrl(projectId, "dxf");
       window.open(url, "_blank");
-      toast.success("Archivo DXF descargado");
+      toast.success("Archivo DXF en descarga");
     } catch {
-      toast.error("Error al generar el archivo");
+      toast.error("Error al descargar el archivo");
+    } finally {
+      setDownloadingId(null);
     }
   };
 
   const handleReprocess = async (projectId: string) => {
+    if (reprocessing) return;
     setReprocessing(projectId);
     try {
       const token = api.getAccessToken();
-      await cadService.generate(projectId, "dxf", token);
+      await cadService.generate(projectId, "dxf", token, true);
       toast.success("Proyecto reprocesado correctamente");
       setRows((prev) =>
         prev.map((r) =>
@@ -203,18 +207,22 @@ export function ConversionHistory() {
                 variant="ghost"
                 size="icon"
                 className="h-8 w-8"
-                disabled={!isCompleted}
+                disabled={!isCompleted || downloadingId !== null}
                 onClick={() => handleDownload(row.project.id)}
                 title="Descargar DXF"
               >
-                <Download className="h-4 w-4" />
+                {downloadingId === row.project.id ? (
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                ) : (
+                  <Download className="h-4 w-4" />
+                )}
               </Button>
 
               <Button
                 variant="ghost"
                 size="icon"
                 className="h-8 w-8"
-                disabled={isProcessing || reprocessing === row.project.id}
+                disabled={isProcessing || reprocessing === row.project.id || downloadingId !== null}
                 onClick={() => handleReprocess(row.project.id)}
                 title="Reprocesar"
               >
@@ -239,7 +247,7 @@ export function ConversionHistory() {
                     </Link>
                   </DropdownMenuItem>
                   <DropdownMenuItem
-                    disabled={!isCompleted}
+                    disabled={!isCompleted || downloadingId !== null}
                     onClick={() => handleDownload(row.project.id)}
                   >
                     <Download className="mr-2 h-4 w-4" />

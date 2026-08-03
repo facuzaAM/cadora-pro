@@ -1,7 +1,8 @@
 "use client";
 
-import { useState } from "react";
+import { Suspense, useState } from "react";
 import Link from "next/link";
+import { useSearchParams } from "next/navigation";
 import { Logo } from "@/components/shared/logo";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -13,6 +14,16 @@ import { Eye, EyeOff, AlertCircle } from "lucide-react";
 import { validatePassword } from "@/lib/password";
 
 export default function RegisterPage() {
+  return (
+    <Suspense fallback={<div className="min-h-screen" />}>
+      <RegisterContent />
+    </Suspense>
+  );
+}
+
+function RegisterContent() {
+  const searchParams = useSearchParams();
+  const plan = searchParams.get("plan");
   const { signUp, signInWithGoogle } = useAuth();
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
@@ -33,7 +44,12 @@ export default function RegisterPage() {
     setPasswordError(null);
     setSubmitting(true);
     try {
-      await signUp(email, password, name);
+      await signUp(
+        email,
+        password,
+        name,
+        plan && plan !== "free" ? `/pricing?plan=${encodeURIComponent(plan)}` : undefined,
+      );
       toast.success("Cuenta creada correctamente");
     } catch (err: unknown) {
       const message = err instanceof Error ? err.message : "Error al registrarse";

@@ -36,7 +36,6 @@ class Settings(BaseSettings):
     DB_MAX_OVERFLOW: int = 20
 
     # Paddle Billing
-    PADDLE_API_KEY: str = ""
     PADDLE_WEBHOOK_SECRET: str = ""
     PADDLE_CLIENT_TOKEN: str = ""
     PADDLE_PRICE_STARTER: str = ""

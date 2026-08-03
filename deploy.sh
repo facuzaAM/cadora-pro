@@ -10,10 +10,12 @@ git fetch origin "$BRANCH"
 git reset --hard "origin/$BRANCH"
 
 echo "→ Rebuilding and restarting services..."
-docker compose up --build -d
+docker compose up --build -d --remove-orphans
 
 echo "→ Running health checks..."
 sleep 5
+
+SITE_URL="${SITE_URL:-https://cadora.pro}"
 
 check() {
   local name=$1 url=$2 max=12
@@ -28,8 +30,8 @@ check() {
   return 1
 }
 
-check "API" "http://localhost:8000/api/v1/health"
-check "Frontend" "http://localhost:3000"
+check "Frontend" "$SITE_URL/"
+check "API" "$SITE_URL/api/v1/readyz"
 
 echo "→ Pruning unused images..."
 docker image prune -f

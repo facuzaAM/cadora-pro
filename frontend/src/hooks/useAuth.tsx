@@ -3,6 +3,7 @@
 import { createContext, useContext, useEffect, useRef, useState, useCallback, type ReactNode } from "react";
 import { useRouter } from "next/navigation";
 import { api } from "@/services/api";
+import { invalidateCache } from "@/lib/cache";
 
 interface AuthUser {
   id: string;
@@ -24,7 +25,7 @@ interface AuthState {
   user: AuthUser | null;
   loading: boolean;
   signIn: (email: string, password: string, redirectTo?: string) => Promise<void>;
-  signUp: (email: string, password: string, name: string) => Promise<void>;
+  signUp: (email: string, password: string, name: string, redirectTo?: string) => Promise<void>;
   signInWithGoogle: () => Promise<void>;
   signOut: () => Promise<void>;
   refreshUser: () => Promise<void>;
@@ -64,6 +65,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       accessTokenRef.current = null;
       api.setAccessToken(null);
       setUser(null);
+      invalidateCache("billing");
       clearRefreshTimer();
       return false;
     }
@@ -104,17 +106,19 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     accessTokenRef.current = data.access_token;
     api.setAccessToken(data.access_token);
     setUser(data.user);
+    invalidateCache("billing");
     scheduleRefresh();
     router.push(redirectTo || "/dashboard");
   };
 
-  const signUp = async (email: string, password: string, name: string) => {
+  const signUp = async (email: string, password: string, name: string, redirectTo?: string) => {
     const data = await api.post<TokenData>("/auth/register", { email, password, name });
     accessTokenRef.current = data.access_token;
     api.setAccessToken(data.access_token);
     setUser(data.user);
+    invalidateCache("billing");
     scheduleRefresh();
-    router.push("/dashboard");
+    router.push(redirectTo || "/dashboard");
   };
 
   const signInWithGoogle = async () => {
@@ -129,6 +133,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
     accessTokenRef.current = null;
     api.setAccessToken(null);
+    invalidateCache("billing");
     clearRefreshTimer();
     setUser(null);
     router.push("/");

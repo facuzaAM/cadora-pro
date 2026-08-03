@@ -5,13 +5,14 @@ from sqlalchemy import select
 
 from app.models.refresh_token import RefreshToken
 from app.repositories import BaseRepository
+from app.utils.tokens import hash_secret
 
 
 class RefreshTokenRepository(BaseRepository):
     async def create(self, user_id: UUID, token: str, expires_at: datetime) -> RefreshToken:
         rt = RefreshToken(
             user_id=user_id,
-            token=token,
+            token=hash_secret(token),
             expires_at=expires_at,
             created_at=datetime.now(UTC),
         )
@@ -19,7 +20,7 @@ class RefreshTokenRepository(BaseRepository):
         return rt
 
     async def get_by_token(self, token: str) -> RefreshToken | None:
-        stmt = select(RefreshToken).where(RefreshToken.token == token)
+        stmt = select(RefreshToken).where(RefreshToken.token == hash_secret(token))
         result = await self.db.execute(stmt)
         return result.scalar_one_or_none()
 

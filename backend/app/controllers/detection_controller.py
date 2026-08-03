@@ -6,7 +6,12 @@ from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException, Request, UploadFile
 from sqlalchemy.ext.asyncio import AsyncSession
-from starlette.status import HTTP_400_BAD_REQUEST, HTTP_404_NOT_FOUND, HTTP_413_CONTENT_TOO_LARGE
+from starlette.status import (
+    HTTP_400_BAD_REQUEST,
+    HTTP_402_PAYMENT_REQUIRED,
+    HTTP_404_NOT_FOUND,
+    HTTP_413_CONTENT_TOO_LARGE,
+)
 
 from app.config import settings
 from app.database import get_db
@@ -16,10 +21,9 @@ from app.ocr.schemas import OcrRequest, OcrResult
 from app.ocr.service import OcrService
 from app.repositories.document_repository import DocumentRepository
 from app.repositories.project_repository import ProjectRepository
-from app.repositories.user_repository import UserRepository
-from app.services.plan_enforcer import enforce_conversion_limit
+from app.services.plan_enforcer import consume_conversion, enforce_conversion_limit
 from app.services.storage_service import StorageService
-from app.utils.rate_limit import limiter
+from app.utils.rate_limit import rate_limit
 
 logger = logging.getLogger(__name__)
 
@@ -33,12 +37,13 @@ def _capture_sentry(exc: Exception | None = None) -> None:
             pass
 
 
-async def _increment_conversion(user, db: AsyncSession) -> None:
-    repo = UserRepository(db)
-    user_db = await repo.get_by_id(user.id)
-    if user_db:
-        user_db.conversions_used += 1
-        await repo._save(user_db)
+async def _consume_or_402(user, db: AsyncSession) -> None:
+    if not await consume_conversion(db, user.id):
+        raise HTTPException(
+            status_code=HTTP_402_PAYMENT_REQUIRED,
+            detail="Has alcanzado el límite de conversiones de tu plan. "
+                   "Actualiza tu plan para seguir usando el servicio.",
+        )
 
 
 router = APIRouter()
@@ -91,7 +96,7 @@ async def _read_upload_safe(file: UploadFile) -> bytes:
 
 
 @router.post("/ocr/{project_id}", response_model=OcrResult)
-@limiter.limit(settings.RATE_LIMIT_DETECTION)
+@rate_limit(settings.RATE_LIMIT_DETECTION)
 async def ocr_document(
     request: Request,
     project_id: UUID,
@@ -129,12 +134,12 @@ async def ocr_document(
         if os.path.exists(temp_path):
             os.remove(temp_path)
 
-    await _increment_conversion(user, db)
+    await _consume_or_402(user, db)
     return result
 
 
 @router.post("/ocr/uploaded/{document_id}", response_model=OcrResult)
-@limiter.limit(settings.RATE_LIMIT_DETECTION)
+@rate_limit(settings.RATE_LIMIT_DETECTION)
 async def ocr_uploaded_document(
     request: Request,
     document_id: UUID,
@@ -177,12 +182,12 @@ async def ocr_uploaded_document(
         if os.path.exists(temp_path):
             os.remove(temp_path)
 
-    await _increment_conversion(user, db)
+    await _consume_or_402(user, db)
     return result
 
 
 @router.post("/windows/{project_id}", response_model=WindowDetectionResult)
-@limiter.limit(settings.RATE_LIMIT_DETECTION)
+@rate_limit(settings.RATE_LIMIT_DETECTION)
 async def detect_windows(
     request: Request,
     project_id: UUID,
@@ -218,12 +223,12 @@ async def detect_windows(
         if os.path.exists(temp_path):
             os.remove(temp_path)
 
-    await _increment_conversion(user, db)
+    await _consume_or_402(user, db)
     return result
 
 
 @router.post("/lines/{project_id}", response_model=LineDetectionResult)
-@limiter.limit(settings.RATE_LIMIT_DETECTION)
+@rate_limit(settings.RATE_LIMIT_DETECTION)
 async def detect_lines(
     request: Request,
     project_id: UUID,
@@ -259,12 +264,12 @@ async def detect_lines(
         if os.path.exists(temp_path):
             os.remove(temp_path)
 
-    await _increment_conversion(user, db)
+    await _consume_or_402(user, db)
     return result
 
 
 @router.post("/doors/{project_id}", response_model=DoorDetectionResult)
-@limiter.limit(settings.RATE_LIMIT_DETECTION)
+@rate_limit(settings.RATE_LIMIT_DETECTION)
 async def detect_doors(
     request: Request,
     project_id: UUID,
@@ -300,5 +305,5 @@ async def detect_doors(
         if os.path.exists(temp_path):
             os.remove(temp_path)
 
-    await _increment_conversion(user, db)
+    await _consume_or_402(user, db)
     return result

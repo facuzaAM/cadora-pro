@@ -88,7 +88,7 @@ export function ProjectCard({
                 <DropdownMenuItem onClick={() => router.push(`/projects/${id}/result`)}>
                   Ver proyecto
                 </DropdownMenuItem>
-                <DropdownMenuItem onClick={() => router.push(`/projects/upload/${id}`)}>
+                <DropdownMenuItem onClick={() => router.push(`/projects/${id}/upload`)}>
                   Subir archivo
                 </DropdownMenuItem>
                 <DropdownMenuItem

@@ -2,6 +2,7 @@ from uuid import UUID
 
 from sqlalchemy import func, select
 
+from app.models.document import Document
 from app.models.project import Project
 from app.repositories import BaseRepository
 
@@ -54,8 +55,6 @@ class ProjectRepository(BaseRepository):
         await self._delete(Project, project_id)
 
     async def get_document_count(self, project_id: UUID) -> int:
-        from app.models.document import Document
-
         stmt = (
             select(func.count())
             .select_from(Document)
@@ -63,3 +62,14 @@ class ProjectRepository(BaseRepository):
         )
         result = await self.db.execute(stmt)
         return result.scalar_one()
+
+    async def get_document_counts(self, project_ids: list[UUID]) -> dict[UUID, int]:
+        if not project_ids:
+            return {}
+        stmt = (
+            select(Document.project_id, func.count())
+            .where(Document.project_id.in_(project_ids))
+            .group_by(Document.project_id)
+        )
+        result = await self.db.execute(stmt)
+        return {pid: count for pid, count in result.all()}

@@ -29,13 +29,13 @@ class ProjectService:
         self, user_id: UUID, skip: int = 0, limit: int = 20
     ) -> list[ProjectResponse]:
         projects = await self.repo.list_by_user(user_id, skip=skip, limit=limit)
-        result = []
-        for p in projects:
-            doc_count = await self.repo.get_document_count(p.id)
-            r = ProjectResponse.model_validate(p)
-            r.document_count = doc_count
-            result.append(r)
-        return result
+        counts = await self.repo.get_document_counts([p.id for p in projects])
+        return [
+            ProjectResponse.model_validate(p).model_copy(
+                update={"document_count": counts.get(p.id, 0)}
+            )
+            for p in projects
+        ]
 
     async def update(
         self, user_id: UUID, project_id: UUID, request: ProjectUpdateRequest

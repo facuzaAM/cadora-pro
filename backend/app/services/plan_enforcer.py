@@ -1,6 +1,7 @@
 from datetime import UTC, datetime
 
 from fastapi import Depends, HTTPException
+from sqlalchemy import or_, update
 from sqlalchemy.ext.asyncio import AsyncSession
 from starlette.status import HTTP_402_PAYMENT_REQUIRED, HTTP_403_FORBIDDEN
 
@@ -33,12 +34,30 @@ async def enforce_conversion_limit(
     return user
 
 
+async def consume_conversion(db: AsyncSession, user_id) -> bool:
+    """Atomically increment conversions_used only if the plan limit allows it.
+
+    Returns False when the limit was already reached (guards against
+    check-then-act races under concurrent requests).
+    """
+    result = await db.execute(
+        update(User)
+        .where(
+            User.id == user_id,
+            or_(User.conversions_limit == 0, User.conversions_used < User.conversions_limit),
+        )
+        .values(conversions_used=User.conversions_used + 1)
+    )
+    await db.commit()
+    return result.rowcount == 1  # type: ignore[attr-defined]
+
+
 def _maybe_reset_monthly(user: User) -> bool:
     """Reset conversions_used when a new billing month starts.
 
     For free users: resets on the 1st of each month (UTC).
     For paid users: resets when the Paddle billing period renews
-    (handled by the invoice.paid webhook via conversions_reset_at).
+    (handled by the transaction.completed webhook via conversions_reset_at).
     Returns True if the user was modified.
     """
     now = datetime.now(UTC)

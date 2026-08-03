@@ -108,9 +108,8 @@ app = FastAPI(
     },
 )
 
-if settings.RATE_LIMIT_ENABLED:
-    app.state.limiter = limiter
-    app.add_exception_handler(RateLimitExceeded, rate_limit_handler)
+app.state.limiter = limiter
+app.add_exception_handler(RateLimitExceeded, rate_limit_handler)
 
 
 @app.exception_handler(Exception)
@@ -171,11 +170,15 @@ async def health():
     if settings.SUPABASE_URL and settings.SUPABASE_KEY:
         try:
             from app.utils.supabase import get_supabase
-            client = get_supabase()
-            if client:
+
+            def _check_storage() -> bool:
+                client = get_supabase()
+                if not client:
+                    return False
                 client.storage.get_bucket(settings.STORAGE_BUCKET)
-            else:
-                storage_ok = False
+                return True
+
+            storage_ok = await asyncio.to_thread(_check_storage)
         except Exception:
             storage_ok = False
 

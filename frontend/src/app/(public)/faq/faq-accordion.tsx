@@ -19,7 +19,7 @@ const faqs = [
   },
   {
     q: "¿Qué pasa si la detección no es precisa?",
-    a: "La detección automática tiene alta precisión pero no es perfecta. Si algún elemento no se detectó correctamente, podés volver a procesar el plano desde tu dashboard. En una futura versión estarás able de editar los elementos detectados manualmente antes de exportar.",
+    a: "La detección automática tiene alta precisión pero no es perfecta. Si algún elemento no se detectó correctamente, podés volver a procesar el plano desde tu dashboard. En una futura versión podrás editar los elementos detectados manualmente antes de exportar.",
   },
   {
     q: "¿Cuánto tiempo se conservan mis archivos?",

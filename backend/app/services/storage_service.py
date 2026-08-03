@@ -1,4 +1,5 @@
 import asyncio
+import os
 from pathlib import Path
 
 from app.config import settings
@@ -6,6 +7,15 @@ from app.utils.supabase import get_supabase
 
 UPLOAD_DIR = Path("uploads")
 UPLOAD_DIR.mkdir(exist_ok=True)
+
+
+def _safe_path(bucket: str, path: str) -> Path:
+    """Resolve a storage path and ensure it stays inside the bucket directory."""
+    base = (UPLOAD_DIR / bucket).resolve()
+    full_path = (base / path).resolve()
+    if not str(full_path).startswith(str(base) + os.sep):
+        raise ValueError("Invalid storage path")
+    return full_path
 
 
 class StorageService:
@@ -34,7 +44,7 @@ class StorageService:
         return path
 
     def _upload_local(self, bucket: str, path: str, data: bytes) -> None:
-        full_path = UPLOAD_DIR / bucket / path
+        full_path = _safe_path(bucket, path)
         full_path.parent.mkdir(parents=True, exist_ok=True)
         full_path.write_bytes(data)
 
@@ -53,7 +63,7 @@ class StorageService:
             if client:
                 await asyncio.to_thread(client.storage.from_(bucket).remove, [path])
                 return
-        full_path = UPLOAD_DIR / bucket / path
+        full_path = _safe_path(bucket, path)
         if full_path.exists():
             full_path.unlink()
 
@@ -78,7 +88,7 @@ class StorageService:
                     return any(f.get("name") == filename for f in files)
                 except Exception:
                     return False
-        full_path = UPLOAD_DIR / bucket / path
+        full_path = _safe_path(bucket, path)
         return full_path.exists()
 
     async def download_bytes(self, bucket: str, path: str) -> bytes:
@@ -86,5 +96,28 @@ class StorageService:
             client = get_supabase()
             if client:
                 return await asyncio.to_thread(client.storage.from_(bucket).download, path)
-        full_path = UPLOAD_DIR / bucket / path
+        full_path = _safe_path(bucket, path)
         return full_path.read_bytes()
+
+    async def get_size(self, bucket: str, path: str) -> int | None:
+        """Return the stored object size in bytes, or None if it does not exist."""
+        if settings.SUPABASE_URL and settings.SUPABASE_KEY:
+            client = get_supabase()
+            if client:
+                try:
+                    files = await asyncio.to_thread(
+                        client.storage.from_(bucket).list, (path.rsplit("/", 1)[0] or ""),
+                    )
+                    filename = path.rsplit("/", 1)[-1]
+                    for f in files:
+                        if f.get("name") == filename:
+                            metadata = f.get("metadata") or {}
+                            size = metadata.get("size")
+                            return int(size) if size is not None else None
+                    return None
+                except Exception:
+                    return None
+        full_path = _safe_path(bucket, path)
+        if full_path.exists():
+            return full_path.stat().st_size
+        return None

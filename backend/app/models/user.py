@@ -52,7 +52,7 @@ class User(Base):
         nullable=False, default=False
     )
     email_verified: Mapped[bool] = mapped_column(nullable=False, default=False)
-    email_verification_code: Mapped[str | None] = mapped_column(String(6), nullable=True)
+    email_verification_code: Mapped[str | None] = mapped_column(String(64), nullable=True)
     email_verification_expires_at: Mapped[datetime | None] = mapped_column(
         DateTime(timezone=True), nullable=True
     )

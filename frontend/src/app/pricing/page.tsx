@@ -1,8 +1,10 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import * as Sentry from "@sentry/nextjs";
 import Script from "next/script";
+import { Suspense } from "react";
+import { useSearchParams } from "next/navigation";
 import { PricingCard } from "@/components/features/pricing/pricing-card";
 import { LandingNav } from "@/components/features/landing/landing-nav";
 import { SiteFooter } from "@/components/layout/site-footer";
@@ -11,11 +13,22 @@ import { billingService, type Plan } from "@/services/billing.service";
 import { api } from "@/services/api";
 
 export default function PricingPage() {
+  return (
+    <Suspense fallback={<div className="min-h-screen" />}>
+      <PricingContent />
+    </Suspense>
+  );
+}
+
+function PricingContent() {
+  const searchParams = useSearchParams();
+  const requestedPlan = searchParams.get("plan");
   const [plans, setPlans] = useState<Plan[]>([]);
   const [userPlan, setUserPlan] = useState<string | undefined>();
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [paddleLoaded, setPaddleLoaded] = useState(false);
   const [paddleReady, setPaddleReady] = useState(false);
+  const autoOpenedRef = useRef(false);
 
   useEffect(() => {
     billingService.getPlans().then(setPlans).catch((err) => { Sentry.captureException(err); });
@@ -48,6 +61,31 @@ export default function PricingPage() {
   useEffect(() => {
     if (paddleLoaded) initPaddle();
   }, [paddleLoaded, initPaddle]);
+
+  useEffect(() => {
+    if (autoOpenedRef.current || !paddleReady || !isAuthenticated || !requestedPlan) return;
+    if (userPlan === requestedPlan) return;
+    const plan = plans.find((p) => p.id === requestedPlan);
+    if (!plan?.paddle_price_id) return;
+
+    autoOpenedRef.current = true;
+    const token = api.getAccessToken();
+    let userId: string | undefined;
+    if (token) {
+      try {
+        const payload = JSON.parse(atob(token.split(".")[1]));
+        userId = payload.sub;
+      } catch {}
+    }
+    window.Paddle.Checkout.open({
+      items: [{ priceId: plan.paddle_price_id, quantity: 1 }],
+      customData: { plan: plan.id, user_id: userId },
+      settings: {
+        displayMode: "overlay",
+        theme: "light",
+      },
+    });
+  }, [paddleReady, isAuthenticated, requestedPlan, userPlan, plans]);
 
   const handleSubscribe = useCallback(async (planId: string) => {
     if (!window.Paddle || !paddleReady) return;

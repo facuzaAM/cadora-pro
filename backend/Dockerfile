@@ -7,6 +7,8 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     libgl1 \
     libglib2.0-0 \
     tesseract-ocr \
+    tesseract-ocr-spa \
+    tesseract-ocr-osd \
     poppler-utils \
     && rm -rf /var/lib/apt/lists/*
 
@@ -38,6 +40,8 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     libgl1 \
     libglib2.0-0 \
     tesseract-ocr \
+    tesseract-ocr-spa \
+    tesseract-ocr-osd \
     poppler-utils \
     && rm -rf /var/lib/apt/lists/*
 

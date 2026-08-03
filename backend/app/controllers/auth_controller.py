@@ -5,9 +5,13 @@ from urllib.parse import urlencode
 
 import httpx
 from fastapi import APIRouter, Depends, File, HTTPException, Request, UploadFile
-from fastapi.responses import JSONResponse, RedirectResponse
+from fastapi.responses import JSONResponse, RedirectResponse, Response
 from sqlalchemy.ext.asyncio import AsyncSession
-from starlette.status import HTTP_400_BAD_REQUEST, HTTP_401_UNAUTHORIZED
+from starlette.status import (
+    HTTP_400_BAD_REQUEST,
+    HTTP_401_UNAUTHORIZED,
+    HTTP_503_SERVICE_UNAVAILABLE,
+)
 
 from app.config import settings
 from app.database import get_db
@@ -26,12 +30,12 @@ from app.schemas.auth import (
     VerifyEmailRequest,
 )
 from app.services.auth_service import AuthService
-from app.utils.dependencies import get_current_user
-from app.utils.rate_limit import limiter
+from app.utils.dependencies import ACCESS_TOKEN_COOKIE, get_current_user
+from app.utils.rate_limit import rate_limit
 
 router = APIRouter()
 
-ACCESS_COOKIE = "cadora_access"
+ACCESS_COOKIE = ACCESS_TOKEN_COOKIE
 REFRESH_COOKIE = "cadora_refresh"
 
 
@@ -41,6 +45,11 @@ def _cookie_secure() -> bool:
 
 def _cookie_samesite() -> Literal["none", "lax"]:
     return "none" if settings.ENVIRONMENT == "production" else "lax"
+
+
+def _frontend_redirect(path: str) -> RedirectResponse:
+    base = settings.FRONTEND_URL or ""
+    return RedirectResponse(f"{base}{path}")
 
 
 def _auth_response(tokens: TokenResponse, user: User) -> JSONResponse:
@@ -74,7 +83,7 @@ def _auth_response(tokens: TokenResponse, user: User) -> JSONResponse:
     resp.set_cookie(
         key=ACCESS_COOKIE,
         value=tokens.access_token,
-        httponly=False,
+        httponly=True,
         secure=_cookie_secure(),
         samesite=_cookie_samesite(),
         max_age=settings.JWT_ACCESS_EXPIRATION_MINUTES * 60,
@@ -137,16 +146,16 @@ async def google_callback(request: Request, db: AsyncSession = Depends(get_db)):
     error = request.query_params.get("error")
 
     stored_state = request.cookies.get("oauth_state")
-    if not state or not stored_state or state != stored_state:
-        return RedirectResponse("/login?error=invalid_state")
+    if not state or not stored_state or not secrets.compare_digest(state, stored_state):
+        return _frontend_redirect("/login?error=invalid_state")
 
-    resp = RedirectResponse("/login")
+    resp = _frontend_redirect("/login")
     resp.delete_cookie("oauth_state", path="/")
 
     if error:
-        return RedirectResponse(f"/login?error={error}")
+        return _frontend_redirect(f"/login?error={error}")
     if not code:
-        return RedirectResponse("/login?error=no_code")
+        return _frontend_redirect("/login?error=no_code")
 
     redirect_uri = settings.GOOGLE_REDIRECT_URI or _derive_google_redirect_uri(request)
 
@@ -162,7 +171,7 @@ async def google_callback(request: Request, db: AsyncSession = Depends(get_db)):
             },
         )
         if token_resp.status_code != 200:
-            return RedirectResponse("/login?error=token_exchange_failed")
+            return _frontend_redirect("/login?error=token_exchange_failed")
         token_data = token_resp.json()
 
         userinfo_resp = await client.get(
@@ -170,15 +179,15 @@ async def google_callback(request: Request, db: AsyncSession = Depends(get_db)):
             headers={"Authorization": f"Bearer {token_data['access_token']}"},
         )
         if userinfo_resp.status_code != 200:
-            return RedirectResponse("/login?error=userinfo_failed")
+            return _frontend_redirect("/login?error=userinfo_failed")
         userinfo = userinfo_resp.json()
 
-    email = userinfo.get("email")
+    email = (userinfo.get("email") or "").strip().lower()
     name = userinfo.get("name", email.split("@")[0] if email else "user")
     avatar_url = userinfo.get("picture")
 
     if not email:
-        return RedirectResponse("/login?error=no_email")
+        return _frontend_redirect("/login?error=no_email")
 
     repo = UserRepository(db)
     user = await repo.get_by_email(email)
@@ -191,15 +200,13 @@ async def google_callback(request: Request, db: AsyncSession = Depends(get_db)):
             email=email, name=name, hashed_password=hashed,
         )
         user.avatar_url = avatar_url
+        user.email_verified = True
         await repo._save(user)
 
     service = AuthService(db)
     tokens = await service._build_token(user)
 
-    base_url = settings.FRONTEND_URL or str(request.url).replace(
-        str(request.url.path), ""
-    ).rstrip("/")
-    resp = RedirectResponse(f"{base_url}/auth/callback")
+    resp = _frontend_redirect("/auth/callback")
     resp.set_cookie(
         key=REFRESH_COOKIE,
         value=tokens.refresh_token,
@@ -212,7 +219,7 @@ async def google_callback(request: Request, db: AsyncSession = Depends(get_db)):
     resp.set_cookie(
         key=ACCESS_COOKIE,
         value=tokens.access_token,
-        httponly=False,
+        httponly=True,
         secure=_cookie_secure(),
         samesite=_cookie_samesite(),
         max_age=settings.JWT_ACCESS_EXPIRATION_MINUTES * 60,
@@ -222,7 +229,7 @@ async def google_callback(request: Request, db: AsyncSession = Depends(get_db)):
 
 
 @router.post("/register")
-@limiter.limit(settings.RATE_LIMIT_AUTH)
+@rate_limit(settings.RATE_LIMIT_AUTH)
 async def register(
     request: Request,
     body: RegisterRequest,
@@ -245,12 +252,18 @@ async def register(
         user.email_verified = True
         await service.repo._save(user)
     else:
+        if not settings.SMTP_HOST:
+            raise HTTPException(
+                status_code=HTTP_503_SERVICE_UNAVAILABLE,
+                detail="El servicio de email no está configurado. "
+                "No se pudo enviar el código de verificación.",
+            )
         await service.send_verification_email(user)
     return _auth_response(result, user)
 
 
 @router.post("/login")
-@limiter.limit(settings.RATE_LIMIT_AUTH)
+@rate_limit(settings.RATE_LIMIT_AUTH)
 async def login(
     request: Request,
     body: LoginRequest,
@@ -273,7 +286,7 @@ async def login(
 
 
 @router.post("/refresh")
-@limiter.limit(settings.RATE_LIMIT_AUTH)
+@rate_limit(settings.RATE_LIMIT_AUTH)
 async def refresh(
     request: Request,
     body: RefreshRequest | None = None,
@@ -319,7 +332,7 @@ async def logout(
         token = request.cookies.get(REFRESH_COOKIE)
     if token:
         await service.logout(token)
-    resp = JSONResponse(status_code=204, content=None)
+    resp = Response(status_code=204)
     resp.delete_cookie(REFRESH_COOKIE, path="/")
     resp.delete_cookie(ACCESS_COOKIE, path="/")
     return resp
@@ -346,7 +359,9 @@ async def update_me(
 
 
 @router.post("/change-password", status_code=204)
+@rate_limit("5/minute")
 async def change_password(
+    request: Request,
     body: ChangePasswordRequest,
     user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
@@ -368,11 +383,22 @@ async def upload_avatar(
     if file.content_type not in allowed:
         raise HTTPException(status_code=400, detail="Formato no soportado. Usa JPG, PNG o WebP.")
 
-    data = await file.read()
-    if len(data) > 5 * 1024 * 1024:
-        raise HTTPException(status_code=400, detail="La imagen no puede superar 5 MB.")
+    max_bytes = 5 * 1024 * 1024
+    data = b""
+    while True:
+        chunk = await file.read(1024 * 1024)
+        if not chunk:
+            break
+        data += chunk
+        if len(data) > max_bytes:
+            raise HTTPException(status_code=413, detail="La imagen no puede superar 5 MB.")
+
+    if not _is_valid_image(data):
+        raise HTTPException(status_code=400, detail="Archivo de imagen inválido")
 
     ext = file.content_type.rsplit("/", 1)[-1]
+    if ext == "jpeg":
+        ext = "jpg"
     path = f"avatars/{user.id}/{uuid.uuid4().hex}.{ext}"
 
     from app.services.storage_service import StorageService
@@ -387,6 +413,18 @@ async def upload_avatar(
     return {"avatar_url": url}
 
 
+def _is_valid_image(data: bytes) -> bool:
+    """Validate image magic bytes to reject spoofed content types."""
+    return bool(
+        data
+        and (
+            data.startswith(b"\x89PNG\r\n\x1a\n")
+            or data.startswith(b"\xff\xd8\xff")
+            or (len(data) >= 12 and data[:4] == b"RIFF" and data[8:12] == b"WEBP")
+        )
+    )
+
+
 @router.post("/logout-all", status_code=204)
 async def logout_all(
     user: User = Depends(get_current_user),
@@ -394,14 +432,14 @@ async def logout_all(
 ):
     service = AuthService(db)
     await service.logout_all(user.id)
-    resp = JSONResponse(status_code=204, content=None)
+    resp = Response(status_code=204)
     resp.delete_cookie(REFRESH_COOKIE, path="/")
     resp.delete_cookie(ACCESS_COOKIE, path="/")
     return resp
 
 
 @router.post("/forgot-password", status_code=204)
-@limiter.limit("3/minute")
+@rate_limit("3/minute")
 async def forgot_password(
     request: Request,
     body: ForgotPasswordRequest,
@@ -412,7 +450,7 @@ async def forgot_password(
 
 
 @router.post("/reset-password")
-@limiter.limit("5/minute")
+@rate_limit("5/minute")
 async def reset_password(
     request: Request,
     body: ResetPasswordRequest,
@@ -427,7 +465,7 @@ async def reset_password(
 
 
 @router.post("/send-verification")
-@limiter.limit("3/minute")
+@rate_limit("3/minute")
 async def send_verification(
     request: Request,
     user: User = Depends(get_current_user),
@@ -446,7 +484,9 @@ async def send_verification(
 
 
 @router.post("/verify-email")
+@rate_limit("5/minute")
 async def verify_email(
+    request: Request,
     body: VerifyEmailRequest,
     user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),

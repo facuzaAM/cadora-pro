@@ -6,10 +6,16 @@ import uuid as _uuid
 from pathlib import Path
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, HTTPException, Request
+from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Request
 from fastapi.responses import FileResponse
 from sqlalchemy.ext.asyncio import AsyncSession
-from starlette.status import HTTP_400_BAD_REQUEST, HTTP_403_FORBIDDEN, HTTP_404_NOT_FOUND
+from starlette.status import (
+    HTTP_400_BAD_REQUEST,
+    HTTP_402_PAYMENT_REQUIRED,
+    HTTP_403_FORBIDDEN,
+    HTTP_404_NOT_FOUND,
+    HTTP_409_CONFLICT,
+)
 
 from app.cad.generator import CadGenerator, convert_dxf_to_dwg
 from app.cad.schemas import CadGenerateRequest, CadGenerateResponse
@@ -26,12 +32,11 @@ from app.ocr.schemas import OcrResult
 from app.ocr.service import OcrService
 from app.repositories.document_repository import DocumentRepository
 from app.repositories.project_repository import ProjectRepository
-from app.repositories.user_repository import UserRepository
 from app.services.plan_config import get_plan
-from app.services.plan_enforcer import enforce_conversion_limit
+from app.services.plan_enforcer import consume_conversion, enforce_conversion_limit
 from app.services.storage_service import StorageService
 from app.utils.dependencies import get_current_user
-from app.utils.rate_limit import limiter
+from app.utils.rate_limit import rate_limit
 
 logger = logging.getLogger(__name__)
 
@@ -182,7 +187,7 @@ def _get_user_format(user: User, requested_format: str) -> str:
 
 
 @router.post("/generate/{project_id}", response_model=CadGenerateResponse)
-@limiter.limit(settings.RATE_LIMIT_CAD)
+@rate_limit(settings.RATE_LIMIT_CAD)
 async def generate_cad(
     request: Request,
     project_id: UUID,
@@ -198,6 +203,23 @@ async def generate_cad(
     if not project or project.user_id != user.id:
         raise HTTPException(status_code=HTTP_404_NOT_FOUND, detail="Proyecto no encontrado")
 
+    ext = "dwg" if fmt == "dwg" else "dxf"
+    cache_key = _cad_cache_path(project_id, fmt)
+
+    if not body.force:
+        if project.status == "processing":
+            raise HTTPException(
+                status_code=HTTP_409_CONFLICT,
+                detail="El proyecto ya está siendo procesado.",
+            )
+        if project.status == "cad_generated":
+            size = await storage.get_size(settings.STORAGE_BUCKET, cache_key)
+            if size is not None:
+                return CadGenerateResponse(
+                    filename=f"cadora_{project_id}.{ext}",
+                    file_size=size,
+                )
+
     doc_repo = DocumentRepository(db)
     docs = await doc_repo.list_by_project(project_id)
     if not docs:
@@ -205,6 +227,8 @@ async def generate_cad(
             status_code=HTTP_400_BAD_REQUEST,
             detail="El proyecto no tiene documentos. Suba un plano primero.",
         )
+
+    await project_repo.update_status(project_id, "processing")
 
     temp_paths = []
     output_path = ""
@@ -254,20 +278,26 @@ async def generate_cad(
             content_type=content_type,
         )
 
-        user_repo = UserRepository(db)
-        user_db = await user_repo.get_by_id(user.id)
-        if user_db:
-            user_db.conversions_used = user_db.conversions_used + 1
-            await user_repo._save(user_db)
+        if not await consume_conversion(db, user.id):
+            await project_repo.update_status(project_id, "error")
+            raise HTTPException(
+                status_code=HTTP_402_PAYMENT_REQUIRED,
+                detail="Has alcanzado el límite de conversiones de tu plan. "
+                       "Actualiza tu plan para seguir usando el servicio.",
+            )
+
+        await project_repo.update_status(project_id, "cad_generated")
 
         return CadGenerateResponse(
             filename=f"cadora_{project_id}.{ext}",
             file_size=file_size,
         )
     except HTTPException:
+        await project_repo.update_status(project_id, "error")
         raise
     except Exception:
         logger.exception("Error generando CAD para proyecto %s", project_id)
+        await project_repo.update_status(project_id, "error")
         raise HTTPException(status_code=HTTP_400_BAD_REQUEST, detail="Error interno del servidor")
     finally:
         for p in temp_paths:
@@ -282,15 +312,19 @@ async def generate_cad(
 
 
 @router.get("/download/{project_id}")
-@limiter.limit(settings.RATE_LIMIT_CAD)
+@rate_limit(settings.RATE_LIMIT_CAD)
 async def download_cad(
     request: Request,
+    background_tasks: BackgroundTasks,
     project_id: UUID,
     format: str = "dxf",
     user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
-    """Download the generated DXF/DWG for a project. Uses cache if available."""
+    """Download the generated DXF/DWG for a project from the cache.
+
+    Read-only: only serves files previously generated via POST /cad/generate.
+    """
     fmt = _get_user_format(user, format)
 
     project_repo = ProjectRepository(db)
@@ -302,95 +336,26 @@ async def download_cad(
     content_type = "application/dwg" if fmt == "dwg" else "application/dxf"
     cache_key = _cad_cache_path(project_id, fmt)
 
-    if await storage.exists(settings.STORAGE_BUCKET, cache_key):
-        tmp = None
-        try:
-            file_bytes = await storage.download_bytes(settings.STORAGE_BUCKET, cache_key)
-            fd, tmp = tempfile.mkstemp(suffix=f".{ext}", prefix=f"dl_{project_id}_")
-            os.close(fd)
-            with open(tmp, "wb") as f:
-                f.write(file_bytes)
-            return FileResponse(
-                path=tmp,
-                filename=f"cadora_{project_id}.{ext}",
-                media_type=content_type,
-            )
-        except Exception:
-            if tmp and os.path.exists(tmp):
-                os.remove(tmp)
-            logger.warning("Error leyendo cache %s, regenerando", ext.upper())
-
-    doc_repo = DocumentRepository(db)
-    docs = await doc_repo.list_by_project(project_id)
-    if not docs:
+    if not await storage.exists(settings.STORAGE_BUCKET, cache_key):
         raise HTTPException(
-            status_code=HTTP_400_BAD_REQUEST,
-            detail="El proyecto no tiene documentos.",
+            status_code=HTTP_404_NOT_FOUND,
+            detail=f"El archivo {ext.upper()} aún no fue generado. "
+                   f"Generalo primero desde el proyecto.",
         )
 
-    temp_paths = []
-    dxf_output = ""
-    try:
-        for doc in docs:
-            path = await _download_doc_to_temp(user.id, project_id, doc, prefix="dl")
-            temp_paths.append(path)
+    file_bytes = await storage.download_bytes(settings.STORAGE_BUCKET, cache_key)
+    fd, tmp = tempfile.mkstemp(suffix=f".{ext}", prefix=f"dl_{project_id}_")
+    os.close(fd)
+    with open(tmp, "wb") as f:
+        f.write(file_bytes)
 
-        lines_result, doors_result, windows_result, ocr_result = (
-            await _run_pipeline_on_docs(temp_paths)
-        )
+    def _cleanup(path: str) -> None:
+        if os.path.exists(path):
+            os.remove(path)
 
-        tag = _uuid.uuid4().hex[:8]
-        fd, dxf_output = tempfile.mkstemp(
-            suffix=".dxf", prefix=f"{user.id}_{project_id}_dl_{tag}_"
-        )
-        os.close(fd)
-
-        await asyncio.to_thread(
-            _generate_dxf_sync,
-            dxf_output, lines_result, doors_result, windows_result, ocr_result,
-        )
-
-        with open(dxf_output, "rb") as f:
-            dxf_bytes = f.read()
-        dxf_cache_key = _cad_cache_path(project_id, "dxf")
-        await storage.upload(
-            settings.STORAGE_BUCKET, dxf_cache_key, dxf_bytes,
-            content_type="application/dxf",
-        )
-
-        final_path = dxf_output
-        if fmt == "dwg":
-            dwg_path = dxf_output.replace(".dxf", ".dwg")
-            converted = await asyncio.to_thread(
-                convert_dxf_to_dwg, Path(dxf_output), Path(dwg_path),
-            )
-            if converted:
-                final_path = dwg_path
-                with open(dwg_path, "rb") as f:
-                    dwg_bytes = f.read()
-                await storage.upload(
-                    settings.STORAGE_BUCKET, cache_key, dwg_bytes,
-                    content_type=content_type,
-                )
-            else:
-                logger.warning("DWG conversion failed, falling back to DXF")
-                fmt = "dxf"
-                ext = "dxf"
-                content_type = "application/dxf"
-
-        return FileResponse(
-            path=final_path,
-            filename=f"cadora_{project_id}.{ext}",
-            media_type=content_type,
-        )
-    except HTTPException:
-        raise
-    except Exception:
-        logger.exception("Error descargando CAD para proyecto %s", project_id)
-        if dxf_output and os.path.exists(dxf_output):
-            os.remove(dxf_output)
-        raise HTTPException(status_code=HTTP_400_BAD_REQUEST, detail="Error interno del servidor")
-    finally:
-        for p in temp_paths:
-            if p and os.path.exists(p):
-                os.remove(p)
+    background_tasks.add_task(_cleanup, tmp)
+    return FileResponse(
+        path=tmp,
+        filename=f"cadora_{project_id}.{ext}",
+        media_type=content_type,
+    )

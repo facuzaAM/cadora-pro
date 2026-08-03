@@ -4,6 +4,7 @@ from pydantic import BaseModel, field_validator
 
 class CadGenerateRequest(BaseModel):
     format: str = "dxf"
+    force: bool = False
 
     @field_validator("format")
     @classmethod

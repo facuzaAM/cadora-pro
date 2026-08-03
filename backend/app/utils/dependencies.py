@@ -1,6 +1,6 @@
 from uuid import UUID
 
-from fastapi import Depends, HTTPException, Security
+from fastapi import Depends, HTTPException, Request, Security
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from sqlalchemy.ext.asyncio import AsyncSession
 from starlette.status import HTTP_401_UNAUTHORIZED
@@ -9,14 +9,26 @@ from app.database import get_db
 from app.repositories.user_repository import UserRepository
 from app.utils.jwt import decode_access_token
 
-security = HTTPBearer()
+ACCESS_TOKEN_COOKIE = "cadora_access"
+
+security = HTTPBearer(auto_error=False)
 
 
 async def get_current_user(
-    credentials: HTTPAuthorizationCredentials = Security(security),
+    request: Request,
+    credentials: HTTPAuthorizationCredentials | None = Security(security),
     db: AsyncSession = Depends(get_db),
 ):
-    payload = decode_access_token(credentials.credentials)
+    token = credentials.credentials if credentials else None
+    if not token:
+        token = request.cookies.get(ACCESS_TOKEN_COOKIE)
+    if not token:
+        raise HTTPException(
+            status_code=HTTP_401_UNAUTHORIZED,
+            detail="No autenticado",
+        )
+
+    payload = decode_access_token(token)
     if payload is None:
         raise HTTPException(
             status_code=HTTP_401_UNAUTHORIZED,
@@ -30,7 +42,13 @@ async def get_current_user(
         )
     token_version = payload.get("token_version", 0)
     repo = UserRepository(db)
-    user = await repo.get_by_id(UUID(user_id))
+    try:
+        user = await repo.get_by_id(UUID(str(user_id)))
+    except ValueError:
+        raise HTTPException(
+            status_code=HTTP_401_UNAUTHORIZED,
+            detail="Token inválido",
+        )
     if not user:
         raise HTTPException(
             status_code=HTTP_401_UNAUTHORIZED,

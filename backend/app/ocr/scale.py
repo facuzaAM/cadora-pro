@@ -18,7 +18,8 @@ def detect_scale_factor(ocr_result: OcrResult, image_width_px: int) -> float | N
 
     The conversion factor represents how many pixels correspond to one meter
     in the real world. For example, at 1:100 on a 300 DPI scan, 1 meter
-    in reality = 1181.1 pixels (100cm * 300dpi / 2.54).
+    in reality = 118.11 pixels on paper (1 cm on paper at 1:100 = 1 real
+    meter, and 1 cm at 300 DPI = 300/2.54 = 118.11 px).
     """
     for scale_text in ocr_result.scales:
         ppm = _parse_scale_text(scale_text.text, image_width_px)
@@ -42,7 +43,7 @@ def _parse_scale_text(text: str, image_width_px: int) -> float | None:
     if num == 0 or den == 0:
         return None
 
-    scale_ratio = den / num
+    scale_ratio = num / den
 
     standard_dpi = 300
     pixels_per_inch = standard_dpi

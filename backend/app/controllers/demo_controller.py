@@ -12,7 +12,7 @@ from starlette.status import (
     HTTP_429_TOO_MANY_REQUESTS,
 )
 
-from app.utils.rate_limit import limiter
+from app.utils.rate_limit import rate_limit
 
 logger = logging.getLogger(__name__)
 
@@ -20,6 +20,14 @@ router = APIRouter()
 
 DEMO_MAX_SIZE_MB = 10
 DEMO_ALLOWED_EXTENSIONS = {".pdf", ".png", ".jpg", ".jpeg", ".tiff"}
+
+_MAGIC_SIGNATURES: dict[str, tuple[bytes, ...]] = {
+    "pdf": (b"%PDF-",),
+    "png": (b"\x89PNG\r\n\x1a\n",),
+    "jpg": (b"\xff\xd8\xff",),
+    "jpeg": (b"\xff\xd8\xff",),
+    "tiff": (b"II*\x00", b"MM\x00*"),
+}
 
 _demo_sessions: TTLCache = TTLCache(maxsize=1000, ttl=3600)
 
@@ -34,6 +42,17 @@ def _validate_demo_file(file: UploadFile) -> str:
             detail=f"Formato .{ext} no soportado en demo. Usá: PDF, PNG, JPG o TIFF.",
         )
     return ext
+
+
+def _validate_magic_bytes(file_type: str, content: bytes) -> None:
+    signatures = _MAGIC_SIGNATURES.get(file_type)
+    if signatures is not None and not any(
+        content.startswith(sig) for sig in signatures
+    ):
+        raise HTTPException(
+            status_code=HTTP_400_BAD_REQUEST,
+            detail=f"El archivo no parece ser un {file_type.upper()} válido",
+        )
 
 
 async def _read_with_limit(file: UploadFile) -> bytes:
@@ -53,7 +72,7 @@ async def _read_with_limit(file: UploadFile) -> bytes:
 
 
 @router.post("/process")
-@limiter.limit("1/minute")
+@rate_limit("1/minute")
 async def process_demo(
     request: Request,
     file: UploadFile,
@@ -66,8 +85,9 @@ async def process_demo(
             detail="Ya usaste la demo. Registrate para seguir usando la plataforma.",
         )
 
-    _validate_demo_file(file)
+    ext = _validate_demo_file(file)
     content = await _read_with_limit(file)
+    _validate_magic_bytes(ext, content)
 
     tag = _uuid.uuid4().hex[:8]
     fd, temp_path = tempfile.mkstemp(

@@ -5,13 +5,14 @@ from sqlalchemy import select
 
 from app.models.password_reset import PasswordResetToken
 from app.repositories import BaseRepository
+from app.utils.tokens import hash_secret
 
 
 class PasswordResetRepository(BaseRepository):
     async def create(self, user_id: UUID, code: str, expires_at: datetime) -> PasswordResetToken:
         token = PasswordResetToken(
             user_id=user_id,
-            code=code,
+            code=hash_secret(code),
             expires_at=expires_at,
         )
         await self._save(token)
@@ -22,7 +23,7 @@ class PasswordResetRepository(BaseRepository):
         stmt = (
             select(PasswordResetToken)
             .where(
-                PasswordResetToken.code == code,
+                PasswordResetToken.code == hash_secret(code),
                 PasswordResetToken.used == False,  # noqa: E712
                 PasswordResetToken.expires_at > now,
             )

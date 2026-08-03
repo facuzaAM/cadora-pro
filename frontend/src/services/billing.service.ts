@@ -30,10 +30,11 @@ export const billingService = {
   getPlans: (token?: string) => api.get<Plan[]>("/billing/plans", token),
 
   getSubscription: async (token?: string) => {
-    const cached = getCached<Subscription>("billing:subscription");
+    const key = `billing:subscription:${token ?? "anon"}`;
+    const cached = getCached<Subscription>(key);
     if (cached) return cached;
     const result = await api.get<Subscription>("/billing/subscription", token);
-    setCache("billing:subscription", result, 30000);
+    setCache(key, result, 30000);
     return result;
   },
 

@@ -11,12 +11,26 @@ logger = logging.getLogger(__name__)
 
 
 def send_email(to: str, subject: str, html_body: str) -> bool:
-    if settings.ENVIRONMENT != "production" or not settings.SMTP_HOST:
+    if settings.ENVIRONMENT != "production":
         logger.info(
             "📧 [DEV EMAIL] To: %s | Subject: %s | Body:\n%s",
             to, subject, html_body,
         )
         return True
+
+    if not settings.SMTP_HOST:
+        logger.error(
+            "SMTP_HOST no configurado en producción: no se pudo enviar email a %s (%s). "
+            "Los flujos de verificación/recuperación de cuenta no funcionarán.",
+            to, subject,
+        )
+        if settings.SENTRY_DSN:
+            with contextlib.suppress(Exception):
+                import sentry_sdk
+                sentry_sdk.capture_message(
+                    f"SMTP_HOST no configurado: email a {to} no enviado"
+                )
+        return False
 
     msg = MIMEMultipart("alternative")
     msg["From"] = f"{settings.EMAIL_FROM_NAME} <{settings.EMAIL_FROM}>"

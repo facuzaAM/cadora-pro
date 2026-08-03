@@ -7,7 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 
 interface UploadZoneProps {
-  onFileSelect: (file: File) => void;
+  onFileSelect: (file: File | null) => void;
   accept?: string;
   maxSizeMB?: number;
 }
@@ -67,7 +67,7 @@ export function UploadZone({
   const removeFile = () => {
     setFile(null);
     setError(null);
-    onFileSelect(null as unknown as File);
+    onFileSelect(null);
   };
 
   return (

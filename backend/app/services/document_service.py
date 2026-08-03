@@ -11,6 +11,23 @@ from app.services.storage_service import StorageService
 IMAGE_EXTS = {"png", "jpg", "jpeg", "gif", "bmp", "webp"}
 
 
+def _safe_filename(filename: str) -> str:
+    """Sanitize an uploaded filename, rejecting path components and hidden files."""
+    import os
+
+    name = os.path.basename(filename or "").strip()
+    if (
+        not name
+        or name in (".", "..")
+        or name.startswith(".")
+        or "/" in name
+        or "\\" in name
+        or "\x00" in name
+    ):
+        raise ValueError("Nombre de archivo inválido")
+    return name
+
+
 class DocumentService:
     def __init__(self, db: AsyncSession):
         self.repo = DocumentRepository(db)
@@ -24,6 +41,7 @@ class DocumentService:
         if not project or project.user_id != user_id:
             raise ValueError("Proyecto no encontrado")
 
+        filename = _safe_filename(filename)
         ext = filename.rsplit(".", 1)[-1].lower() if "." in filename else ""
         file_type = ext
         if ext == "pdf":

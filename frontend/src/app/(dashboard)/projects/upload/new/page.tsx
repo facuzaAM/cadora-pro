@@ -26,7 +26,7 @@ export default function UploadPage() {
   const canSubmit = projectName.length >= 2 && file !== null;
 
   const handleSubmit = async () => {
-    if (!canSubmit || !file) return;
+    if (!canSubmit || !file || loading) return;
     setLoading(true);
     try {
       const token = api.getAccessToken();

@@ -14,4 +14,10 @@ if [ ! -f "$CERT_DIR/fullchain.pem" ]; then
         -subj "/CN=$DOMAIN"
 fi
 
+# Reload periodically so nginx picks up renewed certificates from certbot
+(while :; do
+    sleep 12h
+    nginx -s reload 2>/dev/null || true
+done) &
+
 exec nginx -g "daemon off;"

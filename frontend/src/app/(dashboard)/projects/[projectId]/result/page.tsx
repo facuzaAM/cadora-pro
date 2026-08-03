@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { Suspense, useCallback, useEffect, useRef, useState } from "react";
 import { useRouter, useParams, useSearchParams } from "next/navigation";
 import { ArrowLeft, Download, Share2, Loader2, ChevronDown } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -14,12 +14,20 @@ import { PageHeader } from "@/components/shared/page-header";
 import { projectsService } from "@/services/projects.service";
 import { cadService, type CadFormat } from "@/services/cad.service";
 import { useAuth } from "@/hooks/useAuth";
-import { api } from "@/services/api";
+import { api, ApiError } from "@/services/api";
 import { toast } from "sonner";
 
 const DWG_PLANS = new Set(["pro", "business"]);
 
 export default function ResultPage() {
+  return (
+    <Suspense fallback={<div className="space-y-6" />}>
+      <ResultContent />
+    </Suspense>
+  );
+}
+
+function ResultContent() {
   const router = useRouter();
   const params = useParams();
   const searchParams = useSearchParams();
@@ -28,38 +36,100 @@ export default function ResultPage() {
   const [projectName, setProjectName] = useState("Proyecto");
   const [downloading, setDownloading] = useState(false);
   const [cadReady, setCadReady] = useState(searchParams.has("ready"));
+  const generatedRef = useRef(false);
+  const readyRef = useRef(false);
 
   const canExportDwg = user && DWG_PLANS.has(user.subscription_plan);
 
-  useEffect(() => {
-    const token = api.getAccessToken();
-    projectsService.getById(projectId, token)
-      .then((p) => {
-        setProjectName(p.name);
-        if (p.status === "cad_generated" || p.status === "detection_completed") {
-          setCadReady(true);
+  const markReady = useCallback(() => {
+    if (readyRef.current) return;
+    readyRef.current = true;
+    setCadReady(true);
+  }, []);
+
+  const generateCad = useCallback(
+    async (token?: string) => {
+      if (generatedRef.current) return;
+      generatedRef.current = true;
+      try {
+        await cadService.generate(projectId, "dxf", token);
+        markReady();
+      } catch (err) {
+        generatedRef.current = false;
+        if (err instanceof ApiError && err.status === 402) {
+          toast.error("Alcanzaste el límite de conversiones de tu plan");
+          return;
         }
-      })
-      .catch(() => toast.error("Error cargando proyecto"));
-  }, [projectId]);
+        if (err instanceof ApiError && err.status === 409) {
+          return;
+        }
+        toast.error("Error al generar el archivo CAD");
+      }
+    },
+    [projectId, markReady],
+  );
 
   useEffect(() => {
     const token = api.getAccessToken();
-    if (cadReady) return;
-    cadService.generate(projectId, "dxf", token)
-      .then(() => setCadReady(true))
-      .catch(() => toast.error("Error al generar el archivo CAD"));
-  }, [projectId, cadReady]);
+    let timer: ReturnType<typeof setInterval> | null = null;
+    let stopped = false;
+
+    const stop = () => {
+      stopped = true;
+      if (timer) {
+        clearInterval(timer);
+        timer = null;
+      }
+    };
+
+    const checkStatus = async (): Promise<boolean> => {
+      try {
+        const p = await projectsService.getById(projectId, token);
+        setProjectName(p.name);
+        if (p.status === "cad_generated") {
+          markReady();
+          return true;
+        }
+        if (p.status === "error") {
+          toast.error("El plano no pudo procesarse");
+          return true;
+        }
+        if (
+          p.status === "created" ||
+          p.status === "document_uploaded" ||
+          p.status === "detection_completed"
+        ) {
+          await generateCad(token);
+          return false;
+        }
+        return false;
+      } catch {
+        toast.error("Error cargando proyecto");
+        return true;
+      }
+    };
+
+    checkStatus().then((done) => {
+      if (!done && !stopped) {
+        timer = setInterval(async () => {
+          if (stopped) return;
+          const doneNow = await checkStatus();
+          if (doneNow) stop();
+        }, 4000);
+      }
+    });
+
+    return stop;
+  }, [projectId, generateCad, markReady]);
 
   const handleDownload = async (format: CadFormat = "dxf") => {
     setDownloading(true);
     try {
-      await cadService.generate(projectId, format, api.getAccessToken());
       const url = cadService.downloadUrl(projectId, format);
       window.open(url, "_blank");
-      toast.success(`Archivo ${format.toUpperCase()} generado`);
+      toast.success(`Archivo ${format.toUpperCase()} en descarga`);
     } catch {
-      toast.error("Error al generar el archivo");
+      toast.error("Error al descargar el archivo");
     } finally {
       setDownloading(false);
     }

@@ -4,10 +4,14 @@ from uuid import UUID
 
 from pydantic import BaseModel, EmailStr, field_validator
 
+PASSWORD_MAX_LENGTH = 128
+
 
 def _validate_password_strength(v: str) -> str:
     if len(v) < 8:
         raise ValueError("La contraseña debe tener al menos 8 caracteres")
+    if len(v) > PASSWORD_MAX_LENGTH:
+        raise ValueError(f"La contraseña no puede superar {PASSWORD_MAX_LENGTH} caracteres")
     if not re.search(r"[A-Z]", v):
         raise ValueError("La contraseña debe contener al menos una mayúscula")
     if not re.search(r"[0-9]", v):
@@ -17,10 +21,19 @@ def _validate_password_strength(v: str) -> str:
     return v
 
 
+def _normalize_email(v: str) -> str:
+    return v.strip().lower()
+
+
 class RegisterRequest(BaseModel):
     email: EmailStr
     password: str
     name: str
+
+    @field_validator("email")
+    @classmethod
+    def normalize_email(cls, v: str) -> str:
+        return _normalize_email(v)
 
     @field_validator("password")
     @classmethod
@@ -40,6 +53,11 @@ class LoginRequest(BaseModel):
     email: EmailStr
     password: str
 
+    @field_validator("email")
+    @classmethod
+    def normalize_email(cls, v: str) -> str:
+        return _normalize_email(v)
+
 
 class RefreshRequest(BaseModel):
     refresh_token: str | None = None
@@ -48,6 +66,22 @@ class RefreshRequest(BaseModel):
 class ProfileUpdateRequest(BaseModel):
     name: str | None = None
     avatar_url: str | None = None
+
+    @field_validator("name")
+    @classmethod
+    def validate_name(cls, v: str | None) -> str | None:
+        if v is not None:
+            v = v.strip()
+            if len(v) < 2:
+                raise ValueError("El nombre debe tener al menos 2 caracteres")
+        return v
+
+    @field_validator("avatar_url")
+    @classmethod
+    def validate_avatar_url(cls, v: str | None) -> str | None:
+        if v is not None and v.strip() != "" and not v.startswith("https://"):
+            raise ValueError("La URL del avatar debe ser HTTPS")
+        return v
 
 
 class ChangePasswordRequest(BaseModel):
@@ -62,6 +96,11 @@ class ChangePasswordRequest(BaseModel):
 
 class ForgotPasswordRequest(BaseModel):
     email: EmailStr
+
+    @field_validator("email")
+    @classmethod
+    def normalize_email(cls, v: str) -> str:
+        return _normalize_email(v)
 
 
 class ResetPasswordRequest(BaseModel):

@@ -15,15 +15,48 @@ services:
       frontend:
         condition: service_started
     restart: unless-stopped
+    init: true
+    mem_limit: 256m
+    cpus: 0.5
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost/nginx/health"]
+      interval: 30s
+      timeout: 5s
+      start_period: 10s
+      retries: 3
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "5"
 
   certbot:
-    image: certbot/certbot:latest
+    image: certbot/certbot:2.12.1
     volumes:
       - ./nginx/letsencrypt:/etc/letsencrypt
       - certbot-www:/var/www/certbot
-    entrypoint: "/bin/sh -c 'if [ ! -f /etc/letsencrypt/live/cadora.pro/fullchain.pem ]; then certbot certonly --webroot -w /var/www/certbot --email hello@cadora.pro --agree-tos --no-eff-email -d cadora.pro -d www.cadora.pro -d api.cadora.pro; fi; trap exit TERM; while :; do certbot renew --webroot -w /var/www/certbot --quiet; sleep 12h & wait $${!}; done;'"
+      - ./nginx/certbot.sh:/app/certbot.sh:ro
+    entrypoint: /app/certbot.sh
+    environment:
+      DOMAIN: ${DOMAIN:-cadora.pro}
+      CERTBOT_EMAIL: ${CERTBOT_EMAIL:-hello@cadora.pro}
     depends_on:
       - nginx
+    restart: unless-stopped
+    init: true
+    mem_limit: 256m
+    cpus: 0.25
+    healthcheck:
+      test: ["CMD-SHELL", "test -f /etc/letsencrypt/.issued"]
+      interval: 6h
+      timeout: 10s
+      start_period: 5m
+      retries: 2
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
 
   frontend:
     build:
@@ -44,12 +77,20 @@ services:
       NEXT_PUBLIC_SENTRY_DSN: ${SENTRY_DSN}
       NEXT_PUBLIC_GA_ID: ${GA_ID}
     restart: unless-stopped
+    init: true
+    mem_limit: 768m
+    cpus: 1.0
     healthcheck:
       test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:3000"]
       interval: 30s
       timeout: 10s
       start_period: 40s
       retries: 3
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "5"
 
   api:
     build:
@@ -57,25 +98,40 @@ services:
       dockerfile: Dockerfile
     env_file:
       - ./backend/.env
+    environment:
+      # env_file does NOT interpolate ${POSTGRES_PASSWORD}, so DATABASE_URL is
+      # built here from the root .env (same source the db service uses).
+      DATABASE_URL: postgresql+asyncpg://cadora:${POSTGRES_PASSWORD}@db:5432/cadora
+      # Force production mode: never inherit dev values from backend/.env.
+      ENVIRONMENT: production
+      DEBUG: "false"
     depends_on:
       db:
         condition: service_healthy
     volumes:
       - uploads_volume:/app/uploads
     restart: unless-stopped
+    init: true
+    mem_limit: 1g
+    cpus: 2.0
     healthcheck:
-      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/api/v1/health')"]
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/api/v1/readyz')"]
       interval: 30s
       timeout: 10s
       start_period: 40s
       retries: 3
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "5"
 
   db:
     image: postgres:16-alpine
     environment:
       POSTGRES_DB: ${POSTGRES_DB:-cadora}
       POSTGRES_USER: ${POSTGRES_USER:-cadora}
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-changeme}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?POSTGRES_PASSWORD debe estar definido en .env}
     ports:
       - "127.0.0.1:5432:5432"
     volumes:
@@ -86,6 +142,14 @@ services:
       timeout: 5s
       retries: 5
     restart: unless-stopped
+    init: true
+    mem_limit: 1g
+    cpus: 2.0
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
 
   backup:
     build:
@@ -95,14 +159,30 @@ services:
       - .env
     volumes:
       - backups:/backups
+      - backup-logs:/var/log
       - ./backup/backup.sh:/app/backup.sh:ro
     depends_on:
       db:
         condition: service_healthy
     restart: unless-stopped
+    init: true
+    mem_limit: 128m
+    cpus: 0.25
+    healthcheck:
+      test: ["CMD-SHELL", "pgrep crond >/dev/null"]
+      interval: 30s
+      timeout: 5s
+      start_period: 10s
+      retries: 3
+    logging:
+      driver: json-file
+      options:
+        max-size: "5m"
+        max-file: "3"
 
 volumes:
   pgdata:
   uploads_volume:
   certbot-www:
   backups:
+  backup-logs:

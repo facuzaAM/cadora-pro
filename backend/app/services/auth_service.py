@@ -14,6 +14,7 @@ from app.repositories.user_repository import UserRepository
 from app.schemas.auth import RegisterRequest, TokenResponse, UserResponse
 from app.utils.jwt import create_access_token, create_refresh_token, decode_refresh_token
 from app.utils.security import hash_password, verify_password
+from app.utils.tokens import hash_secret
 
 logger = logging.getLogger(__name__)
 
@@ -95,7 +96,7 @@ class AuthService:
     ) -> bool:
         code = str(_secrets.randbelow(900000) + 100000)
         expires_at = datetime.now(UTC) + timedelta(minutes=15)
-        user.email_verification_code = code
+        user.email_verification_code = hash_secret(code)
         user.email_verification_expires_at = expires_at
         await self.repo._save(user)
         sent = await asyncio.to_thread(email_fn, user.email, code, user.name)
@@ -125,7 +126,7 @@ class AuthService:
             raise ValueError("No hay código de verificación pendiente")
         if user.email_verification_expires_at.replace(tzinfo=UTC) < datetime.now(UTC):
             raise ValueError("El código expiró. Solicitá uno nuevo.")
-        if user.email_verification_code != code:
+        if not _secrets.compare_digest(user.email_verification_code, hash_secret(code)):
             raise ValueError("Código incorrecto")
         user.email_verified = True
         user.email_verification_code = None
