@@ -1,14 +1,20 @@
+from contextlib import suppress
 from uuid import UUID
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.config import settings
+from app.repositories.document_repository import DocumentRepository
 from app.repositories.project_repository import ProjectRepository
 from app.schemas.project import ProjectCreateRequest, ProjectResponse, ProjectUpdateRequest
+from app.services.storage_service import StorageService
 
 
 class ProjectService:
     def __init__(self, db: AsyncSession):
         self.repo = ProjectRepository(db)
+        self.document_repo = DocumentRepository(db)
+        self.storage = StorageService()
 
     async def create(self, user_id: UUID, request: ProjectCreateRequest) -> ProjectResponse:
         project = await self.repo.create(
@@ -52,4 +58,11 @@ class ProjectService:
         project = await self.repo.get_by_id(project_id)
         if not project or project.user_id != user_id:
             raise ValueError("Proyecto no encontrado")
+
+        # Remove stored files so deleting a project does not leak them.
+        docs = await self.document_repo.list_by_project(project_id)
+        for doc in docs:
+            with suppress(Exception):
+                await self.storage.delete(settings.STORAGE_BUCKET, doc.storage_path)
+
         await self.repo.delete(project_id)

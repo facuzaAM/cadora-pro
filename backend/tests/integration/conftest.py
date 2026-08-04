@@ -1,3 +1,7 @@
+import os
+
+os.environ["RATE_LIMIT_ENABLED"] = "false"
+
 import pytest
 from httpx import ASGITransport, AsyncClient
 
@@ -12,12 +16,15 @@ async def setup_database():
     yield
     async with engine.begin() as conn:
         await conn.run_sync(Base.metadata.drop_all)
+    # Each pytest-asyncio test runs in its own event loop; pooled asyncpg
+    # connections bound to a previous loop must be closed in this one.
+    await engine.dispose()
 
 
 @pytest.fixture
 async def client():
     transport = ASGITransport(app=app)
-    async with AsyncClient(transport=transport, base_url="http://test") as ac:
+    async with AsyncClient(transport=transport, base_url="http://localhost") as ac:
         yield ac
 
 

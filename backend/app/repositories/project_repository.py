@@ -73,3 +73,12 @@ class ProjectRepository(BaseRepository):
         )
         result = await self.db.execute(stmt)
         return {pid: count for pid, count in result.all()}
+
+    async def list_documents_by_user(self, user_id: UUID) -> list[Document]:
+        stmt = (
+            select(Document)
+            .join(Project, Project.id == Document.project_id)
+            .where(Project.user_id == user_id)
+        )
+        result = await self.db.execute(stmt)
+        return list(result.scalars().all())

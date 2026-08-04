@@ -1,8 +1,10 @@
 "use client";
 
 import { useState, useEffect, useRef } from "react";
+import { useRouter } from "next/navigation";
 import { useAuth } from "@/hooks/useAuth";
 import { api } from "@/services/api";
+import { deleteMyAccount, downloadExportAsJson, exportMyData } from "@/services/account.service";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -11,11 +13,12 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Skeleton } from "@/components/ui/skeleton";
 import { ThemeToggle } from "@/components/shared/theme-toggle";
 import { toast } from "sonner";
-import { Camera, Lock, Eye, EyeOff, AlertCircle } from "lucide-react";
+import { Camera, Lock, Eye, EyeOff, AlertCircle, Download, Trash2 } from "lucide-react";
 import { validatePassword } from "@/lib/password";
 
 export default function ProfilePage() {
-  const { user, loading, refreshUser } = useAuth();
+  const { user, loading, refreshUser, signOut } = useAuth();
+  const router = useRouter();
   const [name, setName] = useState("");
   const [saving, setSaving] = useState(false);
   const [uploading, setUploading] = useState(false);
@@ -28,6 +31,11 @@ export default function ProfilePage() {
   const [passwordError, setPasswordError] = useState<string | null>(null);
   const [showCurrent, setShowCurrent] = useState(false);
   const [showNew, setShowNew] = useState(false);
+
+  const [exporting, setExporting] = useState(false);
+  const [deletePassword, setDeletePassword] = useState("");
+  const [deleting, setDeleting] = useState(false);
+  const [confirmDelete, setConfirmDelete] = useState(false);
 
   useEffect(() => {
     if (user) setName(user.name);
@@ -102,6 +110,40 @@ export default function ProfilePage() {
       toast.error(msg);
     }
     setChangingPassword(false);
+  };
+
+  const handleExportData = async () => {
+    setExporting(true);
+    try {
+      const data = await exportMyData(api.getAccessToken());
+      downloadExportAsJson(data);
+      toast.success("Exportación generada");
+    } catch {
+      toast.error("Error al exportar tus datos");
+    }
+    setExporting(false);
+  };
+
+  const handleDeleteAccount = async () => {
+    if (!deletePassword) {
+      toast.error("Ingresá tu contraseña para confirmar");
+      return;
+    }
+    if (!confirmDelete) {
+      toast.error("Confirmá que entendés la eliminación");
+      return;
+    }
+    setDeleting(true);
+    try {
+      await deleteMyAccount(deletePassword, api.getAccessToken());
+      await signOut();
+      router.push("/");
+      toast.success("Tu cuenta fue eliminada. Gracias por haber usado Cadora.");
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : "Error al eliminar la cuenta";
+      toast.error(msg);
+    }
+    setDeleting(false);
   };
 
   if (loading) {
@@ -269,6 +311,64 @@ export default function ProfilePage() {
             <p className="text-sm text-muted-foreground">Alterna entre tema claro y oscuro</p>
           </div>
           <ThemeToggle />
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <Download className="h-4 w-4" />
+            Exportar mis datos
+          </CardTitle>
+          <CardDescription>
+            Descargá una copia de tu perfil, suscripción, proyectos y documentos en formato JSON.
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          <Button onClick={handleExportData} disabled={exporting}>
+            {exporting ? "Generando..." : "Exportar datos"}
+          </Button>
+        </CardContent>
+      </Card>
+
+      <Card className="border-destructive/40">
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2 text-destructive">
+            <Trash2 className="h-4 w-4" />
+            Zona de Peligro
+          </CardTitle>
+          <CardDescription>
+            Al eliminar tu cuenta se borran de forma permanente tus proyectos, documentos y archivos.
+            Esta acción no se puede deshacer.
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <div className="space-y-2">
+            <Label htmlFor="delete-password">Contraseña</Label>
+            <Input
+              id="delete-password"
+              type="password"
+              value={deletePassword}
+              onChange={(e) => setDeletePassword(e.target.value)}
+              placeholder="Ingresá tu contraseña para confirmar"
+            />
+          </div>
+          <label className="flex items-start gap-2 text-sm text-muted-foreground">
+            <input
+              type="checkbox"
+              checked={confirmDelete}
+              onChange={(e) => setConfirmDelete(e.target.checked)}
+              className="mt-0.5"
+            />
+            <span>Entiendo que esta acción es irreversible y eliminará todos mis datos.</span>
+          </label>
+          <Button
+            variant="destructive"
+            onClick={handleDeleteAccount}
+            disabled={deleting}
+          >
+            {deleting ? "Eliminando..." : "Eliminar mi cuenta"}
+          </Button>
         </CardContent>
       </Card>
     </div>

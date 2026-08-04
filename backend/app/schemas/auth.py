@@ -94,6 +94,10 @@ class ChangePasswordRequest(BaseModel):
         return _validate_password_strength(v)
 
 
+class DeleteAccountRequest(BaseModel):
+    password: str
+
+
 class ForgotPasswordRequest(BaseModel):
     email: EmailStr
 

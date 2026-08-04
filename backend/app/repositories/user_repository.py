@@ -15,6 +15,9 @@ class UserRepository(BaseRepository):
     async def get_by_id(self, user_id: UUID) -> User | None:
         return await self._get_by_id(User, user_id)
 
+    async def delete(self, user_id: UUID) -> None:
+        await self._delete(User, user_id)
+
     async def get_by_email(self, email: str) -> User | None:
         stmt = select(User).where(User.email == email)
         result = await self.db.execute(stmt)

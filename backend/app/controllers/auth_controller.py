@@ -19,6 +19,7 @@ from app.models.user import User
 from app.repositories.user_repository import UserRepository
 from app.schemas.auth import (
     ChangePasswordRequest,
+    DeleteAccountRequest,
     ForgotPasswordRequest,
     LoginRequest,
     ProfileUpdateRequest,
@@ -29,6 +30,7 @@ from app.schemas.auth import (
     UserResponse,
     VerifyEmailRequest,
 )
+from app.services.account_service import AccountService
 from app.services.auth_service import AuthService
 from app.utils.dependencies import ACCESS_TOKEN_COOKIE, get_current_user
 from app.utils.rate_limit import rate_limit
@@ -497,3 +499,36 @@ async def verify_email(
     except ValueError as e:
         raise HTTPException(status_code=HTTP_400_BAD_REQUEST, detail=str(e))
     return {"message": "Email verificado correctamente"}
+
+
+@router.get("/me/export")
+@rate_limit("5/minute")
+async def export_user_data(
+    request: Request,
+    user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    service = AccountService(db)
+    try:
+        return await service.export_user_data(user.id)
+    except ValueError as e:
+        raise HTTPException(status_code=HTTP_400_BAD_REQUEST, detail=str(e))
+
+
+@router.delete("/me", status_code=204)
+@rate_limit("5/minute")
+async def delete_account(
+    request: Request,
+    body: DeleteAccountRequest,
+    user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    service = AccountService(db)
+    try:
+        await service.delete_account(user.id, body.password)
+    except ValueError as e:
+        raise HTTPException(status_code=HTTP_400_BAD_REQUEST, detail=str(e))
+    resp = Response(status_code=204)
+    resp.delete_cookie(REFRESH_COOKIE, path="/")
+    resp.delete_cookie(ACCESS_COOKIE, path="/")
+    return resp
