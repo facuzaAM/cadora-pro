@@ -15,7 +15,11 @@ async def register_user(client, email: str = "billing@example.com"):
     return resp.json()
 
 
-def build_subscription_created_payload(user_id: str, event_id: str = "evt_sub_created_1"):
+def build_subscription_created_payload(
+    user_id: str,
+    price_id: str,
+    event_id: str = "evt_sub_created_1",
+):
     return {
         "event_id": event_id,
         "event_type": "subscription.created",
@@ -28,7 +32,7 @@ def build_subscription_created_payload(user_id: str, event_id: str = "evt_sub_cr
             "customer": {"email": "billing@example.com"},
             "items": [
                 {
-                    "price": {"id": settings.PADDLE_PRICE_STARTER},
+                    "price": {"id": price_id},
                     "quantity": 1,
                 }
             ],
@@ -58,12 +62,13 @@ async def test_subscription_created_upgrades_plan_and_dedups(client, db_session,
     monkeypatch.setattr(
         PaddleService, "verify_signature", staticmethod(lambda payload, sig: True)
     )
+    monkeypatch.setattr(settings, "PADDLE_PRICE_STARTER", "price_test_starter")
 
     data = await register_user(client)
     user_id = data["user"]["id"]
     token = data["access_token"]
 
-    payload = build_subscription_created_payload(user_id)
+    payload = build_subscription_created_payload(user_id, settings.PADDLE_PRICE_STARTER)
     payload_bytes = __import__("json").dumps(payload).encode()
 
     resp = await client.post(
