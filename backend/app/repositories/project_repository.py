@@ -31,11 +31,6 @@ class ProjectRepository(BaseRepository):
         result = await self.db.execute(stmt)
         return list(result.scalars().all())
 
-    async def count_by_user(self, user_id: UUID) -> int:
-        stmt = select(func.count()).select_from(Project).where(Project.user_id == user_id)
-        result = await self.db.execute(stmt)
-        return result.scalar_one()
-
     async def update(
         self, project_id: UUID, name: str | None = None, description: str | None = None
     ) -> Project | None:

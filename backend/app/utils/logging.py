@@ -24,7 +24,7 @@ def setup_logging() -> None:
         "<level>{message}</level>"
     )
 
-    log_level = "DEBUG" if settings.DEBUG else "INFO"
+    log_level = "DEBUG" if settings.DEBUG else (settings.LOG_LEVEL or "INFO")
 
     logger.remove()
 

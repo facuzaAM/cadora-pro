@@ -53,9 +53,6 @@ class OcrEngine:
 
         return elements
 
-    def extract_raw_text(self, image: np.ndarray) -> str:
-        return pytesseract.image_to_string(image, lang=self.lang, config="--psm 3 --oem 3")
-
     def to_domain(self, raw: OcrRawElement, category: TextCategory) -> OcrTextElement:
         return OcrTextElement(
             text=raw.text,

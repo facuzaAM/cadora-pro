@@ -23,7 +23,6 @@ class Settings(BaseSettings):
     JWT_ALGORITHM: str = "HS256"
     JWT_ACCESS_EXPIRATION_MINUTES: int = 15
     JWT_REFRESH_EXPIRATION_DAYS: int = 7
-    JWT_EXPIRATION_HOURS: int = 24
 
     # Trusted hosts (comma-separated, for TrustedHostMiddleware)
     TRUSTED_HOSTS: str = (
@@ -62,6 +61,8 @@ class Settings(BaseSettings):
     RATE_LIMIT_UPLOAD: str = "5/minute"
     RATE_LIMIT_DETECTION: str = "10/minute"
     RATE_LIMIT_CAD: str = "5/minute"
+    RATE_LIMIT_DEMO: str = "1/minute"
+    RATE_LIMIT_CONTACT: str = "3/hour"
 
     # Logging
     LOG_FILE: str = ""

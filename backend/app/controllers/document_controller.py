@@ -2,11 +2,7 @@ from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException, Request, UploadFile
 from sqlalchemy.ext.asyncio import AsyncSession
-from starlette.status import (
-    HTTP_400_BAD_REQUEST,
-    HTTP_404_NOT_FOUND,
-    HTTP_413_CONTENT_TOO_LARGE,
-)
+from starlette.status import HTTP_404_NOT_FOUND
 
 from app.config import settings
 from app.database import get_db
@@ -15,45 +11,9 @@ from app.services.document_service import DocumentService
 from app.services.plan_enforcer import check_storage_limit, enforce_conversion_limit
 from app.utils.dependencies import get_current_user
 from app.utils.rate_limit import rate_limit
+from app.utils.uploads import read_upload_with_limit, validate_extension, validate_magic_bytes
 
 router = APIRouter()
-
-_MAGIC_SIGNATURES: dict[str, tuple[bytes, ...]] = {
-    "pdf": (b"%PDF-",),
-    "png": (b"\x89PNG\r\n\x1a\n",),
-    "jpg": (b"\xff\xd8\xff",),
-    "jpeg": (b"\xff\xd8\xff",),
-    "tiff": (b"II*\x00", b"MM\x00*"),
-}
-
-
-async def _read_upload_safe(file: UploadFile) -> bytes:
-    """Read upload file in chunks enforcing the configured size limit."""
-    max_bytes = settings.MAX_FILE_SIZE_MB * 1024 * 1024
-    content = bytearray()
-    while True:
-        chunk = await file.read(1024 * 1024)
-        if not chunk:
-            break
-        content.extend(chunk)
-        if len(content) > max_bytes:
-            raise HTTPException(
-                status_code=HTTP_413_CONTENT_TOO_LARGE,
-                detail=f"El archivo excede el límite de {settings.MAX_FILE_SIZE_MB} MB",
-            )
-    return bytes(content)
-
-
-def _validate_magic_bytes(file_type: str, content: bytes) -> None:
-    """Reject files whose magic bytes do not match their declared extension."""
-    signatures = _MAGIC_SIGNATURES.get(file_type)
-    if signatures is not None and not any(
-        content.startswith(sig) for sig in signatures
-    ):
-        raise HTTPException(
-            status_code=HTTP_400_BAD_REQUEST,
-            detail=f"El archivo no parece ser un {file_type.upper()} válido",
-        )
 
 
 @router.post("/{project_id}", response_model=UploadResponse, status_code=201)
@@ -65,24 +25,24 @@ async def upload_document(
     user=Depends(enforce_conversion_limit),
     db: AsyncSession = Depends(get_db),
 ):
-    if not file.filename:
-        raise HTTPException(status_code=HTTP_400_BAD_REQUEST, detail="Archivo no proporcionado")
+    ext = validate_extension(
+        file,
+        settings.ALLOWED_EXTENSIONS,
+        detail=f"Formato no soportado. Usa: {', '.join(settings.ALLOWED_EXTENSIONS)}",
+    )
 
-    ext = file.filename.rsplit(".", 1)[-1].lower() if "." in file.filename else ""
-    if f".{ext}" not in settings.ALLOWED_EXTENSIONS:
-        raise HTTPException(
-            status_code=HTTP_400_BAD_REQUEST,
-            detail=f"Formato .{ext} no soportado. Usa: {', '.join(settings.ALLOWED_EXTENSIONS)}",
-        )
-
-    content = await _read_upload_safe(file)
-    _validate_magic_bytes(ext, content)
+    content = await read_upload_with_limit(
+        file,
+        settings.MAX_FILE_SIZE_MB * 1024 * 1024,
+        f"El archivo excede el límite de {settings.MAX_FILE_SIZE_MB} MB",
+    )
+    validate_magic_bytes(ext, content)
 
     await check_storage_limit(user, len(content))
 
     service = DocumentService(db)
     try:
-        return await service.upload(user.id, project_id, file.filename, content)
+        return await service.upload(user.id, project_id, file.filename or "", content)
     except ValueError as e:
         raise HTTPException(status_code=HTTP_404_NOT_FOUND, detail=str(e))
 

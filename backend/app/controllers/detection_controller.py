@@ -1,17 +1,10 @@
 import logging
 import os
-import tempfile
-import uuid as _uuid
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException, Request, UploadFile
 from sqlalchemy.ext.asyncio import AsyncSession
-from starlette.status import (
-    HTTP_400_BAD_REQUEST,
-    HTTP_402_PAYMENT_REQUIRED,
-    HTTP_404_NOT_FOUND,
-    HTTP_413_CONTENT_TOO_LARGE,
-)
+from starlette.status import HTTP_400_BAD_REQUEST, HTTP_402_PAYMENT_REQUIRED, HTTP_404_NOT_FOUND
 
 from app.config import settings
 from app.database import get_db
@@ -24,6 +17,12 @@ from app.repositories.project_repository import ProjectRepository
 from app.services.plan_enforcer import consume_conversion, enforce_conversion_limit
 from app.services.storage_service import StorageService
 from app.utils.rate_limit import rate_limit
+from app.utils.uploads import (
+    make_temp_path,
+    read_upload_with_limit,
+    validate_extension,
+    validate_magic_bytes,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -52,47 +51,21 @@ detection_service = DetectionService()
 storage = StorageService()
 
 
-def _safe_temp_path(user_id: UUID, project_id: UUID, filename: str | None, prefix: str = "") -> str:
+def _safe_temp_path(user_id, project_id, filename: str | None, prefix: str = "") -> str:
     """Create a safe temp file path with sanitized filename."""
-    safe_name = os.path.basename(filename or "upload").replace("/", "").replace("\\", "")
-    tag = _uuid.uuid4().hex[:8]
-    suffix = f"_{prefix}" if prefix else ""
-    fd, path = tempfile.mkstemp(
-        suffix=f"_{safe_name}", prefix=f"{user_id}_{project_id}{suffix}_{tag}_"
-    )
-    os.close(fd)
-    return path
-
-
-def _validate_upload(file: UploadFile) -> str:
-    """Validate file extension and return lowercase extension."""
-    if not file.filename:
-        raise HTTPException(status_code=HTTP_400_BAD_REQUEST, detail="Archivo no proporcionado")
-
-    ext = file.filename.rsplit(".", 1)[-1].lower() if "." in file.filename else ""
-    if f".{ext}" not in settings.ALLOWED_EXTENSIONS:
-        raise HTTPException(
-            status_code=HTTP_400_BAD_REQUEST,
-            detail=f"Formato .{ext} no soportado",
-        )
-    return ext
+    label = f"{user_id}_{project_id}"
+    if prefix:
+        label = f"{label}_{prefix}"
+    return make_temp_path(label, filename)
 
 
 async def _read_upload_safe(file: UploadFile) -> bytes:
     """Read upload file with size limit enforcement."""
-    max_bytes = settings.MAX_FILE_SIZE_MB * 1024 * 1024
-    content = b""
-    while True:
-        chunk = await file.read(1024 * 1024)
-        if not chunk:
-            break
-        content += chunk
-        if len(content) > max_bytes:
-            raise HTTPException(
-                status_code=HTTP_413_CONTENT_TOO_LARGE,
-                detail=f"Archivo excede el limite de {settings.MAX_FILE_SIZE_MB}MB",
-            )
-    return content
+    return await read_upload_with_limit(
+        file,
+        settings.MAX_FILE_SIZE_MB * 1024 * 1024,
+        f"Archivo excede el limite de {settings.MAX_FILE_SIZE_MB}MB",
+    )
 
 
 @router.post("/ocr/{project_id}", response_model=OcrResult)
@@ -111,8 +84,9 @@ async def ocr_document(
     if not project or project.user_id != user.id:
         raise HTTPException(status_code=HTTP_404_NOT_FOUND, detail="Proyecto no encontrado")
 
-    _validate_upload(file)
+    ext = validate_extension(file, settings.ALLOWED_EXTENSIONS)
     content = await _read_upload_safe(file)
+    validate_magic_bytes(ext, content)
     temp_path = _safe_temp_path(user.id, project_id, file.filename)
     try:
         with open(temp_path, "wb") as f:
@@ -201,8 +175,9 @@ async def detect_windows(
     if not project or project.user_id != user.id:
         raise HTTPException(status_code=HTTP_404_NOT_FOUND, detail="Proyecto no encontrado")
 
-    _validate_upload(file)
+    ext = validate_extension(file, settings.ALLOWED_EXTENSIONS)
     content = await _read_upload_safe(file)
+    validate_magic_bytes(ext, content)
     temp_path = _safe_temp_path(user.id, project_id, file.filename, prefix="windows")
     try:
         with open(temp_path, "wb") as f:
@@ -242,8 +217,9 @@ async def detect_lines(
     if not project or project.user_id != user.id:
         raise HTTPException(status_code=HTTP_404_NOT_FOUND, detail="Proyecto no encontrado")
 
-    _validate_upload(file)
+    ext = validate_extension(file, settings.ALLOWED_EXTENSIONS)
     content = await _read_upload_safe(file)
+    validate_magic_bytes(ext, content)
     temp_path = _safe_temp_path(user.id, project_id, file.filename, prefix="lines")
     try:
         with open(temp_path, "wb") as f:
@@ -283,8 +259,9 @@ async def detect_doors(
     if not project or project.user_id != user.id:
         raise HTTPException(status_code=HTTP_404_NOT_FOUND, detail="Proyecto no encontrado")
 
-    _validate_upload(file)
+    ext = validate_extension(file, settings.ALLOWED_EXTENSIONS)
     content = await _read_upload_safe(file)
+    validate_magic_bytes(ext, content)
     temp_path = _safe_temp_path(user.id, project_id, file.filename, prefix="doors")
     try:
         with open(temp_path, "wb") as f:

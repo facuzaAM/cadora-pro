@@ -92,14 +92,3 @@ async def check_storage_limit(
             detail="Has alcanzado el límite de almacenamiento de tu plan. "
                    "Actualiza tu plan para subir archivos más grandes.",
         )
-
-
-async def require_priority_processing(
-    user: User = Depends(get_current_user),
-) -> User:
-    if not user.priority_processing:
-        raise HTTPException(
-            status_code=HTTP_403_FORBIDDEN,
-            detail="El procesamiento prioritario requiere un plan Pro o Business.",
-        )
-    return user

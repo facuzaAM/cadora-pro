@@ -1,22 +1,6 @@
-export const APP_NAME = "Cadora.pro";
 export const APP_TAGLINE = "De planos arquitectónicos a CAD";
 export const APP_DESCRIPTION =
   "Sube tu plano arquitectónico y obtén un archivo DXF/DWG editable con detección automática de muros, puertas, ventanas, habitaciones, textos y cotas.";
-
-export const NAV_ITEMS = [
-  { label: "Inicio", href: "/" },
-  { label: "Cómo funciona", href: "/como-funciona" },
-  { label: "Precios", href: "/pricing" },
-] as const;
-
-export const DASHBOARD_NAV = [
-  { label: "Dashboard", href: "/dashboard", icon: "LayoutDashboard" },
-  { label: "Historial", href: "/dashboard/history", icon: "History" },
-  { label: "Mis Proyectos", href: "/projects", icon: "FolderKanban" },
-  { label: "Facturación", href: "/billing", icon: "CreditCard" },
-  { label: "Perfil", href: "/profile", icon: "User" },
-  { label: "Configuración", href: "/settings", icon: "Settings" },
-] as const;
 
 export const PLANS = [
   {
@@ -100,14 +84,4 @@ export const PLANS = [
     storage: "25 GB",
     priority: true,
   },
-] as const;
-
-export const DETECTION_STEPS = [
-  { id: "preprocessing", label: "Preprocesando imagen" },
-  { id: "walls", label: "Detectando muros" },
-  { id: "doors_windows", label: "Detectando puertas y ventanas" },
-  { id: "rooms", label: "Segmentando ambientes" },
-  { id: "text", label: "Reconociendo textos" },
-  { id: "dimensions", label: "Extrayendo cotas" },
-  { id: "cad", label: "Generando archivo CAD" },
 ] as const;

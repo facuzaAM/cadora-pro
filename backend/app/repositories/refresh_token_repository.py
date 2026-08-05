@@ -39,12 +39,3 @@ class RefreshTokenRepository(BaseRepository):
         for rt in result.scalars().all():
             rt.revoked = True
             self.db.add(rt)
-
-    async def cleanup_expired(self) -> int:
-        now = datetime.now(UTC)
-        stmt = select(RefreshToken).where(RefreshToken.expires_at < now)
-        result = await self.db.execute(stmt)
-        tokens = result.scalars().all()
-        for rt in tokens:
-            await self.db.delete(rt)
-        return len(tokens)

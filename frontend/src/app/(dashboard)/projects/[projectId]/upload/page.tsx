@@ -7,7 +7,6 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { UploadZone } from "@/components/features/projects/upload-zone";
 import { documentsService } from "@/services/documents.service";
-import { useAuth } from "@/hooks/useAuth";
 import { api } from "@/services/api";
 import { toast } from "sonner";
 
@@ -15,7 +14,6 @@ export default function UploadToProjectPage() {
   const router = useRouter();
   const params = useParams();
   const projectId = params.projectId as string;
-  const { user: _user } = useAuth();
   const [file, setFile] = useState<File | null>(null);
   const [loading, setLoading] = useState(false);
 

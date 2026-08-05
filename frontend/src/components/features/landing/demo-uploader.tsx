@@ -14,6 +14,7 @@ import {
   DialogDescription,
 } from "@/components/ui/dialog";
 import { PLANS, APP_TAGLINE, APP_DESCRIPTION } from "@/lib/constants";
+import { api } from "@/services/api";
 
 const DEMO_MAX_SIZE_MB = 10;
 const DEMO_ACCEPT = ".pdf,.png,.jpg,.jpeg,.tiff";
@@ -101,19 +102,13 @@ export function DemoUploader() {
       const formData = new FormData();
       formData.append("file", file);
 
-      const apiBase = process.env.NEXT_PUBLIC_API_URL || "";
-      const res = await fetch(`${apiBase}/demo/process`, {
-        method: "POST",
-        headers: { "X-Demo-Session": demoSessionRef.current },
-        body: formData,
-      });
+      const data = await api.upload<DemoResult>(
+        "/demo/process",
+        formData,
+        undefined,
+        { "X-Demo-Session": demoSessionRef.current },
+      );
 
-      if (!res.ok) {
-        const body = await res.json().catch(() => null);
-        throw new Error(body?.detail || "Error al procesar el archivo");
-      }
-
-      const data: DemoResult = await res.json();
       setResult(data);
       setState("result");
       sessionStorage.setItem(SESSION_KEY, "1");

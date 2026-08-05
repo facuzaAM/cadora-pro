@@ -8,10 +8,6 @@ const nextConfig = {
     remotePatterns: [
       {
         protocol: "https",
-        hostname: "**.supabase.co",
-      },
-      {
-        protocol: "https",
         hostname: "lh3.googleusercontent.com",
       },
     ],
@@ -35,11 +31,11 @@ const nextConfig = {
             key: "Content-Security-Policy",
             value: [
               "default-src 'self'",
-              "script-src 'self' 'unsafe-inline' https://*.supabase.co https://*.paddle.com https://*.googletagmanager.com https://*.google-analytics.com",
+              "script-src 'self' 'unsafe-inline' https://*.paddle.com https://*.googletagmanager.com https://*.google-analytics.com",
               "style-src 'self' 'unsafe-inline'",
-              "img-src 'self' data: blob: https://*.supabase.co https://lh3.googleusercontent.com https://*.google-analytics.com https://*.googletagmanager.com",
+              "img-src 'self' data: blob: https://lh3.googleusercontent.com https://*.google-analytics.com https://*.googletagmanager.com",
               "font-src 'self'",
-              "connect-src 'self' https://*.supabase.co https://*.paddle.com https://*.google-analytics.com https://*.googletagmanager.com",
+              "connect-src 'self' https://*.paddle.com https://*.google-analytics.com https://*.googletagmanager.com",
               "frame-src https://*.paddle.com",
               "base-uri 'self'",
             ].join("; "),

@@ -85,12 +85,6 @@ class AuthService:
         await self.repo._save(user)
         await self.refresh_repo.revoke_all_for_user(user.id)
 
-    async def get_user(self, user_id: UUID) -> User:
-        user = await self.repo.get_by_id(user_id)
-        if not user:
-            raise ValueError("Usuario no encontrado")
-        return user
-
     async def _send_code(
         self, user: User, subject: str, email_fn, log_action: str
     ) -> bool:

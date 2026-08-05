@@ -68,35 +68,6 @@ class OcrService:
 
         return self._build_result(all_texts, raw_text, len(images))
 
-    async def process_image(
-        self,
-        image: np.ndarray,
-        request: OcrRequest | None = None,
-        dpi: int = 72,
-    ) -> OcrResult:
-        return await asyncio.to_thread(self._process_image_sync, image, request, dpi)
-
-    def _process_image_sync(
-        self,
-        image: np.ndarray,
-        request: OcrRequest | None = None,
-        dpi: int = 72,
-    ) -> OcrResult:
-        opts = request or OcrRequest()
-        engine = OcrEngine(lang=opts.language or "spa+eng")
-        processed = self.preprocessor.pipeline(image, dpi=dpi)
-        raw_elements = engine.extract(processed)
-
-        texts = []
-        raw_parts = []
-        for raw in raw_elements:
-            category = self._classify_with_options(raw.text, opts)
-            texts.append(engine.to_domain(raw, category))
-            raw_parts.append(raw.text)
-
-        raw_text = " ".join(raw_parts)
-        return self._build_result(texts, raw_text, 1)
-
     # ── helpers ──────────────────────────────────────────────────────────────
 
     def _classify_with_options(self, text: str, opts: OcrRequest) -> TextCategory:

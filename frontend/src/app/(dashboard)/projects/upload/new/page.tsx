@@ -11,13 +11,11 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { UploadZone } from "@/components/features/projects/upload-zone";
 import { projectsService } from "@/services/projects.service";
 import { documentsService } from "@/services/documents.service";
-import { useAuth } from "@/hooks/useAuth";
 import { api } from "@/services/api";
 import { toast } from "sonner";
 
 export default function UploadPage() {
   const router = useRouter();
-  const { user: _user } = useAuth();
   const [projectName, setProjectName] = useState("");
   const [description, setDescription] = useState("");
   const [file, setFile] = useState<File | null>(null);

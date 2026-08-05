@@ -56,9 +56,14 @@ class ApiClient {
     return this.handleResponse<T>(res);
   }
 
-  async upload<T>(path: string, formData: FormData, token?: string): Promise<T> {
+  async upload<T>(
+    path: string,
+    formData: FormData,
+    token?: string,
+    extraHeaders?: Record<string, string>,
+  ): Promise<T> {
     const auth = token || this.accessToken;
-    const headers: Record<string, string> = {};
+    const headers: Record<string, string> = { ...extraHeaders };
     if (auth) headers["Authorization"] = `Bearer ${auth}`;
     const res = await this._fetch(`${this.baseUrl}${path}`, {
       method: "POST",

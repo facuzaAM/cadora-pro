@@ -99,13 +99,16 @@ GOOGLE_USERINFO_URL = "https://www.googleapis.com/oauth2/v2/userinfo"
 
 
 def _derive_google_redirect_uri(request: Request) -> str:
-    if settings.FRONTEND_URL:
-        base = settings.FRONTEND_URL
-    else:
-        scheme = request.headers.get("X-Forwarded-Proto", "https")
-        host = request.headers.get("Host", "api.cadora.pro")
-        base = f"{scheme}://{host}"
-    return f"{base}/api/v1/auth/google/callback"
+    """Build the OAuth callback URL from the API host actually serving the request.
+
+    Using FRONTEND_URL here is wrong: the callback lives on the API, not the
+    frontend. When running behind nginx the ``Host``/``X-Forwarded-Proto``
+    headers resolve to the API domain (e.g. api.cadora.pro), which is the
+    address Google must redirect back to.
+    """
+    scheme = request.headers.get("X-Forwarded-Proto", "https")
+    host = request.headers.get("Host", "api.cadora.pro")
+    return f"{scheme}://{host}/api/v1/auth/google/callback"
 
 
 @router.get("/google")

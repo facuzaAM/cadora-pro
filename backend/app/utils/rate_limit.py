@@ -20,7 +20,7 @@ def _get_client_ip(request: Request) -> str:
     return request.client.host if request.client else "127.0.0.1"
 
 
-limiter = Limiter(key_func=_get_client_ip, default_limits=["30/minute"])
+limiter = Limiter(key_func=_get_client_ip, default_limits=[settings.RATE_LIMIT_DEFAULT])
 
 
 def rate_limit(limit: str) -> Callable[[F], F]:

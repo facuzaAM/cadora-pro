@@ -23,7 +23,7 @@ class ContactRequest(BaseModel):
 
 
 @router.post("")
-@rate_limit("3/hour")
+@rate_limit(settings.RATE_LIMIT_CONTACT)
 async def send_contact(request: Request, body: ContactRequest):
     """Receive a contact form submission and forward it via email."""
     if not body.message.strip():

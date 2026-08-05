@@ -36,9 +36,6 @@ class DetectionService:
         image = await asyncio.to_thread(self._load_image_from_file, file_path)
         return await asyncio.to_thread(self._process_image, image)
 
-    async def process_image(self, image: np.ndarray) -> LineDetectionResult:
-        return await asyncio.to_thread(self._process_image, image)
-
     def _process_image(self, image: np.ndarray) -> LineDetectionResult:
         binary = self.preprocessor.detect_pipeline(image)
         lines, grouped, intersections, w, h = self.detector.detect(image, binary=binary)
@@ -61,9 +58,6 @@ class DetectionService:
         image = await asyncio.to_thread(self._load_image_from_file, file_path)
         return await asyncio.to_thread(self._process_image_doors, image)
 
-    async def process_image_doors(self, image: np.ndarray) -> DoorDetectionResult:
-        return await asyncio.to_thread(self._process_image_doors, image)
-
     def _process_image_doors(self, image: np.ndarray) -> DoorDetectionResult:
         binary = self.preprocessor.detect_pipeline(image)
         lines, grouped, _, _, _ = self.detector.detect(image, binary=binary)
@@ -75,50 +69,10 @@ class DetectionService:
         image = await asyncio.to_thread(self._load_image_from_file, file_path)
         return await asyncio.to_thread(self._process_image_windows, image)
 
-    async def process_image_windows(self, image: np.ndarray) -> WindowDetectionResult:
-        return await asyncio.to_thread(self._process_image_windows, image)
-
     def _process_image_windows(self, image: np.ndarray) -> WindowDetectionResult:
         binary = self.preprocessor.detect_pipeline(image)
         _, grouped, _, _, _ = self.detector.detect(image, binary=binary)
         return self.window_detector.detect(image, grouped, binary=binary)
-
-    async def process_all(
-        self, file_path: str | Path,
-    ) -> dict:
-        """Run all detectors in one pass (lines + doors + windows)."""
-        image = await asyncio.to_thread(self._load_image_from_file, file_path)
-        return await asyncio.to_thread(self._process_all_image, image)
-
-    async def process_all_image(self, image: np.ndarray) -> dict:
-        return await asyncio.to_thread(self._process_all_image, image)
-
-    def _process_all_image(self, image: np.ndarray) -> dict:
-        binary = self.preprocessor.detect_pipeline(image)
-        lines, grouped, intersections, w, h = self.detector.detect(image, binary=binary)
-
-        line_result = LineDetectionResult(
-            lines=lines,
-            grouped_lines=grouped,
-            intersections=intersections,
-            image_width=w,
-            image_height=h,
-        )
-        line_result.horizontal = [line for line in lines if line.category.value == "horizontal"]
-        line_result.vertical = [line for line in lines if line.category.value == "vertical"]
-        line_result.diagonal = [line for line in lines if line.category.value == "diagonal"]
-
-        door_result = self.door_detector.detect(image, grouped, lines, binary=binary)
-        window_result = self.window_detector.detect(image, grouped, binary=binary)
-
-        return {
-            "lines": line_result,
-            "doors": door_result,
-            "windows": window_result,
-        }
-
-    def to_json(self, result: LineDetectionResult, indent: int = 2) -> str:
-        return result.model_dump_json(indent=indent)
 
     @staticmethod
     def _load_image_from_file(file_path: str | Path) -> np.ndarray:

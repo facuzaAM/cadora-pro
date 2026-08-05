@@ -1,18 +1,19 @@
 import logging
 import os
-import tempfile
 import time
-import uuid as _uuid
 
 from cachetools import TTLCache
 from fastapi import APIRouter, HTTPException, Request, UploadFile
-from starlette.status import (
-    HTTP_400_BAD_REQUEST,
-    HTTP_413_CONTENT_TOO_LARGE,
-    HTTP_429_TOO_MANY_REQUESTS,
-)
+from starlette.status import HTTP_400_BAD_REQUEST, HTTP_429_TOO_MANY_REQUESTS
 
+from app.config import settings
 from app.utils.rate_limit import rate_limit
+from app.utils.uploads import (
+    make_temp_path,
+    read_upload_with_limit,
+    validate_extension,
+    validate_magic_bytes,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -21,58 +22,11 @@ router = APIRouter()
 DEMO_MAX_SIZE_MB = 10
 DEMO_ALLOWED_EXTENSIONS = {".pdf", ".png", ".jpg", ".jpeg", ".tiff"}
 
-_MAGIC_SIGNATURES: dict[str, tuple[bytes, ...]] = {
-    "pdf": (b"%PDF-",),
-    "png": (b"\x89PNG\r\n\x1a\n",),
-    "jpg": (b"\xff\xd8\xff",),
-    "jpeg": (b"\xff\xd8\xff",),
-    "tiff": (b"II*\x00", b"MM\x00*"),
-}
-
 _demo_sessions: TTLCache = TTLCache(maxsize=1000, ttl=3600)
 
 
-def _validate_demo_file(file: UploadFile) -> str:
-    if not file.filename:
-        raise HTTPException(status_code=HTTP_400_BAD_REQUEST, detail="Archivo no proporcionado")
-    ext = file.filename.rsplit(".", 1)[-1].lower() if "." in file.filename else ""
-    if f".{ext}" not in DEMO_ALLOWED_EXTENSIONS:
-        raise HTTPException(
-            status_code=HTTP_400_BAD_REQUEST,
-            detail=f"Formato .{ext} no soportado en demo. Usá: PDF, PNG, JPG o TIFF.",
-        )
-    return ext
-
-
-def _validate_magic_bytes(file_type: str, content: bytes) -> None:
-    signatures = _MAGIC_SIGNATURES.get(file_type)
-    if signatures is not None and not any(
-        content.startswith(sig) for sig in signatures
-    ):
-        raise HTTPException(
-            status_code=HTTP_400_BAD_REQUEST,
-            detail=f"El archivo no parece ser un {file_type.upper()} válido",
-        )
-
-
-async def _read_with_limit(file: UploadFile) -> bytes:
-    max_bytes = DEMO_MAX_SIZE_MB * 1024 * 1024
-    content = b""
-    while True:
-        chunk = await file.read(1024 * 1024)
-        if not chunk:
-            break
-        content += chunk
-        if len(content) > max_bytes:
-            raise HTTPException(
-                status_code=HTTP_413_CONTENT_TOO_LARGE,
-                detail=f"El archivo excede el límite de {DEMO_MAX_SIZE_MB} MB para la demo.",
-            )
-    return content
-
-
 @router.post("/process")
-@rate_limit("1/minute")
+@rate_limit(settings.RATE_LIMIT_DEMO)
 async def process_demo(
     request: Request,
     file: UploadFile,
@@ -85,15 +39,19 @@ async def process_demo(
             detail="Ya usaste la demo. Registrate para seguir usando la plataforma.",
         )
 
-    ext = _validate_demo_file(file)
-    content = await _read_with_limit(file)
-    _validate_magic_bytes(ext, content)
-
-    tag = _uuid.uuid4().hex[:8]
-    fd, temp_path = tempfile.mkstemp(
-        suffix=f"_{file.filename}", prefix=f"demo_{tag}_"
+    ext = validate_extension(
+        file,
+        DEMO_ALLOWED_EXTENSIONS,
+        detail="Formato no soportado en demo. Usá: PDF, PNG, JPG o TIFF.",
     )
-    os.close(fd)
+    content = await read_upload_with_limit(
+        file,
+        DEMO_MAX_SIZE_MB * 1024 * 1024,
+        f"El archivo excede el límite de {DEMO_MAX_SIZE_MB} MB para la demo.",
+    )
+    validate_magic_bytes(ext, content)
+
+    temp_path = make_temp_path("demo", file.filename)
 
     try:
         with open(temp_path, "wb") as f:
