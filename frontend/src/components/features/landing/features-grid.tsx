@@ -48,7 +48,8 @@ const features: Feature[] = [
 
 export function FeaturesGrid() {
   return (
-    <section className="relative py-16 lg:py-24 bg-section-alt">
+    <section className="relative overflow-hidden py-16 lg:py-24 bg-section-alt">
+      <div className="absolute inset-0 bg-grid-cad pointer-events-none" />
       <div className="mx-auto max-w-6xl px-4">
         <div className="text-center">
           <h2 className="text-3xl font-bold tracking-tight">Todo lo que necesitas</h2>

@@ -14,6 +14,7 @@ import {
   DialogDescription,
 } from "@/components/ui/dialog";
 import { PLANS, APP_TAGLINE, APP_DESCRIPTION } from "@/lib/constants";
+import { CadCrosshair } from "@/components/features/landing/cad-crosshair";
 import { api } from "@/services/api";
 
 const DEMO_MAX_SIZE_MB = 10;
@@ -152,6 +153,9 @@ export function DemoUploader() {
   return (
     <>
       <section className="relative flex min-h-[85vh] items-center justify-center overflow-hidden bg-gradient-to-b from-primary/[0.06] via-background to-background pt-14">
+        <div className="absolute inset-0 bg-grid-cad bg-grid-cad-fade pointer-events-none" />
+        <CadCrosshair className="absolute right-[8%] top-1/2 hidden h-48 w-48 -translate-y-1/2 rotate-0 text-primary/10 lg:block pointer-events-none" />
+        <CadCrosshair className="absolute left-[6%] bottom-[12%] hidden h-32 w-32 text-primary/[0.07] pointer-events-none" />
         <div className="absolute -left-24 top-1/4 h-64 w-64 animate-blob rounded-full bg-primary/10 blur-3xl pointer-events-none" />
         <div className="absolute -right-24 top-1/3 h-64 w-64 animate-blob-delayed rounded-full bg-blue-500/10 blur-3xl pointer-events-none" />
         <div className="absolute left-1/2 top-1/2 h-48 w-48 -translate-x-1/2 -translate-y-1/2 animate-blob-slow rounded-full bg-emerald-500/10 blur-3xl pointer-events-none" />

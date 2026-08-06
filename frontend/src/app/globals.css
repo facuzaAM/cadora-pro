@@ -107,6 +107,28 @@
     background-size: 64px 64px;
   }
 
+  .bg-grid-cad {
+    background-image:
+      linear-gradient(to right, hsl(var(--primary) / 0.06) 1px, transparent 1px),
+      linear-gradient(to bottom, hsl(var(--primary) / 0.06) 1px, transparent 1px),
+      linear-gradient(to right, hsl(var(--primary) / 0.14) 1px, transparent 1px),
+      linear-gradient(to bottom, hsl(var(--primary) / 0.14) 1px, transparent 1px);
+    background-size: 24px 24px, 24px 24px, 120px 120px, 120px 120px;
+  }
+
+  .dark .bg-grid-cad {
+    background-image:
+      linear-gradient(to right, hsl(var(--primary) / 0.08) 1px, transparent 1px),
+      linear-gradient(to bottom, hsl(var(--primary) / 0.08) 1px, transparent 1px),
+      linear-gradient(to right, hsl(var(--primary) / 0.18) 1px, transparent 1px),
+      linear-gradient(to bottom, hsl(var(--primary) / 0.18) 1px, transparent 1px);
+  }
+
+  .bg-grid-cad-fade {
+    -webkit-mask-image: radial-gradient(ellipse 85% 75% at 50% 35%, black 25%, transparent 78%);
+    mask-image: radial-gradient(ellipse 85% 75% at 50% 35%, black 25%, transparent 78%);
+  }
+
   .bg-card-highlight {
     background: linear-gradient(
       135deg,
