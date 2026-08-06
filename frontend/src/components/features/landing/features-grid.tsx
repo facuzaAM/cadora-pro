@@ -48,8 +48,8 @@ const features: Feature[] = [
 
 export function FeaturesGrid() {
   return (
-    <section className="relative overflow-hidden py-16 lg:py-24 bg-section-alt">
-      <div className="absolute inset-0 bg-grid-cad pointer-events-none" />
+    <section className="relative isolate overflow-hidden py-16 lg:py-24 bg-section-alt">
+      <div className="absolute inset-0 bg-grid-cad -z-10 pointer-events-none" />
       <div className="mx-auto max-w-6xl px-4">
         <div className="text-center">
           <h2 className="text-3xl font-bold tracking-tight">Todo lo que necesitas</h2>
@@ -62,6 +62,10 @@ export function FeaturesGrid() {
             const Icon = f.icon;
             return (
               <div key={f.title} className={"group relative overflow-hidden rounded-xl border bg-card p-6 transition-all duration-300 hover:shadow-lg hover:border-primary/50 hover:-translate-y-0.5" + (f.highlight ? " lg:col-span-3 border-primary/40 bg-gradient-to-br from-primary/10 via-card to-card" : "")}>
+                <span className="pointer-events-none absolute left-2 top-2 h-1.5 w-1.5 rounded-full bg-primary opacity-0 transition-all duration-300 group-hover:opacity-100 group-hover:scale-125" />
+                <span className="pointer-events-none absolute right-2 top-2 h-1.5 w-1.5 rounded-full bg-primary opacity-0 transition-all duration-300 group-hover:opacity-100 group-hover:scale-125" />
+                <span className="pointer-events-none absolute bottom-2 left-2 h-1.5 w-1.5 rounded-full bg-primary opacity-0 transition-all duration-300 group-hover:opacity-100 group-hover:scale-125" />
+                <span className="pointer-events-none absolute bottom-2 right-2 h-1.5 w-1.5 rounded-full bg-primary opacity-0 transition-all duration-300 group-hover:opacity-100 group-hover:scale-125" />
                 <div className="absolute right-0 top-0 h-20 w-20 translate-x-6 -translate-y-6 rounded-full bg-primary/[0.04] transition-all duration-300 group-hover:scale-150" />
                 <div className="relative">
                   <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-gradient-to-br from-primary/10 to-primary/5 group-hover:from-primary/20 group-hover:to-primary/10 transition-all duration-300">

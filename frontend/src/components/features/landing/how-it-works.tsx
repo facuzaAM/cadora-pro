@@ -23,8 +23,8 @@ const steps = [
 
 export function HowItWorks() {
   return (
-    <section className="relative overflow-hidden py-16 lg:py-24">
-      <div className="absolute inset-0 bg-grid-cad pointer-events-none" />
+    <section className="relative isolate overflow-hidden py-16 lg:py-24">
+      <div className="absolute inset-0 bg-grid-cad -z-10 pointer-events-none" />
       <div className="mx-auto max-w-6xl px-4">
         <div className="text-center">
           <h2 className="text-3xl font-bold tracking-tight">Cómo funciona</h2>

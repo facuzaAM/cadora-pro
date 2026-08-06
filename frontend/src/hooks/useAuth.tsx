@@ -118,6 +118,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setUser(data.user);
     invalidateCache("billing");
     scheduleRefresh();
+    localStorage.setItem("cadora_onboarding", "pending");
     router.push(redirectTo || "/dashboard");
   };
 

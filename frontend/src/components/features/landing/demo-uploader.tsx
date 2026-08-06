@@ -15,6 +15,8 @@ import {
 } from "@/components/ui/dialog";
 import { PLANS, APP_TAGLINE, APP_DESCRIPTION } from "@/lib/constants";
 import { CadCrosshair } from "@/components/features/landing/cad-crosshair";
+import { CadCursor } from "@/components/features/landing/cad-cursor";
+import { CadDimension } from "@/components/features/landing/cad-dimension";
 import { api } from "@/services/api";
 
 const DEMO_MAX_SIZE_MB = 10;
@@ -152,10 +154,13 @@ export function DemoUploader() {
 
   return (
     <>
-      <section className="relative flex min-h-[85vh] items-center justify-center overflow-hidden bg-gradient-to-b from-primary/[0.06] via-background to-background pt-14">
-        <div className="absolute inset-0 bg-grid-cad bg-grid-cad-fade pointer-events-none" />
-        <CadCrosshair className="absolute right-[8%] top-1/2 hidden h-48 w-48 -translate-y-1/2 rotate-0 text-primary/10 lg:block pointer-events-none" />
-        <CadCrosshair className="absolute left-[6%] bottom-[12%] hidden h-32 w-32 text-primary/[0.07] pointer-events-none" />
+      <section className="cad-hero relative flex min-h-[85vh] items-center justify-center overflow-hidden isolate bg-gradient-to-b from-[#131f3d] via-[#0d1524] to-background pt-14">
+        <div className="absolute inset-0 bg-grid-cad bg-grid-cad-fade -z-10 pointer-events-none" />
+        <CadCrosshair className="absolute right-[8%] top-1/2 hidden h-48 w-48 -translate-y-1/2 text-primary/15 lg:block -z-10 pointer-events-none" />
+        <CadCrosshair className="absolute left-[6%] bottom-[12%] hidden h-32 w-32 text-primary/10 -z-10 pointer-events-none" />
+        <CadDimension label="4.80 m" className="absolute left-[10%] top-[22%] hidden h-14 w-32 text-primary/30 lg:block -z-10" />
+        <CadDimension label="3.20 m" horizontal={false} className="absolute right-[11%] top-[16%] hidden h-32 w-14 text-primary/30 lg:block -z-10" />
+        <CadDimension label="6.40 m" className="absolute left-[14%] bottom-[14%] hidden h-14 w-32 text-primary/20 lg:block -z-10" />
         <div className="absolute -left-24 top-1/4 h-64 w-64 animate-blob rounded-full bg-primary/10 blur-3xl pointer-events-none" />
         <div className="absolute -right-24 top-1/3 h-64 w-64 animate-blob-delayed rounded-full bg-blue-500/10 blur-3xl pointer-events-none" />
         <div className="absolute left-1/2 top-1/2 h-48 w-48 -translate-x-1/2 -translate-y-1/2 animate-blob-slow rounded-full bg-emerald-500/10 blur-3xl pointer-events-none" />
@@ -230,13 +235,13 @@ export function DemoUploader() {
             ) : state === "result" && result ? (
               <div className="space-y-6">
                 <div className="rounded-xl border bg-card overflow-hidden shadow-sm">
-                  <div className="relative aspect-[4/3] bg-muted/30">
+                  <div className="relative aspect-[4/3] bg-muted/30 bg-grid-cad overflow-hidden">
                     {imageUrl && (
                       // eslint-disable-next-line @next/next/no-img-element
                       <img
                         src={imageUrl}
                         alt="Plano subido"
-                        className="absolute inset-0 h-full w-full object-contain"
+                        className="absolute inset-0 h-full w-full object-contain opacity-80"
                       />
                     )}
 
@@ -245,54 +250,60 @@ export function DemoUploader() {
                       viewBox={`0 0 ${result.image_width || 1} ${result.image_height || 1}`}
                       preserveAspectRatio="xMidYMid meet"
                     >
-                      {result.walls.map((wall, i) => (
-                        <line
-                          key={`w-${i}`}
-                          x1={wall.x1}
-                          y1={wall.y1}
-                          x2={wall.x2}
-                          y2={wall.y2}
-                          stroke="#18181b"
-                          strokeWidth={3}
-                          strokeLinecap="round"
-                          opacity={0.8}
-                        />
-                      ))}
-                      {result.doors.map((door, i) => (
-                        <g key={`d-${i}`} transform={`translate(${door.x},${door.y}) rotate(${door.rotation})`}>
+                      <g className="cad-draw">
+                        {result.walls.map((wall, i) => (
+                          <line
+                            key={`w-${i}`}
+                            x1={wall.x1}
+                            y1={wall.y1}
+                            x2={wall.x2}
+                            y2={wall.y2}
+                            stroke="#e2e8f0"
+                            strokeWidth={3}
+                            strokeLinecap="round"
+                            opacity={0.9}
+                          />
+                        ))}
+                      </g>
+                      <g className="cad-draw cad-draw-delay-1">
+                        {result.doors.map((door, i) => (
+                          <g key={`d-${i}`} transform={`translate(${door.x},${door.y}) rotate(${door.rotation})`}>
+                            <rect
+                              x={-door.width / 2}
+                              y={-2}
+                              width={door.width}
+                              height={4}
+                              fill="#38bdf8"
+                              rx={1}
+                            />
+                            <path
+                              d={`M ${-door.width / 2} 0 A ${door.width} ${door.width} 0 0 ${door.swing === "left" ? 0 : 1} ${door.swing === "left" ? -door.width : door.width} ${door.swing === "left" ? -door.width : door.width}`}
+                              fill="none"
+                              stroke="#38bdf8"
+                              strokeWidth={1.5}
+                              strokeDasharray="4 2"
+                              opacity={0.6}
+                            />
+                          </g>
+                        ))}
+                      </g>
+                      <g className="cad-draw cad-draw-delay-2">
+                        {result.windows.map((win, i) => (
                           <rect
-                            x={-door.width / 2}
-                            y={-2}
-                            width={door.width}
-                            height={4}
-                            fill="#2563eb"
-                            rx={1}
-                          />
-                          <path
-                            d={`M ${-door.width / 2} 0 A ${door.width} ${door.width} 0 0 ${door.swing === "left" ? 0 : 1} ${door.swing === "left" ? -door.width : door.width} ${door.swing === "left" ? -door.width : door.width}`}
+                            key={`wi-${i}`}
+                            x={win.x - win.width / 2}
+                            y={win.y - win.height / 2}
+                            width={win.width}
+                            height={win.height}
                             fill="none"
-                            stroke="#2563eb"
-                            strokeWidth={1.5}
-                            strokeDasharray="4 2"
-                            opacity={0.6}
+                            stroke="#34d399"
+                            strokeWidth={2.5}
+                            rx={1}
+                            transform={`rotate(${win.rotation} ${win.x} ${win.y})`}
+                            opacity={0.9}
                           />
-                        </g>
-                      ))}
-                      {result.windows.map((win, i) => (
-                        <rect
-                          key={`wi-${i}`}
-                          x={win.x - win.width / 2}
-                          y={win.y - win.height / 2}
-                          width={win.width}
-                          height={win.height}
-                          fill="none"
-                          stroke="#059669"
-                          strokeWidth={2.5}
-                          rx={1}
-                          transform={`rotate(${win.rotation} ${win.x} ${win.y})`}
-                          opacity={0.85}
-                        />
-                      ))}
+                        ))}
+                      </g>
                     </svg>
                   </div>
 
@@ -325,6 +336,8 @@ export function DemoUploader() {
             </div>
           )}
         </div>
+
+        <CadCursor />
       </section>
 
       <Dialog open={showAuthModal} onOpenChange={setShowAuthModal}>
