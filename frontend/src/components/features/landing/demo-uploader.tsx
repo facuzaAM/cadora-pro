@@ -154,13 +154,13 @@ export function DemoUploader() {
 
   return (
     <>
-      <section className="cad-hero relative flex min-h-[85vh] items-center justify-center overflow-hidden isolate bg-gradient-to-b from-[#131f3d] via-[#0d1524] to-background pt-14">
+      <section className="relative flex min-h-[85vh] items-center justify-center overflow-hidden isolate bg-gradient-to-b from-primary/[0.06] via-background to-background pt-14">
         <div className="absolute inset-0 bg-grid-cad bg-grid-cad-fade -z-10 pointer-events-none" />
-        <CadCrosshair className="absolute right-[8%] top-1/2 hidden h-48 w-48 -translate-y-1/2 text-primary/15 lg:block -z-10 pointer-events-none" />
-        <CadCrosshair className="absolute left-[6%] bottom-[12%] hidden h-32 w-32 text-primary/10 -z-10 pointer-events-none" />
-        <CadDimension label="4.80 m" className="absolute left-[10%] top-[22%] hidden h-14 w-32 text-primary/30 lg:block -z-10" />
-        <CadDimension label="3.20 m" horizontal={false} className="absolute right-[11%] top-[16%] hidden h-32 w-14 text-primary/30 lg:block -z-10" />
-        <CadDimension label="6.40 m" className="absolute left-[14%] bottom-[14%] hidden h-14 w-32 text-primary/20 lg:block -z-10" />
+        <CadCrosshair className="absolute right-[8%] top-1/2 hidden h-48 w-48 -translate-y-1/2 text-primary/30 lg:block -z-10 pointer-events-none" />
+        <CadCrosshair className="absolute left-[6%] bottom-[12%] hidden h-32 w-32 text-primary/20 -z-10 pointer-events-none" />
+        <CadDimension label="4.80 m" className="absolute left-[10%] top-[22%] hidden h-14 w-32 text-primary/50 lg:block -z-10" />
+        <CadDimension label="3.20 m" horizontal={false} className="absolute right-[11%] top-[16%] hidden h-32 w-14 text-primary/50 lg:block -z-10" />
+        <CadDimension label="6.40 m" className="absolute left-[14%] bottom-[14%] hidden h-14 w-32 text-primary/35 lg:block -z-10" />
         <div className="absolute -left-24 top-1/4 h-64 w-64 animate-blob rounded-full bg-primary/10 blur-3xl pointer-events-none" />
         <div className="absolute -right-24 top-1/3 h-64 w-64 animate-blob-delayed rounded-full bg-blue-500/10 blur-3xl pointer-events-none" />
         <div className="absolute left-1/2 top-1/2 h-48 w-48 -translate-x-1/2 -translate-y-1/2 animate-blob-slow rounded-full bg-emerald-500/10 blur-3xl pointer-events-none" />
@@ -246,7 +246,7 @@ export function DemoUploader() {
                     )}
 
                     <svg
-                      className="absolute inset-0 h-full w-full"
+                      className="absolute inset-0 h-full w-full text-foreground"
                       viewBox={`0 0 ${result.image_width || 1} ${result.image_height || 1}`}
                       preserveAspectRatio="xMidYMid meet"
                     >
@@ -258,7 +258,7 @@ export function DemoUploader() {
                             y1={wall.y1}
                             x2={wall.x2}
                             y2={wall.y2}
-                            stroke="#e2e8f0"
+                            stroke="currentColor"
                             strokeWidth={3}
                             strokeLinecap="round"
                             opacity={0.9}
@@ -273,13 +273,13 @@ export function DemoUploader() {
                               y={-2}
                               width={door.width}
                               height={4}
-                              fill="#38bdf8"
+                              fill="#2563eb"
                               rx={1}
                             />
                             <path
                               d={`M ${-door.width / 2} 0 A ${door.width} ${door.width} 0 0 ${door.swing === "left" ? 0 : 1} ${door.swing === "left" ? -door.width : door.width} ${door.swing === "left" ? -door.width : door.width}`}
                               fill="none"
-                              stroke="#38bdf8"
+                              stroke="#2563eb"
                               strokeWidth={1.5}
                               strokeDasharray="4 2"
                               opacity={0.6}
@@ -296,7 +296,7 @@ export function DemoUploader() {
                             width={win.width}
                             height={win.height}
                             fill="none"
-                            stroke="#34d399"
+                            stroke="#059669"
                             strokeWidth={2.5}
                             rx={1}
                             transform={`rotate(${win.rotation} ${win.x} ${win.y})`}

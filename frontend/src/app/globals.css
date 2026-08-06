@@ -109,52 +109,24 @@
 
   .bg-grid-cad {
     background-image:
-      linear-gradient(to right, hsl(var(--primary) / 0.06) 1px, transparent 1px),
-      linear-gradient(to bottom, hsl(var(--primary) / 0.06) 1px, transparent 1px),
-      linear-gradient(to right, hsl(var(--primary) / 0.14) 1px, transparent 1px),
-      linear-gradient(to bottom, hsl(var(--primary) / 0.14) 1px, transparent 1px);
+      linear-gradient(to right, hsl(var(--primary) / 0.09) 1px, transparent 1px),
+      linear-gradient(to bottom, hsl(var(--primary) / 0.09) 1px, transparent 1px),
+      linear-gradient(to right, hsl(var(--primary) / 0.2) 1px, transparent 1px),
+      linear-gradient(to bottom, hsl(var(--primary) / 0.2) 1px, transparent 1px);
     background-size: 24px 24px, 24px 24px, 120px 120px, 120px 120px;
   }
 
   .dark .bg-grid-cad {
     background-image:
-      linear-gradient(to right, hsl(var(--primary) / 0.08) 1px, transparent 1px),
-      linear-gradient(to bottom, hsl(var(--primary) / 0.08) 1px, transparent 1px),
-      linear-gradient(to right, hsl(var(--primary) / 0.18) 1px, transparent 1px),
-      linear-gradient(to bottom, hsl(var(--primary) / 0.18) 1px, transparent 1px);
+      linear-gradient(to right, hsl(var(--primary) / 0.1) 1px, transparent 1px),
+      linear-gradient(to bottom, hsl(var(--primary) / 0.1) 1px, transparent 1px),
+      linear-gradient(to right, hsl(var(--primary) / 0.22) 1px, transparent 1px),
+      linear-gradient(to bottom, hsl(var(--primary) / 0.22) 1px, transparent 1px);
   }
 
   .bg-grid-cad-fade {
     -webkit-mask-image: radial-gradient(ellipse 85% 75% at 50% 35%, black 25%, transparent 78%);
     mask-image: radial-gradient(ellipse 85% 75% at 50% 35%, black 25%, transparent 78%);
-  }
-
-  .cad-hero {
-    --background: 222 47% 7%;
-    --foreground: 210 40% 98%;
-    --card: 222 47% 10%;
-    --card-foreground: 210 40% 98%;
-    --primary: 199 89% 58%;
-    --primary-foreground: 222 47% 6%;
-    --secondary: 199 89% 12%;
-    --secondary-foreground: 199 89% 80%;
-    --muted: 217 33% 14%;
-    --muted-foreground: 215 20% 68%;
-    --accent: 199 89% 12%;
-    --accent-foreground: 199 89% 80%;
-    --destructive: 0 62.8% 45%;
-    --destructive-foreground: 0 0% 98%;
-    --border: 217 33% 20%;
-    --input: 217 33% 20%;
-    --ring: 199 89% 58%;
-  }
-
-  .cad-hero .bg-grid-cad {
-    background-image:
-      linear-gradient(to right, hsl(var(--primary) / 0.1) 1px, transparent 1px),
-      linear-gradient(to bottom, hsl(var(--primary) / 0.1) 1px, transparent 1px),
-      linear-gradient(to right, hsl(var(--primary) / 0.22) 1px, transparent 1px),
-      linear-gradient(to bottom, hsl(var(--primary) / 0.22) 1px, transparent 1px);
   }
 
   .cad-draw {
