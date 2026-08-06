@@ -175,7 +175,7 @@ async def health():
                 client = get_supabase()
                 if not client:
                     return False
-                client.storage.get_bucket(settings.STORAGE_BUCKET)
+                client.storage.from_(settings.STORAGE_BUCKET).list("")
                 return True
 
             storage_ok = await asyncio.to_thread(_check_storage)
