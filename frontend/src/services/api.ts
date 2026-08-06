@@ -84,6 +84,16 @@ class ApiClient {
     return this.handleResponse<T>(res);
   }
 
+  async put<T>(path: string, body: unknown, token?: string): Promise<T> {
+    const res = await this._fetch(`${this.baseUrl}${path}`, {
+      method: "PUT",
+      credentials: "include",
+      headers: this.headers(token),
+      body: JSON.stringify(body),
+    });
+    return this.handleResponse<T>(res);
+  }
+
   async delete<T>(path: string, token?: string, body?: unknown): Promise<T> {
     const res = await this._fetch(`${this.baseUrl}${path}`, {
       method: "DELETE",

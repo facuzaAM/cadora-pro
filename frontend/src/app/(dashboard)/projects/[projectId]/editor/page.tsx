@@ -1,0 +1,194 @@
+"use client";
+
+import { useCallback, useEffect, useState } from "react";
+import { useRouter, useParams } from "next/navigation";
+import { ArrowLeft, Loader2, AlertCircle } from "lucide-react";
+import { PageHeader } from "@/components/shared/page-header";
+import { CadEditor } from "@/components/features/editor/cad-editor";
+import { editorService } from "@/services/editor.service";
+import { cadService } from "@/services/cad.service";
+import { api, ApiError } from "@/services/api";
+import type { EditorElements, EditorDetection } from "@/types/editor";
+import { toast } from "sonner";
+
+const POLL_INTERVAL_MS = 3000;
+
+export default function EditorPage() {
+  const router = useRouter();
+  const params = useParams();
+  const projectId = params.projectId as string;
+  const token = api.getAccessToken();
+
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [detection, setDetection] = useState<EditorDetection | null>(null);
+  const [savedElements, setSavedElements] = useState<EditorElements | null>(null);
+  const [saving, setSaving] = useState(false);
+  const [exporting, setExporting] = useState(false);
+
+  const imageUrl = detection ? editorService.previewUrl(projectId, token) : null;
+
+  const loadSaved = useCallback(
+    async (loaded: EditorDetection) => {
+      try {
+        const saved = await editorService.getElements(projectId, token);
+        setSavedElements(saved);
+      } catch {
+        setSavedElements(null);
+      }
+      setDetection(loaded);
+      setLoading(false);
+    },
+    [projectId, token],
+  );
+
+  useEffect(() => {
+    let stopped = false;
+    let timer: ReturnType<typeof setInterval> | null = null;
+
+    const poll = async (): Promise<boolean> => {
+      try {
+        const res = await editorService.getDetection(projectId, token);
+        if (res.status === "completed") {
+          await loadSaved(res);
+          return true;
+        }
+        return false;
+      } catch {
+        setError("Error cargando el plano. Intentá nuevamente.");
+        setLoading(false);
+        return true;
+      }
+    };
+
+    const start = async () => {
+      try {
+        await editorService.runDetection(projectId, token);
+      } catch (err) {
+        if (err instanceof ApiError && err.status === 402) {
+          toast.error("Alcanzaste el límite de conversiones de tu plan");
+          router.replace("/billing");
+          return;
+        }
+      }
+      const done = await poll();
+      if (!done && !stopped) {
+        timer = setInterval(async () => {
+          if (stopped) return;
+          const doneNow = await poll();
+          if (doneNow) stop();
+        }, POLL_INTERVAL_MS);
+      }
+    };
+
+    const stop = () => {
+      stopped = true;
+      if (timer) {
+        clearInterval(timer);
+        timer = null;
+      }
+    };
+
+    start();
+    return stop;
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [projectId, token]);
+
+  const handleSave = useCallback(
+    async (elements: EditorElements) => {
+      setSaving(true);
+      try {
+        await editorService.saveElements(projectId, elements, token);
+        toast.success("Cambios guardados");
+      } catch {
+        toast.error("Error al guardar los cambios");
+      } finally {
+        setSaving(false);
+      }
+    },
+    [projectId, token],
+  );
+
+  const handleExport = useCallback(
+    async (elements: EditorElements) => {
+      setExporting(true);
+      try {
+        await editorService.saveElements(projectId, elements, token);
+        await cadService.generate(projectId, "dxf", token, true);
+        window.open(cadService.downloadUrl(projectId, "dxf"), "_blank");
+        toast.success("Archivo DXF generado");
+      } catch (err) {
+        if (err instanceof ApiError && err.status === 402) {
+          toast.error("Alcanzaste el límite de conversiones de tu plan");
+          router.replace("/billing");
+          return;
+        }
+        if (err instanceof ApiError && err.status === 409) {
+          return;
+        }
+        toast.error("Error al generar el archivo CAD");
+      } finally {
+        setExporting(false);
+      }
+    },
+    [projectId, token, router],
+  );
+
+  const initial: EditorElements | null = savedElements ?? detection;
+
+  return (
+    <div className="space-y-6">
+      <button
+        type="button"
+        onClick={() => router.push(`/projects/${projectId}/result`)}
+        className="inline-flex items-center gap-2 text-sm font-medium text-muted-foreground transition-colors hover:text-foreground"
+      >
+        <ArrowLeft className="h-4 w-4" />
+        Volver al resultado
+      </button>
+
+      <PageHeader
+        title="Editor de planos"
+        description="Ajustá muros, puertas y ventanas detectados automáticamente antes de exportar."
+      />
+
+      {loading && (
+        <div className="flex flex-col items-center justify-center rounded-xl border border-dashed bg-muted/30 px-6 py-16 text-center">
+          <Loader2 className="mb-4 h-8 w-8 animate-spin text-primary" />
+          <h2 className="text-xl font-bold">Analizando plano</h2>
+          <p className="mt-2 max-w-md text-sm text-muted-foreground">
+            Estamos detectando muros, puertas y ventanas en tu plano. Esto puede tomar unos segundos.
+          </p>
+        </div>
+      )}
+
+      {!loading && error && (
+        <div className="flex flex-col items-center justify-center rounded-xl border border-dashed bg-muted/30 px-6 py-16 text-center">
+          <AlertCircle className="mb-4 h-8 w-8 text-destructive" />
+          <h2 className="text-xl font-bold">No pudimos cargar el plano</h2>
+          <p className="mt-2 max-w-md text-sm text-muted-foreground">{error}</p>
+          <button
+            className="mt-4 text-sm text-primary underline-offset-4 hover:underline"
+            onClick={() => router.replace(`/projects/${projectId}/result`)}
+          >
+            Volver al resultado
+          </button>
+        </div>
+      )}
+
+      {!loading && !error && initial && detection && (
+        <CadEditor
+          imageUrl={imageUrl ?? ""}
+          width={detection.image_width || 1}
+          height={detection.image_height || 1}
+          initial={initial}
+          measurements={detection.ocr_measurements}
+          onSave={handleSave}
+          onExport={handleExport}
+          saving={saving}
+          exporting={exporting}
+        />
+      )}
+    </div>
+  );
+}

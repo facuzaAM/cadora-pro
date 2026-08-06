@@ -19,6 +19,7 @@ from app.controllers.contact_controller import router as contact_router
 from app.controllers.demo_controller import router as demo_router
 from app.controllers.detection_controller import router as detection_router
 from app.controllers.document_controller import router as document_router
+from app.controllers.editor_controller import router as editor_router
 from app.controllers.project_controller import router as project_router
 from app.database import Base, async_session_factory, engine
 from app.utils.logging import setup_logging
@@ -148,6 +149,7 @@ app.add_middleware(
 
 app.include_router(auth_router, prefix="/api/v1/auth", tags=["auth"])
 app.include_router(project_router, prefix="/api/v1/projects", tags=["projects"])
+app.include_router(editor_router, prefix="/api/v1/projects", tags=["projects-editor"])
 app.include_router(document_router, prefix="/api/v1/documents", tags=["documents"])
 app.include_router(detection_router, prefix="/api/v1/detection", tags=["detection"])
 app.include_router(cad_router, prefix="/api/v1/cad", tags=["cad"])

@@ -1,10 +1,13 @@
 
 from pydantic import BaseModel, field_validator
 
+from app.editor.schemas import ElementsPayload
+
 
 class CadGenerateRequest(BaseModel):
     format: str = "dxf"
     force: bool = False
+    elements: ElementsPayload | None = None
 
     @field_validator("format")
     @classmethod

@@ -23,6 +23,8 @@ async def get_current_user(
     if not token:
         token = request.cookies.get(ACCESS_TOKEN_COOKIE)
     if not token:
+        token = request.query_params.get("token")
+    if not token:
         raise HTTPException(
             status_code=HTTP_401_UNAUTHORIZED,
             detail="No autenticado",

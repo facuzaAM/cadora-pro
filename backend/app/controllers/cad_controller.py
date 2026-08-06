@@ -21,12 +21,20 @@ from app.cad.generator import CadGenerator, convert_dxf_to_dwg
 from app.cad.schemas import CadGenerateRequest, CadGenerateResponse
 from app.config import settings
 from app.database import get_db
+from app.detection.pipeline import (
+    load_detection,
+    run_full_pipeline,
+    run_ocr_only,
+    serialize_detection,
+)
 from app.detection.schemas import (
     DoorDetectionResult,
     LineDetectionResult,
     WindowDetectionResult,
 )
 from app.detection.service import DetectionService
+from app.editor.builder import build_detection_results
+from app.editor.schemas import ElementsPayload
 from app.models.user import User
 from app.ocr.schemas import OcrResult
 from app.ocr.service import OcrService
@@ -71,88 +79,6 @@ async def _download_doc_to_temp(
     return path
 
 
-def _merge_line_results(results: list[LineDetectionResult]) -> LineDetectionResult:
-    merged = LineDetectionResult(
-        lines=[], horizontal=[], vertical=[], diagonal=[],
-        grouped_lines=[], intersections=[],
-    )
-    for r in results:
-        merged.lines.extend(r.lines)
-        merged.horizontal.extend(r.horizontal)
-        merged.vertical.extend(r.vertical)
-        merged.diagonal.extend(r.diagonal)
-        merged.grouped_lines.extend(r.grouped_lines)
-        merged.intersections.extend(r.intersections)
-        if r.image_width > merged.image_width:
-            merged.image_width = r.image_width
-        if r.image_height > merged.image_height:
-            merged.image_height = r.image_height
-    return merged
-
-
-def _merge_door_results(results: list[DoorDetectionResult]) -> DoorDetectionResult:
-    merged = DoorDetectionResult(doors=[], image_width=0, image_height=0)
-    for r in results:
-        merged.doors.extend(r.doors)
-        if r.image_width > merged.image_width:
-            merged.image_width = r.image_width
-        if r.image_height > merged.image_height:
-            merged.image_height = r.image_height
-    return merged
-
-
-def _merge_window_results(results: list[WindowDetectionResult]) -> WindowDetectionResult:
-    merged = WindowDetectionResult(windows=[], image_width=0, image_height=0)
-    for r in results:
-        merged.windows.extend(r.windows)
-        if r.image_width > merged.image_width:
-            merged.image_width = r.image_width
-        if r.image_height > merged.image_height:
-            merged.image_height = r.image_height
-    return merged
-
-
-def _merge_ocr_results(results: list[OcrResult]) -> OcrResult:
-    merged = OcrResult(
-        texts=[], measurements=[], room_names=[], scales=[], notes=[],
-        raw_text="", page_count=0,
-    )
-    for r in results:
-        merged.texts.extend(r.texts)
-        merged.measurements.extend(r.measurements)
-        merged.room_names.extend(r.room_names)
-        merged.scales.extend(r.scales)
-        merged.notes.extend(r.notes)
-        if merged.raw_text and r.raw_text:
-            merged.raw_text += "\n" + r.raw_text
-        elif r.raw_text:
-            merged.raw_text = r.raw_text
-        merged.page_count += r.page_count
-    return merged
-
-
-async def _run_pipeline_on_docs(
-    temp_paths: list[str],
-) -> tuple[LineDetectionResult, DoorDetectionResult, WindowDetectionResult, OcrResult]:
-    line_results = []
-    door_results = []
-    window_results = []
-    ocr_results = []
-
-    for path in temp_paths:
-        line_results.append(await detection_service.process_file(path))
-        door_results.append(await detection_service.process_file_doors(path))
-        window_results.append(await detection_service.process_file_windows(path))
-        ocr_results.append(await ocr_service.process_file(path))
-
-    return (
-        _merge_line_results(line_results),
-        _merge_door_results(door_results),
-        _merge_window_results(window_results),
-        _merge_ocr_results(ocr_results),
-    )
-
-
 def _generate_dxf_sync(
     output_path: str,
     lines_result: LineDetectionResult,
@@ -184,6 +110,44 @@ def _get_user_format(user: User, requested_format: str) -> str:
             detail="La exportación DWG requiere un plan Pro o Business.",
         )
     return requested_format
+
+
+async def _resolve_pipeline(
+    project,
+    edited_elements,
+    temp_paths: list[str],
+) -> tuple[LineDetectionResult, DoorDetectionResult, WindowDetectionResult, OcrResult]:
+    """Pick the fastest detection data source for DXF generation.
+
+    Priority:
+      1. Edited elements (from the online editor) + OCR only.
+      2. Cached detection result + OCR only.
+      3. Full detection pipeline (first generation).
+    """
+    cached = project.detection_result
+
+    if edited_elements is not None:
+        if cached:
+            image_w = cached.get("image_width", 0)
+            image_h = cached.get("image_height", 0)
+            ocr_result = await run_ocr_only(temp_paths, ocr_service)
+        else:
+            lines_result, _, _, ocr_result = await run_full_pipeline(
+                temp_paths, detection_service, ocr_service,
+            )
+            image_w = lines_result.image_width
+            image_h = lines_result.image_height
+        return (
+            *build_detection_results(edited_elements, image_w, image_h),
+            ocr_result,
+        )
+
+    if cached:
+        lines_result, doors_result, windows_result = load_detection(cached)
+        ocr_result = await run_ocr_only(temp_paths, ocr_service)
+        return lines_result, doors_result, windows_result, ocr_result
+
+    return await run_full_pipeline(temp_paths, detection_service, ocr_service)
 
 
 @router.post("/generate/{project_id}", response_model=CadGenerateResponse)
@@ -228,6 +192,12 @@ async def generate_cad(
             detail="El proyecto no tiene documentos. Suba un plano primero.",
         )
 
+    elements = body.elements
+    if elements is None and project.edited_elements:
+        elements = ElementsPayload.model_validate(project.edited_elements)
+    if elements is not None:
+        await project_repo.set_edited_elements(project_id, elements.model_dump(mode="json"))
+
     await project_repo.update_status(project_id, "processing")
 
     temp_paths = []
@@ -238,7 +208,7 @@ async def generate_cad(
             temp_paths.append(path)
 
         lines_result, doors_result, windows_result, ocr_result = (
-            await _run_pipeline_on_docs(temp_paths)
+            await _resolve_pipeline(project, elements, temp_paths)
         )
 
         tag = _uuid.uuid4().hex[:8]

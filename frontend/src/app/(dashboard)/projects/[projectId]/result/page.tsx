@@ -2,7 +2,7 @@
 
 import { Suspense, useCallback, useEffect, useRef, useState } from "react";
 import { useRouter, useParams, useSearchParams } from "next/navigation";
-import { ArrowLeft, Download, Share2, Loader2, ChevronDown } from "lucide-react";
+import { ArrowLeft, Download, Share2, Loader2, ChevronDown, Pencil } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
   DropdownMenu,
@@ -159,6 +159,14 @@ function ResultContent() {
             <Button variant="outline" size="sm" onClick={handleShare}>
               <Share2 className="mr-2 h-4 w-4" />
               Compartir
+            </Button>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => router.push(`/projects/${projectId}/editor`)}
+            >
+              <Pencil className="mr-2 h-4 w-4" />
+              Editar plano
             </Button>
             {cadReady ? (
               canExportDwg ? (

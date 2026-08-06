@@ -46,6 +46,12 @@ class ProjectRepository(BaseRepository):
     async def update_status(self, project_id: UUID, status: str) -> None:
         await self._update(Project, project_id, status=status)
 
+    async def set_detection_result(self, project_id: UUID, data: dict) -> None:
+        await self._update(Project, project_id, detection_result=data)
+
+    async def set_edited_elements(self, project_id: UUID, data: dict) -> None:
+        await self._update(Project, project_id, edited_elements=data)
+
     async def delete(self, project_id: UUID) -> None:
         await self._delete(Project, project_id)
 
