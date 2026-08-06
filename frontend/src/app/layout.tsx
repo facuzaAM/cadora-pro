@@ -15,16 +15,21 @@ const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || "https://cadora.pro";
 export const metadata: Metadata = {
   metadataBase: new URL(siteUrl),
   title: {
-    default: "Cadora - De planos arquitectónicos a CAD",
+    default: "Convierte PDF, PNG, JPG, JPEG y TIFF a CAD | Cadora",
     template: "%s - Cadora",
   },
   description:
-    "Sube tu plano arquitectónico y obtén un archivo DXF/DWG editable con detección automática de muros, puertas, ventanas, habitaciones, textos y cotas.",
+    "Convierte planos arquitectónicos en PDF, PNG, JPG, JPEG o TIFF — incluso generados con IA — a archivos DXF/DWG editables con detección automática de muros, puertas, ventanas, habitaciones, textos y cotas.",
   keywords: [
+    "convertir pdf a dxf",
+    "convertir pdf a cad",
+    "convertir imagen a cad",
+    "convertir plano a dwg",
+    "plano generado por ia",
     "planos arquitectónicos",
-    "CAD",
-    "DXF",
-    "DWG",
+    "vectorizar plano arquitectónico",
+    "dxf",
+    "dwg",
     "detección automática",
     "muros",
     "puertas",
@@ -36,17 +41,17 @@ export const metadata: Metadata = {
     type: "website",
     locale: "es_AR",
     siteName: "Cadora",
-    title: "Cadora - De planos arquitectónicos a CAD",
+    title: "Convierte PDF, PNG, JPG, JPEG y TIFF a CAD | Cadora",
     description:
-      "Sube tu plano arquitectónico y obtén un archivo DXF/DWG editable con detección automática de muros, puertas y ventanas.",
+      "Sube tu plano arquitectónico en PDF, PNG, JPG, JPEG o TIFF — escaneado, fotografiado o generado con IA — y obtén un DXF/DWG editable con detección automática de muros, puertas y ventanas.",
     url: siteUrl,
     images: [{ url: "/og-image.png", width: 1200, height: 630 }],
   },
   twitter: {
     card: "summary_large_image",
-    title: "Cadora - De planos arquitectónicos a CAD",
+    title: "Convierte PDF, PNG, JPG, JPEG y TIFF a CAD | Cadora",
     description:
-      "Sube tu plano arquitectónico y obtén un archivo DXF/DWG editable con detección automática.",
+      "Convierte planos en PDF, PNG, JPG, JPEG o TIFF — incluso generados con IA — a DXF/DWG editables con detección automática.",
     images: ["/og-image.png"],
   },
   robots: {

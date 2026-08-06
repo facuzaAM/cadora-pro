@@ -1,6 +1,13 @@
-import { Ruler, DoorOpen, ScanLine, TextSearch, Hash, BrickWall } from "lucide-react";
+import { Ruler, DoorOpen, ScanLine, TextSearch, Hash, BrickWall, Sparkles, type LucideIcon } from "lucide-react";
 
-const features = [
+type Feature = {
+  icon: LucideIcon;
+  title: string;
+  desc: string;
+  highlight?: boolean;
+};
+
+const features: Feature[] = [
   {
     icon: BrickWall,
     title: "Detección de Muros",
@@ -31,7 +38,13 @@ const features = [
     title: "Exportación CAD",
     desc: "Genera archivos DXF editable con capas organizadas. DWG disponible en planes Pro y Business.",
   },
-] as const;
+  {
+    icon: Sparkles,
+    title: "Compatible con planos generados por IA",
+    desc: "Procesamos también planos creados con herramientas de IA: los vectorizamos a DXF/DWG igual que los tradicionales, sin configuración extra.",
+    highlight: true,
+  },
+];
 
 export function FeaturesGrid() {
   return (
@@ -40,14 +53,14 @@ export function FeaturesGrid() {
         <div className="text-center">
           <h2 className="text-3xl font-bold tracking-tight">Todo lo que necesitas</h2>
           <p className="mt-2 text-muted-foreground">
-            Detección precisa de muros, puertas, ventanas y más.
+            Detección precisa de muros, puertas, ventanas y más. Compatible con planos escaneados, fotografiados o generados por IA.
           </p>
         </div>
         <div className="mt-12 grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
           {features.map((f) => {
             const Icon = f.icon;
             return (
-              <div key={f.title} className="group relative overflow-hidden rounded-xl border bg-card p-6 transition-all duration-300 hover:shadow-lg hover:border-primary/50 hover:-translate-y-0.5">
+              <div key={f.title} className={"group relative overflow-hidden rounded-xl border bg-card p-6 transition-all duration-300 hover:shadow-lg hover:border-primary/50 hover:-translate-y-0.5" + (f.highlight ? " lg:col-span-3 border-primary/40 bg-gradient-to-br from-primary/10 via-card to-card" : "")}>
                 <div className="absolute right-0 top-0 h-20 w-20 translate-x-6 -translate-y-6 rounded-full bg-primary/[0.04] transition-all duration-300 group-hover:scale-150" />
                 <div className="relative">
                   <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-gradient-to-br from-primary/10 to-primary/5 group-hover:from-primary/20 group-hover:to-primary/10 transition-all duration-300">

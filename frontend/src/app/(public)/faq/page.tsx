@@ -5,7 +5,8 @@ import { FaqAccordion } from "./faq-accordion";
 
 export const metadata: Metadata = {
   title: "FAQ - Cadora",
-  description: "Preguntas frecuentes sobre Cadora",
+  description:
+    "Preguntas frecuentes sobre Cadora: qué formatos aceptamos (PDF, PNG, JPG, JPEG, TIFF), cómo convertir planos a DXF/DWG, tiempos de procesamiento y seguridad de tus datos.",
 };
 
 export default function FaqPage() {

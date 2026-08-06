@@ -11,7 +11,7 @@ const faqs = [
   },
   {
     q: "¿Qué formatos de plano aceptan?",
-    a: "Aceptamos PDF, PNG, JPG, JPEG y TIFF. Los planos deben tener una resolución mínima de 300 DPI para mejores resultados en la detección.",
+    a: "Aceptamos PDF, PNG, JPG, JPEG y TIFF. Convertimos cualquier de esos formatos a CAD (DXF/DWG). Los planos deben tener una resolución mínima de 300 DPI para mejores resultados en la detección.",
   },
   {
     q: "¿Qué formatos de salida genera?",
@@ -20,6 +20,10 @@ const faqs = [
   {
     q: "¿Qué pasa si la detección no es precisa?",
     a: "La detección automática tiene alta precisión pero no es perfecta. Si algún elemento no se detectó correctamente, podés volver a procesar el plano desde tu dashboard. En una futura versión podrás editar los elementos detectados manualmente antes de exportar.",
+  },
+  {
+    q: "¿Funciona con planos generados por inteligencia artificial?",
+    a: "Sí. Nuestro motor también procesa planos creados con herramientas de IA, siempre que los exportes como PDF, PNG, JPG, JPEG o TIFF. La detección de muros, puertas, ventanas y textos funciona igual que con planos tradicionales.",
   },
   {
     q: "¿Cuánto tiempo se conservan mis archivos?",

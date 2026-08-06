@@ -1,6 +1,6 @@
-export const APP_TAGLINE = "De planos arquitectónicos a CAD";
+export const APP_TAGLINE = "Convierte PDF, PNG, JPG, JPEG y TIFF a CAD";
 export const APP_DESCRIPTION =
-  "Sube tu plano arquitectónico y obtén un archivo DXF/DWG editable con detección automática de muros, puertas, ventanas, habitaciones, textos y cotas.";
+  "Sube tu plano arquitectónico — escaneado, fotografiado o generado con IA — y obtén un archivo DXF/DWG editable con detección automática de muros, puertas, ventanas, habitaciones, textos y cotas.";
 
 export const PLANS = [
   {
