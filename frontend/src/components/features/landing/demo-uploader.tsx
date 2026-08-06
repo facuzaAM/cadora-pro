@@ -2,7 +2,9 @@
 
 import { useState, useCallback, useRef, useEffect } from "react";
 import Link from "next/link";
-import { Upload, AlertCircle, Loader2, Download, ArrowRight, Check } from "lucide-react";
+import { useRouter } from "next/navigation";
+import { Upload, AlertCircle, Loader2, Download, ArrowRight, Check, Pencil } from "lucide-react";
+import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -18,6 +20,8 @@ import { CadCrosshair } from "@/components/features/landing/cad-crosshair";
 import { CadCursor } from "@/components/features/landing/cad-cursor";
 import { CadDimension } from "@/components/features/landing/cad-dimension";
 import { api } from "@/services/api";
+import { projectsService } from "@/services/projects.service";
+import { documentsService } from "@/services/documents.service";
 
 const DEMO_MAX_SIZE_MB = 10;
 const DEMO_ACCEPT = ".pdf,.png,.jpg,.jpeg,.tiff";
@@ -45,11 +49,13 @@ const PROCESSING_STEPS = [
 ];
 
 export function DemoUploader() {
+  const router = useRouter();
   const [state, setState] = useState<DemoState>("idle");
   const [dragOver, setDragOver] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [result, setResult] = useState<DemoResult | null>(null);
   const [imageUrl, setImageUrl] = useState<string | null>(null);
+  const [demoFile, setDemoFile] = useState<File | null>(null);
   const [step, setStep] = useState(0);
   const [showAuthModal, setShowAuthModal] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -113,6 +119,7 @@ export function DemoUploader() {
       );
 
       setResult(data);
+      setDemoFile(file);
       setState("result");
       sessionStorage.setItem(SESSION_KEY, "1");
     } catch (err: unknown) {
@@ -141,12 +148,32 @@ export function DemoUploader() {
   const reset = () => {
     setState("idle");
     setResult(null);
+    setDemoFile(null);
     if (imageUrl) URL.revokeObjectURL(imageUrl);
     setImageUrl(null);
     setStep(0);
     setError(null);
     if (fileInputRef.current) fileInputRef.current.value = "";
   };
+
+  const handleEdit = useCallback(async () => {
+    const token = api.getAccessToken();
+    if (!token) {
+      setShowAuthModal(true);
+      return;
+    }
+    if (!demoFile) return;
+    try {
+      const project = await projectsService.create(
+        { name: demoFile.name.replace(/\.[^.]+$/, "") || "Plano importado" },
+        token,
+      );
+      await documentsService.upload(project.id, demoFile, token);
+      router.push(`/projects/${project.id}/processing`);
+    } catch {
+      toast.error("Error al crear el proyecto. Intenta de nuevo.");
+    }
+  }, [demoFile, router]);
 
   const wallCount = result?.walls.length ?? 0;
   const doorCount = result?.doors.length ?? 0;
@@ -313,10 +340,16 @@ export function DemoUploader() {
                       <Badge variant="secondary">{doorCount} puertas</Badge>
                       <Badge variant="secondary">{windowCount} ventanas</Badge>
                     </div>
-                    <Button onClick={() => setShowAuthModal(true)}>
-                      <Download className="mr-2 h-4 w-4" />
-                      Descargá tu archivo DXF
-                    </Button>
+                    <div className="flex flex-wrap items-center gap-2">
+                      <Button onClick={handleEdit}>
+                        <Pencil className="mr-2 h-4 w-4" />
+                        Editar plano
+                      </Button>
+                      <Button variant="outline" onClick={() => setShowAuthModal(true)}>
+                        <Download className="mr-2 h-4 w-4" />
+                        Descargar DXF
+                      </Button>
+                    </div>
                   </div>
                 </div>
 
@@ -343,9 +376,9 @@ export function DemoUploader() {
       <Dialog open={showAuthModal} onOpenChange={setShowAuthModal}>
         <DialogContent className="sm:max-w-2xl max-h-[90vh] overflow-y-auto">
           <DialogHeader>
-            <DialogTitle className="text-xl">Elegí tu plan para descargar</DialogTitle>
+            <DialogTitle className="text-xl">Creá tu cuenta gratis</DialogTitle>
             <DialogDescription>
-              Creá una cuenta gratuita para descargar tu DXF, o elegí un plan premium para más conversiones.
+              Creá una cuenta gratuita para editar tu plano y descargar tu DXF, o elegí un plan premium para más conversiones.
             </DialogDescription>
           </DialogHeader>
 
