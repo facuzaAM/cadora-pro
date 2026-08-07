@@ -1,7 +1,7 @@
 import secrets
 import uuid
 from typing import Literal
-from urllib.parse import urlencode
+from urllib.parse import urlencode, urlparse
 
 import httpx
 from fastapi import APIRouter, Depends, File, HTTPException, Request, UploadFile
@@ -49,6 +49,24 @@ def _cookie_samesite() -> Literal["none", "lax"]:
     return "none" if settings.ENVIRONMENT == "production" else "lax"
 
 
+def _cookie_domain() -> str | None:
+    """Parent domain so auth cookies are shared across app./api. subdomains.
+
+    The frontend calls the API via the same-origin path (``/api/v1`` on
+    app.cadora.pro), but the Google OAuth callback lives on api.cadora.pro.
+    A host-only cookie set on one subdomain is invisible on the other, so the
+    OAuth ``state`` check (and the session cookies set by the callback) fail.
+    Scoping them to the parent domain fixes the hand-off.
+    """
+    if settings.ENVIRONMENT != "production":
+        return None
+    host = urlparse(settings.FRONTEND_URL or "cadora.pro").hostname or "cadora.pro"
+    for prefix in ("app.", "www."):
+        if host.startswith(prefix):
+            host = host[len(prefix) :]
+    return f".{host}"
+
+
 def _frontend_redirect(path: str) -> RedirectResponse:
     base = settings.FRONTEND_URL or ""
     return RedirectResponse(f"{base}{path}")
@@ -56,31 +74,34 @@ def _frontend_redirect(path: str) -> RedirectResponse:
 
 def _auth_response(tokens: TokenResponse, user: User) -> JSONResponse:
     """Create a JSON response with refresh token as HttpOnly cookie."""
-    resp = JSONResponse(content={
-        "access_token": tokens.access_token,
-        "user": {
-            "id": str(user.id),
-            "email": user.email,
-            "name": user.name,
-            "avatar_url": user.avatar_url,
-            "subscription_plan": user.subscription_plan,
-            "subscription_status": user.subscription_status,
-            "conversions_used": user.conversions_used,
-            "conversions_limit": user.conversions_limit,
-            "storage_used": user.storage_used,
-            "storage_limit": user.storage_limit,
-            "priority_processing": user.priority_processing,
-            "is_admin": user.is_admin,
-            "email_verified": user.email_verified,
-            "created_at": user.created_at.isoformat() if user.created_at else "",
-        },
-    })
+    resp = JSONResponse(
+        content={
+            "access_token": tokens.access_token,
+            "user": {
+                "id": str(user.id),
+                "email": user.email,
+                "name": user.name,
+                "avatar_url": user.avatar_url,
+                "subscription_plan": user.subscription_plan,
+                "subscription_status": user.subscription_status,
+                "conversions_used": user.conversions_used,
+                "conversions_limit": user.conversions_limit,
+                "storage_used": user.storage_used,
+                "storage_limit": user.storage_limit,
+                "priority_processing": user.priority_processing,
+                "is_admin": user.is_admin,
+                "email_verified": user.email_verified,
+                "created_at": user.created_at.isoformat() if user.created_at else "",
+            },
+        }
+    )
     resp.set_cookie(
         key=REFRESH_COOKIE,
         value=tokens.refresh_token,
         httponly=True,
         secure=_cookie_secure(),
         samesite=_cookie_samesite(),
+        domain=_cookie_domain(),
         max_age=7 * 24 * 3600,
         path="/",
     )
@@ -90,10 +111,12 @@ def _auth_response(tokens: TokenResponse, user: User) -> JSONResponse:
         httponly=True,
         secure=_cookie_secure(),
         samesite=_cookie_samesite(),
+        domain=_cookie_domain(),
         max_age=settings.JWT_ACCESS_EXPIRATION_MINUTES * 60,
         path="/",
     )
     return resp
+
 
 GOOGLE_AUTH_URL = "https://accounts.google.com/o/oauth2/v2/auth"
 GOOGLE_TOKEN_URL = "https://oauth2.googleapis.com/token"
@@ -138,6 +161,7 @@ async def google_login(request: Request):
         httponly=True,
         secure=_cookie_secure(),
         samesite=_cookie_samesite(),
+        domain=_cookie_domain(),
         max_age=600,
         path="/",
     )
@@ -156,7 +180,7 @@ async def google_callback(request: Request, db: AsyncSession = Depends(get_db)):
         return _frontend_redirect("/login?error=invalid_state")
 
     resp = _frontend_redirect("/login")
-    resp.delete_cookie("oauth_state", path="/")
+    resp.delete_cookie("oauth_state", path="/", domain=_cookie_domain())
 
     if error:
         return _frontend_redirect(f"/login?error={error}")
@@ -200,10 +224,13 @@ async def google_callback(request: Request, db: AsyncSession = Depends(get_db)):
 
     if not user:
         from app.utils.security import hash_password
+
         random_password = secrets.token_hex(32)
         hashed = hash_password(random_password)
         user = await repo.create(
-            email=email, name=name, hashed_password=hashed,
+            email=email,
+            name=name,
+            hashed_password=hashed,
         )
 
     user.avatar_url = avatar_url or user.avatar_url
@@ -220,6 +247,7 @@ async def google_callback(request: Request, db: AsyncSession = Depends(get_db)):
         httponly=True,
         secure=_cookie_secure(),
         samesite=_cookie_samesite(),
+        domain=_cookie_domain(),
         max_age=7 * 24 * 3600,
         path="/",
     )
@@ -229,6 +257,7 @@ async def google_callback(request: Request, db: AsyncSession = Depends(get_db)):
         httponly=True,
         secure=_cookie_secure(),
         samesite=_cookie_samesite(),
+        domain=_cookie_domain(),
         max_age=settings.JWT_ACCESS_EXPIRATION_MINUTES * 60,
         path="/",
     )
@@ -246,9 +275,7 @@ async def register(
     try:
         result = await service.register(body)
     except ValueError as e:
-        raise HTTPException(
-            status_code=HTTP_400_BAD_REQUEST, detail=str(e)
-        )
+        raise HTTPException(status_code=HTTP_400_BAD_REQUEST, detail=str(e))
     user = await service.repo.get_by_email(body.email)
     if not user:
         raise HTTPException(
@@ -280,9 +307,7 @@ async def login(
     try:
         result = await service.login(body.email, body.password)
     except ValueError as e:
-        raise HTTPException(
-            status_code=HTTP_400_BAD_REQUEST, detail=str(e)
-        )
+        raise HTTPException(status_code=HTTP_400_BAD_REQUEST, detail=str(e))
     user = await service.repo.get_by_email(body.email)
     if not user:
         raise HTTPException(
@@ -313,9 +338,7 @@ async def refresh(
     try:
         result = await service.refresh(token)
     except ValueError as e:
-        raise HTTPException(
-            status_code=HTTP_401_UNAUTHORIZED, detail=str(e)
-        )
+        raise HTTPException(status_code=HTTP_401_UNAUTHORIZED, detail=str(e))
     user = await service.repo.get_by_id(result.user.id)
     if not user:
         raise HTTPException(
@@ -340,8 +363,8 @@ async def logout(
     if token:
         await service.logout(token)
     resp = Response(status_code=204)
-    resp.delete_cookie(REFRESH_COOKIE, path="/")
-    resp.delete_cookie(ACCESS_COOKIE, path="/")
+    resp.delete_cookie(REFRESH_COOKIE, path="/", domain=_cookie_domain())
+    resp.delete_cookie(ACCESS_COOKIE, path="/", domain=_cookie_domain())
     return resp
 
 
@@ -409,6 +432,7 @@ async def upload_avatar(
     path = f"avatars/{user.id}/{uuid.uuid4().hex}.{ext}"
 
     from app.services.storage_service import StorageService
+
     storage = StorageService()
     await storage.upload(settings.STORAGE_BUCKET, path, data, file.content_type)
     url = await storage.get_download_url(settings.STORAGE_BUCKET, path)
@@ -440,8 +464,8 @@ async def logout_all(
     service = AuthService(db)
     await service.logout_all(user.id)
     resp = Response(status_code=204)
-    resp.delete_cookie(REFRESH_COOKIE, path="/")
-    resp.delete_cookie(ACCESS_COOKIE, path="/")
+    resp.delete_cookie(REFRESH_COOKIE, path="/", domain=_cookie_domain())
+    resp.delete_cookie(ACCESS_COOKIE, path="/", domain=_cookie_domain())
     return resp
 
 
@@ -534,6 +558,6 @@ async def delete_account(
     except ValueError as e:
         raise HTTPException(status_code=HTTP_400_BAD_REQUEST, detail=str(e))
     resp = Response(status_code=204)
-    resp.delete_cookie(REFRESH_COOKIE, path="/")
-    resp.delete_cookie(ACCESS_COOKIE, path="/")
+    resp.delete_cookie(REFRESH_COOKIE, path="/", domain=_cookie_domain())
+    resp.delete_cookie(ACCESS_COOKIE, path="/", domain=_cookie_domain())
     return resp
