@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import {
   FileText,
@@ -11,9 +11,12 @@ import {
   AlertCircle,
   Loader2,
   MoreHorizontal,
+  Search,
+  ChevronDown,
 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -67,6 +70,9 @@ export function ConversionHistory() {
   const [loading, setLoading] = useState(true);
   const [reprocessing, setReprocessing] = useState<string | null>(null);
   const [downloadingId, setDownloadingId] = useState<string | null>(null);
+  const [query, setQuery] = useState("");
+  const [statusFilter, setStatusFilter] = useState<"all" | ProjectStatus>("all");
+  const [visible, setVisible] = useState(15);
 
   useEffect(() => {
     const token = api.getAccessToken();
@@ -135,6 +141,13 @@ export function ConversionHistory() {
     }
   };
 
+  const filtered = useMemo(() => {
+    const q = query.trim().toLowerCase();
+    return rows
+      .filter((r) => (statusFilter === "all" ? true : r.project.status === statusFilter))
+      .filter((r) => !q || r.project.name.toLowerCase().includes(q) || r.filename.toLowerCase().includes(q));
+  }, [rows, query, statusFilter]);
+
   if (loading) {
     return (
       <div className="space-y-3">
@@ -160,8 +173,60 @@ export function ConversionHistory() {
   }
 
   return (
-    <div className="space-y-2">
-      {rows.map((row) => {
+    <div className="space-y-4">
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
+        <div className="relative flex-1">
+          <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+          <Input
+            value={query}
+            onChange={(e) => {
+              setQuery(e.target.value);
+              setVisible(15);
+            }}
+            placeholder="Buscar por proyecto o archivo..."
+            className="pl-9"
+            aria-label="Buscar en historial de conversiones"
+          />
+        </div>
+        <div className="flex items-center gap-2 overflow-x-auto">
+          {(["all", "cad_generated", "processing", "error", "created"] as const).map((s) => (
+            <Button
+              key={s}
+              size="sm"
+              variant={statusFilter === s ? "default" : "outline"}
+              onClick={() => {
+                setStatusFilter(s as "all" | ProjectStatus);
+                setVisible(15);
+              }}
+            >
+              {s === "all" ? "Todos" : statusConfig[s].label}
+            </Button>
+          ))}
+        </div>
+      </div>
+
+      {filtered.length === 0 ? (
+        <div className="flex flex-col items-center justify-center rounded-lg border border-dashed px-6 py-16 text-center">
+          <Search className="mb-4 h-8 w-8 text-muted-foreground/60" />
+          <p className="text-sm text-muted-foreground">
+            No hay conversiones que coincidan con tu búsqueda.
+          </p>
+          <Button
+            variant="outline"
+            className="mt-4"
+            size="sm"
+            onClick={() => {
+              setQuery("");
+              setStatusFilter("all");
+              setVisible(15);
+            }}
+          >
+            Limpiar filtros
+          </Button>
+        </div>
+      ) : (
+        <div className="space-y-2">
+          {filtered.slice(0, visible).map((row) => {
         const cfg = statusConfig[row.project.status] || statusConfig.created;
         const StatusIcon = cfg.icon;
         const isProcessing = row.project.status === "processing";
@@ -265,7 +330,18 @@ export function ConversionHistory() {
             </div>
           </div>
         );
-      })}
+        })}
+        </div>
+      )}
+
+      {filtered.length > visible && (
+        <div className="flex justify-center pt-2">
+          <Button variant="outline" size="sm" onClick={() => setVisible((v) => v + 15)}>
+            <ChevronDown className="mr-2 h-4 w-4" />
+            Cargar más
+          </Button>
+        </div>
+      )}
     </div>
   );
 }

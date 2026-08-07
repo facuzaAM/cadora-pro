@@ -5,6 +5,7 @@ from app.config import settings
 from app.schemas.billing import (
     PaddleConfigResponse,
     PlanResponse,
+    PortalResponse,
     SubscriptionResponse,
 )
 from app.services.paddle_service import PaddleService
@@ -43,7 +44,21 @@ async def get_subscription(
         storage_used=user.storage_used,
         storage_limit=user.storage_limit,
         priority_processing=user.priority_processing,
+        paddle_customer_id=user.paddle_customer_id,
     )
+
+
+@router.get("/portal", response_model=PortalResponse)
+async def get_portal_url(
+    user=Depends(get_current_user),
+):
+    """Create a Paddle customer portal session for the current user."""
+    if not user.paddle_customer_id:
+        return PortalResponse(url=None, available=False)
+    url = await PaddleService.create_portal_url(user.paddle_customer_id)
+    if not url:
+        return PortalResponse(url=None, available=False)
+    return PortalResponse(url=url, available=True)
 
 
 @router.get("/config", response_model=PaddleConfigResponse)

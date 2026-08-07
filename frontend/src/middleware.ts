@@ -1,18 +1,13 @@
 import { type NextRequest, NextResponse } from "next/server";
+import { decodeJwtPayload } from "@/lib/jwt";
 
 const protectedRoutes = ["/dashboard", "/projects", "/settings", "/profile", "/billing"];
 
 function isTokenValid(token: string): boolean {
-  try {
-    const parts = token.split(".");
-    if (parts.length !== 3) return false;
-    const payload = JSON.parse(atob(parts[1]));
-    if (!payload.exp) return false;
-    const now = Math.floor(Date.now() / 1000);
-    return payload.exp > now;
-  } catch {
-    return false;
-  }
+  const payload = decodeJwtPayload(token);
+  if (!payload || typeof payload.exp !== "number") return false;
+  const now = Math.floor(Date.now() / 1000);
+  return payload.exp > now;
 }
 
 export function middleware(request: NextRequest) {

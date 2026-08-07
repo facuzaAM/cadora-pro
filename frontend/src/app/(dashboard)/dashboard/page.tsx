@@ -10,7 +10,6 @@ import { ProcessingStatus } from "@/components/features/dashboard/processing-sta
 import { ProcessingHistory } from "@/components/features/dashboard/processing-history";
 import { CreditUsage } from "@/components/features/dashboard/credit-usage";
 import { EmailVerificationBanner } from "@/components/features/dashboard/email-verification-banner";
-import { OnboardingTour } from "@/components/features/dashboard/onboarding-tour";
 import { useAuth } from "@/hooks/useAuth";
 
 export default function DashboardPage() {
@@ -19,7 +18,6 @@ export default function DashboardPage() {
 
   return (
     <div className="space-y-6">
-      <OnboardingTour />
       <EmailVerificationBanner />
       <PageHeader
         title="Dashboard"

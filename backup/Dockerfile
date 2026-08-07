@@ -1,6 +1,6 @@
 FROM postgres:16-alpine
 
-RUN apk add --no-cache bash
+RUN apk add --no-cache bash gnupg curl
 
 COPY backup.sh /app/backup.sh
 RUN chmod +x /app/backup.sh

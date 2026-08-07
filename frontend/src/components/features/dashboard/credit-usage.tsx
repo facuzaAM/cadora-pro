@@ -18,11 +18,12 @@ export function CreditUsage() {
   }, []);
 
   const used = sub?.conversions_used ?? 0;
-  const total = sub?.conversions_limit ?? 5;
+  const total = sub?.conversions_limit ?? 0;
   const pct = total > 0 ? Math.round((used / total) * 100) : 0;
   const planName = sub?.plan
     ? sub.plan.charAt(0).toUpperCase() + sub.plan.slice(1)
     : "Free";
+  const loading = sub === null;
 
   return (
     <Card>
@@ -37,11 +38,15 @@ export function CreditUsage() {
         <div className="space-y-2">
           <div className="flex items-center justify-between text-sm">
             <span className="text-muted-foreground">
-              {used} de {total} usados
+              {loading ? "Cargando..." : `${used} de ${total} usados`}
             </span>
-            <span className="font-medium tabular-nums">{pct}%</span>
+            <span className="font-medium tabular-nums">{loading ? "—" : `${pct}%`}</span>
           </div>
-          <Progress value={pct} className="h-2" />
+          {loading ? (
+            <div className="h-2 animate-pulse rounded-full bg-muted" />
+          ) : (
+            <Progress value={pct} className="h-2" />
+          )}
         </div>
 
         {sub && (

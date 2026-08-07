@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, use } from "react";
+import { useState, use, useEffect } from "react";
 import Link from "next/link";
 import { Logo } from "@/components/shared/logo";
 import { Button } from "@/components/ui/button";
@@ -14,7 +14,7 @@ import { Eye, EyeOff } from "lucide-react";
 export default function LoginPage({
   searchParams,
 }: {
-  searchParams: Promise<{ redirect?: string }>;
+  searchParams: Promise<{ redirect?: string; error?: string }>;
 }) {
   const { signIn, signInWithGoogle } = useAuth();
   const [email, setEmail] = useState("");
@@ -23,6 +23,12 @@ export default function LoginPage({
   const [submitting, setSubmitting] = useState(false);
   const [googleLoading, setGoogleLoading] = useState(false);
   const params = use(searchParams);
+
+  useEffect(() => {
+    if (params.error) {
+      toast.error("No pudimos iniciar sesión con Google. Probá de nuevo o usá tu email.");
+    }
+  }, [params.error]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();

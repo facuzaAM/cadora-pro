@@ -36,6 +36,7 @@ class Settings(BaseSettings):
 
     # Paddle Billing
     PADDLE_WEBHOOK_SECRET: str = ""
+    PADDLE_API_KEY: str = ""
     PADDLE_CLIENT_TOKEN: str = ""
     PADDLE_PRICE_STARTER: str = ""
     PADDLE_PRICE_PRO: str = ""

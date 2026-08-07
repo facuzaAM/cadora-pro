@@ -19,6 +19,12 @@ class SubscriptionResponse(BaseModel):
     storage_used: int
     storage_limit: int
     priority_processing: bool
+    paddle_customer_id: str | None = None
+
+
+class PortalResponse(BaseModel):
+    url: str | None = None
+    available: bool
 
 
 class PaddleConfigResponse(BaseModel):

@@ -1,12 +1,20 @@
 from __future__ import annotations
 
+import asyncio
 import json
 import logging
 from datetime import UTC, datetime
 from uuid import UUID
 
+from paddle_billing.Client import Client
+from paddle_billing.Environment import Environment
 from paddle_billing.Notifications.Secret import Secret
 from paddle_billing.Notifications.Verifier import Verifier
+from paddle_billing.Options import Options
+from paddle_billing.Resources.CustomerPortalSessions.Operations import (
+    CreateCustomerPortalSession,
+)
+from paddle_billing.Resources.Subscriptions.Operations import CancelSubscription
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -43,6 +51,53 @@ class _WebhookRequest:
 class PaddleService:
     def __init__(self, db: AsyncSession):
         self.repo = UserRepository(db)
+
+    @staticmethod
+    def _get_client() -> Client | None:
+        if not settings.PADDLE_API_KEY:
+            logger.warning("PADDLE_API_KEY no configurado; operaciones de billing deshabilitadas")
+            return None
+        environment = (
+            Environment.SANDBOX if settings.PADDLE_ENVIRONMENT == "sandbox" else Environment.PRODUCTION
+        )
+        return Client(api_key=settings.PADDLE_API_KEY, options=Options(environment=environment))
+
+    @staticmethod
+    async def create_portal_url(customer_id: str) -> str | None:
+        """Create a Paddle customer portal session and return the general URL."""
+        client = PaddleService._get_client()
+        if not client:
+            return None
+        try:
+            session = await asyncio.to_thread(
+                client.customer_portal_sessions.create,
+                customer_id,
+                CreateCustomerPortalSession(),
+            )
+            return session.urls.general.url
+        except Exception:
+            logger.exception("Error creando sesión del customer portal para %s", customer_id)
+            return None
+
+    @staticmethod
+    async def cancel_subscription(subscription_id: str) -> None:
+        """Cancel a Paddle subscription. Best-effort; failures are logged, not raised."""
+        client = PaddleService._get_client()
+        if not client:
+            return
+        try:
+            await asyncio.to_thread(
+                client.subscriptions.cancel,
+                subscription_id,
+                CancelSubscription(),
+            )
+            logger.info("Suscripción Paddle %s cancelada", subscription_id)
+        except Exception:
+            logger.exception(
+                "No se pudo cancelar la suscripción Paddle %s en el dashboard; "
+                "cancelar manualmente.",
+                subscription_id,
+            )
 
     @staticmethod
     def verify_signature(payload: bytes, paddle_signature: str) -> bool:

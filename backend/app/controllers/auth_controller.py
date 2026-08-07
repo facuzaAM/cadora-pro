@@ -70,6 +70,7 @@ def _auth_response(tokens: TokenResponse, user: User) -> JSONResponse:
             "storage_used": user.storage_used,
             "storage_limit": user.storage_limit,
             "priority_processing": user.priority_processing,
+            "is_admin": user.is_admin,
             "created_at": user.created_at.isoformat() if user.created_at else "",
         },
     })

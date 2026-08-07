@@ -5,8 +5,10 @@ from uuid import UUID
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.config import settings
+from app.models.user import User
 from app.repositories.project_repository import ProjectRepository
 from app.repositories.user_repository import UserRepository
+from app.services.paddle_service import PaddleService
 from app.services.storage_service import StorageService
 from app.utils.security import verify_password
 
@@ -88,22 +90,30 @@ class AccountService:
             raise ValueError("Usuario no encontrado")
         if not verify_password(password, user.hashed_password):
             raise ValueError("La contraseña es incorrecta")
+        await self._delete_user_cleanup(user)
 
+    async def delete_account_by_admin(self, user_id: UUID) -> None:
+        user = await self.user_repo.get_by_id(user_id)
+        if not user:
+            raise ValueError("Usuario no encontrado")
+        await self._delete_user_cleanup(user)
+
+    async def _delete_user_cleanup(self, user: User) -> None:
         if user.paddle_subscription_id:
-            logger.warning(
-                "Account %s deleted while a Paddle subscription (%s) is active; "
-                "billing must be cancelled separately in the Paddle dashboard",
-                user.id, user.paddle_subscription_id,
+            await PaddleService.cancel_subscription(user.paddle_subscription_id)
+            logger.info(
+                "Suscripción Paddle %s cancelada por borrado de cuenta %s",
+                user.paddle_subscription_id, user.id,
             )
 
-        documents = await self.project_repo.list_documents_by_user(user_id)
+        documents = await self.project_repo.list_documents_by_user(user.id)
         for doc in documents:
             try:
                 await self.storage.delete(settings.STORAGE_BUCKET, doc.storage_path)
             except Exception:
                 logger.warning(
                     "Failed to delete stored file %s for user %s",
-                    doc.storage_path, user_id,
+                    doc.storage_path, user.id,
                 )
 
-        await self.user_repo.delete(user_id)
+        await self.user_repo.delete(user.id)

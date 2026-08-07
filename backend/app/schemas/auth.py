@@ -145,6 +145,7 @@ class UserResponse(BaseModel):
     storage_used: int = 0
     storage_limit: int = 52428800
     priority_processing: bool = False
+    is_admin: bool = False
     created_at: datetime
 
     model_config = {"from_attributes": True}

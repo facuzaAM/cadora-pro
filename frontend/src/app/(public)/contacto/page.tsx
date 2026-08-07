@@ -1,6 +1,8 @@
 import type { Metadata } from "next";
 import { Mail, MessageSquare, Zap } from "lucide-react";
 import { LandingNav } from "@/components/features/landing/landing-nav";
+import { SiteFooter } from "@/components/layout/site-footer";
+import { PageHero } from "@/components/shared/page-hero";
 import { ContactForm } from "./contact-form";
 
 export const metadata: Metadata = {
@@ -12,12 +14,15 @@ export default function ContactoPage() {
   return (
     <div className="flex min-h-screen flex-col">
       <LandingNav />
+      <PageHero
+        title="Contacto"
+        subtitle="Estamos para ayudarte. Respondemos en menos de 24 horas hábiles."
+      />
       <main className="mx-auto flex w-full max-w-4xl flex-1 items-center justify-center px-4 py-12">
         <div className="grid w-full gap-12 md:grid-cols-2">
           <div>
-            <h1 className="text-3xl font-bold">Contacto</h1>
-            <p className="mt-2 text-muted-foreground">
-              Estamos para ayudarte. Respondemos en menos de 24 horas hábiles.
+            <p className="text-muted-foreground">
+              Escribinos por cualquier consulta sobre tu cuenta, tus planos o tus conversiones.
             </p>
 
             <div className="mt-8 space-y-6">
@@ -68,6 +73,7 @@ export default function ContactoPage() {
           </div>
         </div>
       </main>
+      <SiteFooter />
     </div>
   );
 }

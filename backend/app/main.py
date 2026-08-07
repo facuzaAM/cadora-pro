@@ -12,6 +12,7 @@ from slowapi.errors import RateLimitExceeded
 from sqlalchemy import text
 
 from app.config import settings
+from app.controllers.admin_controller import router as admin_router
 from app.controllers.auth_controller import router as auth_router
 from app.controllers.billing_controller import router as billing_router
 from app.controllers.cad_controller import router as cad_router
@@ -22,6 +23,7 @@ from app.controllers.document_controller import router as document_router
 from app.controllers.editor_controller import router as editor_router
 from app.controllers.project_controller import router as project_router
 from app.database import Base, async_session_factory, engine
+from app.utils.csrf import CSRFOriginMiddleware
 from app.utils.logging import setup_logging
 from app.utils.rate_limit import limiter
 
@@ -147,6 +149,11 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+app.add_middleware(
+    CSRFOriginMiddleware,
+    allowed_origins=settings.CORS_ORIGINS,
+)
+
 app.include_router(auth_router, prefix="/api/v1/auth", tags=["auth"])
 app.include_router(project_router, prefix="/api/v1/projects", tags=["projects"])
 app.include_router(editor_router, prefix="/api/v1/projects", tags=["projects-editor"])
@@ -156,6 +163,7 @@ app.include_router(cad_router, prefix="/api/v1/cad", tags=["cad"])
 app.include_router(billing_router, prefix="/api/v1/billing", tags=["billing"])
 app.include_router(demo_router, prefix="/api/v1/demo", tags=["demo"])
 app.include_router(contact_router, prefix="/api/v1/contact", tags=["contact"])
+app.include_router(admin_router, prefix="/api/v1/admin", tags=["admin"])
 
 
 @app.get("/api/v1/health", tags=["health"])

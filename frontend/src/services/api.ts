@@ -38,8 +38,18 @@ class ApiClient {
     }
   }
 
-  async get<T>(path: string, token?: string): Promise<T> {
-    const res = await this._fetch(`${this.baseUrl}${path}`, {
+  async get<T>(
+    path: string,
+    token?: string,
+    params?: Record<string, string | number | undefined>,
+  ): Promise<T> {
+    const qs = params
+      ? `?${Object.entries(params)
+          .filter(([, v]) => v !== undefined && v !== "")
+          .map(([k, v]) => `${encodeURIComponent(k)}=${encodeURIComponent(String(v))}`)
+          .join("&")}`
+      : "";
+    const res = await this._fetch(`${this.baseUrl}${path}${qs}`, {
       credentials: "include",
       headers: this.headers(token),
     });
@@ -107,7 +117,7 @@ class ApiClient {
 
   private async handleResponse<T>(res: Response): Promise<T> {
     if (res.status === 402 && typeof window !== "undefined") {
-      window.location.href = "/pricing?reason=limit_reached";
+      window.location.href = "/billing?reason=limit_reached";
       throw new ApiError(402, { detail: "Límite alcanzado. Redirigiendo..." });
     }
     if (!res.ok) {

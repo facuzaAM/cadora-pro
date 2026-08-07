@@ -15,6 +15,8 @@ import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
 import { Logo } from "@/components/shared/logo";
+import { ShieldCheck } from "lucide-react";
+import { useAuth } from "@/hooks/useAuth";
 
 const navItems = [
   { label: "Dashboard", href: "/dashboard", icon: LayoutDashboard },
@@ -25,6 +27,8 @@ const navItems = [
   { label: "Configuración", href: "/settings", icon: Settings },
 ];
 
+const adminNavItem = { label: "Admin", href: "/admin", icon: ShieldCheck };
+
 interface MobileSidebarProps {
   open: boolean;
   onClose: () => void;
@@ -32,6 +36,7 @@ interface MobileSidebarProps {
 
 export function MobileSidebar({ open, onClose }: MobileSidebarProps) {
   const pathname = usePathname();
+  const { user } = useAuth();
 
   if (!open) return null;
 
@@ -49,7 +54,7 @@ export function MobileSidebar({ open, onClose }: MobileSidebarProps) {
         <Separator className="my-4" />
 
         <nav className="flex flex-col gap-1">
-          {navItems.map((item) => {
+          {[...navItems, ...(user?.is_admin ? [adminNavItem] : [])].map((item) => {
             const Icon = item.icon;
             const isActive = pathname.startsWith(item.href);
             return (

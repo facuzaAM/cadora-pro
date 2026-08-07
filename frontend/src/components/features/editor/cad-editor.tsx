@@ -125,6 +125,17 @@ export function CadEditor({
   const [selected, setSelected] = useState<Selected | null>(null);
   const [hoverId, setHoverId] = useState<string | null>(null);
   const [dirty, setDirty] = useState(false);
+  const [coarse, setCoarse] = useState(false);
+
+  useEffect(() => {
+    const mq = window.matchMedia("(pointer: coarse)");
+    const update = () => setCoarse(mq.matches);
+    update();
+    mq.addEventListener("change", update);
+    return () => mq.removeEventListener("change", update);
+  }, []);
+
+  const touchScale = coarse ? 1.7 : 1;
 
   const draftRef = useRef<{
     kind: "draw-wall" | "draw-door" | "draw-window" | "move" | "resize";
@@ -173,7 +184,7 @@ export function CadEditor({
 
   const hitTest = useCallback(
     (x: number, y: number): Selected | null => {
-      const radius = Math.max(8, strokeW * 2.5);
+      const radius = Math.max(8, strokeW * 2.5) * touchScale;
       for (const w of windows) {
         const { gx, gy, px, py } = windowAxis(w);
         const dx = x - w.x;
@@ -204,7 +215,7 @@ export function CadEditor({
       }
       return null;
     },
-    [walls, doors, windows, strokeW],
+    [walls, doors, windows, strokeW, touchScale],
   );
 
   const handlePointerDown = useCallback(
@@ -541,6 +552,9 @@ export function CadEditor({
           <button
             key={t.id}
             type="button"
+            aria-pressed={tool === t.id}
+            aria-label={t.label}
+            title={t.label}
             onClick={() => {
               setTool(t.id);
               setSelected(null);
@@ -570,6 +584,8 @@ export function CadEditor({
           ref={svgRef}
           viewBox={`0 0 ${width || 1} ${height || 1}`}
           preserveAspectRatio="xMidYMid meet"
+          role="img"
+          aria-label="Editor de plano: arrastrá para dibujar muros, puertas y ventanas. Usá la herramienta seleccionar para mover o redimensionar elementos."
           className="block w-full touch-none select-none"
           style={{ maxHeight: "75vh", cursor: tool === "select" ? "default" : "crosshair" }}
           onPointerDown={handlePointerDown}
@@ -741,7 +757,7 @@ export function CadEditor({
                   key={h.mode}
                   cx={h.hx}
                   cy={h.hy}
-                  r={Math.max(5, strokeW * 1.4)}
+                  r={Math.max(5, strokeW * 1.4) * touchScale}
                   fill="#fff"
                   stroke={SELECT_COLOR}
                   strokeWidth={2}
@@ -760,7 +776,7 @@ export function CadEditor({
                   <circle
                     cx={geo.gx2}
                     cy={geo.gy2}
-                    r={Math.max(5, strokeW * 1.4)}
+                    r={Math.max(5, strokeW * 1.4) * touchScale}
                     fill="#fff"
                     stroke={SELECT_COLOR}
                     strokeWidth={2}
@@ -781,7 +797,7 @@ export function CadEditor({
                     <circle
                       cx={selectedWindow.x + (selectedWindow.width / 2) * gx}
                       cy={selectedWindow.y + (selectedWindow.width / 2) * gy}
-                      r={Math.max(5, strokeW * 1.4)}
+                      r={Math.max(5, strokeW * 1.4) * touchScale}
                       fill="#fff"
                       stroke={SELECT_COLOR}
                       strokeWidth={2}
@@ -791,7 +807,7 @@ export function CadEditor({
                     <circle
                       cx={selectedWindow.x + (selectedWindow.height / 2) * px}
                       cy={selectedWindow.y + (selectedWindow.height / 2) * py}
-                      r={Math.max(5, strokeW * 1.4)}
+                      r={Math.max(5, strokeW * 1.4) * touchScale}
                       fill="#fff"
                       stroke={SELECT_COLOR}
                       strokeWidth={2}

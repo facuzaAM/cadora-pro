@@ -4,7 +4,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useEffect, useState } from "react";
 import * as Sentry from "@sentry/nextjs";
-import { LayoutDashboard, FolderKanban, CreditCard, User, Settings, Plus, History } from "lucide-react";
+import { LayoutDashboard, FolderKanban, CreditCard, User, Settings, Plus, History, ShieldCheck } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
@@ -24,6 +24,8 @@ const navItems = [
   { label: "Perfil", href: "/profile", icon: User },
   { label: "Configuración", href: "/settings", icon: Settings },
 ];
+
+const adminNavItem = { label: "Admin", href: "/admin", icon: ShieldCheck };
 
 export function Sidebar() {
   const pathname = usePathname();
@@ -64,7 +66,7 @@ export function Sidebar() {
         <Separator />
 
         <nav className="flex flex-1 flex-col gap-1">
-          {navItems.map((item) => {
+          {[...navItems, ...(user?.is_admin ? [adminNavItem] : [])].map((item) => {
             const Icon = item.icon;
             const isActive = pathname.startsWith(item.href);
             return (

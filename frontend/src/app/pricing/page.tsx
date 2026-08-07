@@ -8,9 +8,18 @@ import { useSearchParams } from "next/navigation";
 import { PricingCard } from "@/components/features/pricing/pricing-card";
 import { LandingNav } from "@/components/features/landing/landing-nav";
 import { SiteFooter } from "@/components/layout/site-footer";
+import { PageHero } from "@/components/shared/page-hero";
 import { PLANS as DISPLAY_PLANS } from "@/lib/constants";
 import { billingService, type Plan } from "@/services/billing.service";
 import { api } from "@/services/api";
+import { decodeJwtPayload } from "@/lib/jwt";
+
+function getUserIdFromToken(): string | undefined {
+  const token = api.getAccessToken();
+  if (!token) return undefined;
+  const payload = decodeJwtPayload(token);
+  return typeof payload?.sub === "string" ? payload.sub : undefined;
+}
 
 export default function PricingPage() {
   return (
@@ -69,14 +78,7 @@ function PricingContent() {
     if (!plan?.paddle_price_id) return;
 
     autoOpenedRef.current = true;
-    const token = api.getAccessToken();
-    let userId: string | undefined;
-    if (token) {
-      try {
-        const payload = JSON.parse(atob(token.split(".")[1]));
-        userId = payload.sub;
-      } catch {}
-    }
+    const userId = getUserIdFromToken();
     window.Paddle.Checkout.open({
       items: [{ priceId: plan.paddle_price_id, quantity: 1 }],
       customData: { plan: plan.id, user_id: userId },
@@ -92,14 +94,7 @@ function PricingContent() {
     const plan = plans.find((p) => p.id === planId);
     if (!plan?.paddle_price_id) return;
 
-    const token = api.getAccessToken();
-    let userId: string | undefined;
-    if (token) {
-      try {
-        const payload = JSON.parse(atob(token.split(".")[1]));
-        userId = payload.sub;
-      } catch {}
-    }
+    const userId = getUserIdFromToken();
     window.Paddle.Checkout.open({
       items: [{ priceId: plan.paddle_price_id, quantity: 1 }],
       customData: { plan: planId, user_id: userId },
@@ -120,16 +115,14 @@ function PricingContent() {
 
       <LandingNav />
 
+      <PageHero
+        title="Planes y Precios"
+        subtitle="Elegí el plan que mejor se adapte a tus necesidades"
+      />
+
       <main className="flex-1 py-16 lg:py-24">
         <div className="mx-auto max-w-6xl px-4">
-          <div className="text-center">
-            <h1 className="text-4xl font-bold tracking-tight">Planes y Precios</h1>
-            <p className="mt-2 text-muted-foreground">
-              Elige el plan que mejor se adapte a tus necesidades
-            </p>
-          </div>
-
-          <div className="mt-12 grid gap-8 lg:grid-cols-4">
+          <div className="grid gap-8 lg:grid-cols-4">
             {DISPLAY_PLANS.map((display) => (
               <PricingCard
                 key={display.id}

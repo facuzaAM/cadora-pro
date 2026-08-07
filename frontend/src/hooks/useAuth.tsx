@@ -18,6 +18,7 @@ interface AuthUser {
   storage_used: number;
   storage_limit: number;
   priority_processing: boolean;
+  is_admin?: boolean;
   created_at: string;
 }
 

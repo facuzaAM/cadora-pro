@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { LandingNav } from "@/components/features/landing/landing-nav";
 import { SiteFooter } from "@/components/layout/site-footer";
+import { PageHero } from "@/components/shared/page-hero";
 import { Upload, Cog, Download, DoorOpen, BrickWall, ScanLine, TextSearch, Hash, Ruler } from "lucide-react";
 
 export const metadata: Metadata = {
@@ -61,14 +62,10 @@ export default function ComoFuncionaPage() {
       <LandingNav />
       <main className="flex-1">
         {/* Hero */}
-        <section className="py-16 text-center lg:py-24">
-          <div className="mx-auto max-w-3xl px-4">
-            <h1 className="text-4xl font-bold tracking-tight sm:text-5xl">Cómo funciona Cadora</h1>
-            <p className="mt-4 text-lg text-muted-foreground">
-              Convertí tus planos arquitectónicos en archivos CAD editables en tres simples pasos.
-            </p>
-          </div>
-        </section>
+        <PageHero
+          title="Cómo funciona Cadora"
+          subtitle="Convertí tus planos arquitectónicos en archivos CAD editables en tres simples pasos."
+        />
 
         {/* Steps */}
         <section className="bg-muted/50 py-16 lg:py-24">

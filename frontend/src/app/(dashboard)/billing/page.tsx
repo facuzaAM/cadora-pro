@@ -1,7 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState } from "react";
-import Script from "next/script";
+import { useCallback, useEffect, useState } from "react";
 import { toast } from "sonner";
 import {
   CreditCard,
@@ -32,8 +31,6 @@ function formatBytes(bytes: number): string {
 export default function BillingPage() {
   const [sub, setSub] = useState<Subscription | null>(null);
   const [loading, setLoading] = useState(true);
-  const [paddleLoaded, setPaddleLoaded] = useState(false);
-  const paddleReady = useRef(false);
 
   useEffect(() => {
     const token = api.getAccessToken();
@@ -41,30 +38,19 @@ export default function BillingPage() {
     billingService.getSubscription(token).then(setSub).finally(() => setLoading(false));
   }, []);
 
-  const initPaddle = useCallback(async () => {
-    if (paddleReady.current || typeof window === "undefined" || !window.Paddle) return;
+  const handleManage = useCallback(async () => {
     try {
-      const config = await billingService.getConfig();
-      window.Paddle.Initialize({
-        token: config.client_token,
-        environment: config.environment === "sandbox" ? "sandbox" : "production",
-      });
-      paddleReady.current = true;
+      const token = api.getAccessToken();
+      const portal = await billingService.getPortalUrl(token);
+      if (portal?.url) {
+        window.open(portal.url, "_blank", "noopener,noreferrer");
+      } else {
+        toast.error("No se pudo abrir el portal de Paddle. Probá de nuevo más tarde.");
+      }
     } catch {
-      toast.error("Error al inicializar Paddle. Recargá la página o contactanos.");
+      toast.error("No se pudo abrir el portal de Paddle. Probá de nuevo más tarde.");
     }
   }, []);
-
-  useEffect(() => {
-    if (paddleLoaded) initPaddle();
-  }, [paddleLoaded, initPaddle]);
-
-  const handleManage = useCallback(async () => {
-    if (!paddleReady.current) await initPaddle();
-    if (paddleReady.current && typeof window !== "undefined" && window.Paddle) {
-      window.Paddle.CustomerPortal.open();
-    }
-  }, [initPaddle]);
 
   const planInfo = PLANS.find((p) => p.id === sub?.plan);
 
@@ -77,13 +63,7 @@ export default function BillingPage() {
     : 0;
 
   return (
-    <>
-      <Script
-        src="https://cdn.paddle.com/paddle/v2/paddle.js"
-        strategy="afterInteractive"
-        onLoad={() => setPaddleLoaded(true)}
-      />
-      <div className="space-y-6">
+    <div className="space-y-6">
       <PageHeader
         title="Facturación"
         description="Administra tu suscripción y límites de uso"
@@ -238,6 +218,5 @@ export default function BillingPage() {
         </Card>
       )}
     </div>
-    </>
   );
 }

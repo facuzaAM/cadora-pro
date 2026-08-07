@@ -2,7 +2,7 @@
 
 import { Suspense, useCallback, useEffect, useRef, useState } from "react";
 import { useRouter, useParams, useSearchParams } from "next/navigation";
-import { ArrowLeft, Download, Share2, Loader2, ChevronDown, Pencil } from "lucide-react";
+import { ArrowLeft, Download, Share2, Loader2, ChevronDown, Pencil, AlertCircle, RefreshCw } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
   DropdownMenu,
@@ -36,6 +36,8 @@ function ResultContent() {
   const [projectName, setProjectName] = useState("Proyecto");
   const [downloading, setDownloading] = useState(false);
   const [cadReady, setCadReady] = useState(searchParams.has("ready"));
+  const [error, setError] = useState(false);
+  const [retryCount, setRetryCount] = useState(0);
   const generatedRef = useRef(false);
   const readyRef = useRef(false);
 
@@ -85,6 +87,7 @@ function ResultContent() {
     const checkStatus = async (): Promise<boolean> => {
       try {
         const p = await projectsService.getById(projectId, token);
+        setError(false);
         setProjectName(p.name);
         if (p.status === "cad_generated") {
           markReady();
@@ -104,8 +107,8 @@ function ResultContent() {
         }
         return false;
       } catch {
-        toast.error("Error cargando proyecto");
-        return true;
+        setError(true);
+        return false;
       }
     };
 
@@ -120,7 +123,7 @@ function ResultContent() {
     });
 
     return stop;
-  }, [projectId, generateCad, markReady]);
+  }, [projectId, generateCad, markReady, retryCount]);
 
   const handleDownload = async (format: CadFormat = "dxf") => {
     setDownloading(true);
@@ -211,13 +214,33 @@ function ResultContent() {
         }
       />
 
-      {!cadReady && (
+      {!cadReady && !error && (
         <div className="flex flex-col items-center justify-center rounded-xl border border-dashed bg-muted/30 px-6 py-16 text-center">
           <Loader2 className="mb-4 h-8 w-8 animate-spin text-primary" />
           <h2 className="text-xl font-bold">Procesando plano</h2>
           <p className="mt-2 max-w-md text-sm text-muted-foreground">
             Estamos generando el archivo CAD a partir de tu plano. Esto puede tomar unos segundos.
           </p>
+        </div>
+      )}
+
+      {error && (
+        <div className="flex flex-col items-center justify-center rounded-xl border border-dashed bg-muted/30 px-6 py-16 text-center">
+          <AlertCircle className="mb-4 h-8 w-8 text-destructive" />
+          <h2 className="text-xl font-bold">No pudimos conectar</h2>
+          <p className="mt-2 max-w-md text-sm text-muted-foreground">
+            Hubo un problema al consultar el estado del proyecto. Revisá tu conexión e intentá de nuevo.
+          </p>
+          <Button
+            className="mt-6"
+            onClick={() => {
+              setError(false);
+              setRetryCount((c) => c + 1);
+            }}
+          >
+            <RefreshCw className="mr-2 h-4 w-4" />
+            Reintentar
+          </Button>
         </div>
       )}
 

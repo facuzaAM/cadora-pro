@@ -56,6 +56,7 @@ class User(Base):
     email_verification_expires_at: Mapped[datetime | None] = mapped_column(
         DateTime(timezone=True), nullable=True
     )
+    is_admin: Mapped[bool] = mapped_column(nullable=False, default=False)
     token_version: Mapped[int] = mapped_column(nullable=False, default=0)
 
     created_at: Mapped[datetime] = mapped_column(

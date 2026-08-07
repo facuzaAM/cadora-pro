@@ -67,7 +67,7 @@ export function ProjectCard({
       <Card className="transition-colors hover:border-primary/50">
         <CardContent className="p-5">
           <div className="flex items-start justify-between">
-            <Link href={`/projects/${id}/result`} className="flex items-start gap-3 flex-1">
+            <Link href={`/projects/${id}`} className="flex items-start gap-3 flex-1">
               <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-primary/10">
                 <FileText className="h-5 w-5 text-primary" />
               </div>
@@ -85,7 +85,7 @@ export function ProjectCard({
                 </Button>
               </DropdownMenuTrigger>
               <DropdownMenuContent align="end">
-                <DropdownMenuItem onClick={() => router.push(`/projects/${id}/result`)}>
+                <DropdownMenuItem onClick={() => router.push(`/projects/${id}`)}>
                   Ver proyecto
                 </DropdownMenuItem>
                 <DropdownMenuItem onClick={() => router.push(`/projects/${id}/upload`)}>

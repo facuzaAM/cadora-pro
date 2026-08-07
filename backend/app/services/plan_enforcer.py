@@ -9,7 +9,29 @@ from app.config import settings
 from app.database import get_db
 from app.models.user import User
 from app.repositories.user_repository import UserRepository
+from app.services.plan_config import get_plan
 from app.utils.dependencies import get_current_user
+
+
+async def _degrade_if_past_due(user: User, db: AsyncSession) -> None:
+    """When a Paddle subscription is past_due, drop the user back to the free
+    plan so they can't keep consuming paid-tier resources without paying.
+    """
+    if user.subscription_plan == "free" or user.subscription_status != "past_due":
+        return
+
+    free_plan = get_plan("free")
+    now = datetime.now(UTC)
+    user.subscription_plan = "free"
+    user.conversions_limit = free_plan.conversions_limit
+    user.storage_limit = free_plan.storage_limit
+    user.priority_processing = free_plan.priority_processing
+    user.conversions_used = 0
+    user.conversions_reset_at = now
+    user.subscription_end = None
+
+    repo = UserRepository(db)
+    await repo._save(user)
 
 
 async def enforce_conversion_limit(
@@ -22,6 +44,7 @@ async def enforce_conversion_limit(
             detail="Verificá tu email antes de usar el servicio. "
                    "Revisá tu bandeja de entrada o solicitá un nuevo código.",
         )
+    await _degrade_if_past_due(user, db)
     if _maybe_reset_monthly(user):
         repo = UserRepository(db)
         await repo._save(user)

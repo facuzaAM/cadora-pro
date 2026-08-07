@@ -1,6 +1,8 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import { Logo } from "@/components/shared/logo";
+import { LandingNav } from "@/components/features/landing/landing-nav";
+import { SiteFooter } from "@/components/layout/site-footer";
+import { PageHero } from "@/components/shared/page-hero";
 
 export const metadata: Metadata = {
   title: "Política de Privacidad - Cadora",
@@ -10,14 +12,12 @@ export const metadata: Metadata = {
 export default function PrivacidadPage() {
   return (
     <div className="flex min-h-screen flex-col">
-      <header className="border-b">
-        <div className="mx-auto flex h-14 max-w-3xl items-center px-4">
-          <Link href="/"><Logo /></Link>
-        </div>
-      </header>
+      <LandingNav />
+      <PageHero
+        title="Política de Privacidad"
+        subtitle="Última actualización: Julio 2026"
+      />
       <main className="mx-auto max-w-3xl px-4 py-12">
-        <h1 className="text-3xl font-bold">Política de Privacidad</h1>
-        <p className="mt-2 text-sm text-muted-foreground">Última actualización: Julio 2026</p>
 
         <div className="mt-8 space-y-8 text-sm leading-relaxed text-muted-foreground">
           <section>
@@ -119,6 +119,7 @@ export default function PrivacidadPage() {
           </section>
         </div>
       </main>
+      <SiteFooter />
     </div>
   );
 }

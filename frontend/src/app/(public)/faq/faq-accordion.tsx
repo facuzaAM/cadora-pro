@@ -19,7 +19,7 @@ const faqs = [
   },
   {
     q: "¿Qué pasa si la detección no es precisa?",
-    a: "La detección automática tiene alta precisión pero no es perfecta. Si algún elemento no se detectó correctamente, podés volver a procesar el plano desde tu dashboard. En una futura versión podrás editar los elementos detectados manualmente antes de exportar.",
+    a: "La detección automática tiene alta precisión pero no es perfecta. Si algún elemento no se detectó correctamente, podés abrir el plano en el editor en línea y agregar, mover, rotar o eliminar muros, puertas y ventanas antes de exportar. Después podés volver a generar el archivo CAD con tus correcciones.",
   },
   {
     q: "¿Funciona con planos generados por inteligencia artificial?",
@@ -56,6 +56,7 @@ export function FaqAccordion() {
         <div key={i} className="rounded-lg border">
           <button
             onClick={() => setOpen(open === i ? null : i)}
+            aria-expanded={open === i}
             className="flex w-full items-center justify-between px-4 py-3 text-left font-medium"
           >
             {faq.q}

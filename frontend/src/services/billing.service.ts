@@ -19,6 +19,12 @@ export interface Subscription {
   storage_used: number;
   storage_limit: number;
   priority_processing: boolean;
+  paddle_customer_id?: string | null;
+}
+
+export interface PortalSession {
+  url: string | null;
+  available: boolean;
 }
 
 export interface PaddleConfig {
@@ -37,6 +43,8 @@ export const billingService = {
     setCache(key, result, 30000);
     return result;
   },
+
+  getPortalUrl: (token?: string) => api.get<PortalSession>("/billing/portal", token),
 
   getConfig: () => api.get<PaddleConfig>("/billing/config"),
 };

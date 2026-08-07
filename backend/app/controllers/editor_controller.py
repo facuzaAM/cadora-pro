@@ -23,9 +23,11 @@ from app.detection.schemas import (
 )
 from app.detection.service import DetectionService
 from app.editor.schemas import ElementsPayload
+from app.models.user import User
 from app.ocr.service import OcrService
 from app.repositories.document_repository import DocumentRepository
 from app.repositories.project_repository import ProjectRepository
+from app.services.plan_enforcer import consume_conversion, enforce_conversion_limit
 from app.services.storage_service import StorageService
 from app.utils.dependencies import get_current_user
 from app.utils.rate_limit import rate_limit
@@ -112,6 +114,16 @@ async def _detect_project_background(user_id: UUID, project_id: UUID) -> None:
                 lines_result, doors_result, windows_result, ocr_result,
             )
 
+            if not await consume_conversion(session, user_id):
+                await repo.update_status(project_id, "document_uploaded")
+                await session.commit()
+                logger.warning(
+                    "Detección completada pero el usuario %s no tenía conversiones "
+                    "disponibles (race); proyecto %s vuelto a document_uploaded",
+                    user_id, project_id,
+                )
+                return
+
             repo = ProjectRepository(session)
             await repo.set_detection_result(project_id, payload)
             await repo.update_status(project_id, "detection_completed")
@@ -137,7 +149,7 @@ async def run_detection(
     request: Request,
     background_tasks: BackgroundTasks,
     project_id: UUID,
-    user=Depends(get_current_user),
+    user: User = Depends(enforce_conversion_limit),
     db: AsyncSession = Depends(get_db),
 ):
     """Start detection in the background (idempotent). Returns status immediately."""
