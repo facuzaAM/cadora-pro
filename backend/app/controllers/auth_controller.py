@@ -129,7 +129,6 @@ async def google_login(request: Request):
         "response_type": "code",
         "scope": "openid email profile",
         "access_type": "offline",
-        "prompt": "consent",
         "state": state,
     }
     resp = RedirectResponse(f"{GOOGLE_AUTH_URL}?{urlencode(params)}")
