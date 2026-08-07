@@ -73,7 +73,10 @@ async def _ensure_preview(docs, project_id: UUID) -> bytes:
         image = await asyncio.to_thread(DetectionService._load_image_from_file, path)
         ok, buf = cv2.imencode(".png", cv2.cvtColor(image, cv2.COLOR_RGB2BGR))
         if not ok:
-            raise HTTPException(status_code=HTTP_400_BAD_REQUEST, detail="No se pudo generar la vista previa")
+            raise HTTPException(
+                status_code=HTTP_400_BAD_REQUEST,
+                detail="No se pudo generar la vista previa",
+            )
         data = buf.tobytes()
         await storage.upload(settings.STORAGE_BUCKET, key, data, content_type="image/png")
         return data
@@ -81,7 +84,10 @@ async def _ensure_preview(docs, project_id: UUID) -> bytes:
         raise
     except Exception:
         logger.exception("Error generando preview para proyecto %s", project_id)
-        raise HTTPException(status_code=HTTP_400_BAD_REQUEST, detail="No se pudo generar la vista previa")
+        raise HTTPException(
+            status_code=HTTP_400_BAD_REQUEST,
+            detail="No se pudo generar la vista previa",
+        )
     finally:
         if os.path.exists(path):
             os.remove(path)
@@ -114,6 +120,7 @@ async def _detect_project_background(user_id: UUID, project_id: UUID) -> None:
                 lines_result, doors_result, windows_result, ocr_result,
             )
 
+            repo = ProjectRepository(session)
             if not await consume_conversion(session, user_id):
                 await repo.update_status(project_id, "document_uploaded")
                 await session.commit()
@@ -124,7 +131,6 @@ async def _detect_project_background(user_id: UUID, project_id: UUID) -> None:
                 )
                 return
 
-            repo = ProjectRepository(session)
             await repo.set_detection_result(project_id, payload)
             await repo.update_status(project_id, "detection_completed")
             await session.commit()

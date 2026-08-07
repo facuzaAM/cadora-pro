@@ -2,11 +2,11 @@ from uuid import uuid4
 
 from app.detection.schemas import LineCategory, Orientation
 from app.editor.builder import (
+    _snap_axis,
     build_detection_results,
     build_doors,
     build_walls,
     build_windows,
-    _snap_axis,
 )
 from app.editor.schemas import (
     DoorElement,

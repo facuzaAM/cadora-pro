@@ -58,7 +58,9 @@ class PaddleService:
             logger.warning("PADDLE_API_KEY no configurado; operaciones de billing deshabilitadas")
             return None
         environment = (
-            Environment.SANDBOX if settings.PADDLE_ENVIRONMENT == "sandbox" else Environment.PRODUCTION
+            Environment.SANDBOX
+            if settings.PADDLE_ENVIRONMENT == "sandbox"
+            else Environment.PRODUCTION
         )
         return Client(api_key=settings.PADDLE_API_KEY, options=Options(environment=environment))
 

@@ -25,7 +25,6 @@ from app.detection.pipeline import (
     load_detection,
     run_full_pipeline,
     run_ocr_only,
-    serialize_detection,
 )
 from app.detection.schemas import (
     DoorDetectionResult,
