@@ -120,6 +120,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     invalidateCache("billing");
     scheduleRefresh();
     localStorage.setItem("cadora_onboarding", "pending");
+    if (data.user.email_verified === false) {
+      router.push("/verify-email");
+      return;
+    }
     router.push(redirectTo || "/dashboard");
   };
 

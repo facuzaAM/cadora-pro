@@ -1,7 +1,8 @@
 "use client";
 
 import { useState } from "react";
-import { Mail, RefreshCw, CheckCircle, X } from "lucide-react";
+import Link from "next/link";
+import { Mail, RefreshCw, CheckCircle, ArrowRight } from "lucide-react";
 import { useAuth } from "@/hooks/useAuth";
 import { api } from "@/services/api";
 
@@ -11,9 +12,8 @@ export function EmailVerificationBanner() {
   const [code, setCode] = useState("");
   const [step, setStep] = useState<"idle" | "sent" | "verifying" | "done" | "error">("idle");
   const [message, setMessage] = useState("");
-  const [dismissed, setDismissed] = useState(false);
 
-  if (!user || user.email_verified || dismissed) return null;
+  if (!user || user.email_verified) return null;
 
   const handleSend = async () => {
     setSending(true);
@@ -73,12 +73,13 @@ export function EmailVerificationBanner() {
             </p>
           </div>
         </div>
-        <button
-          onClick={() => setDismissed(true)}
-          className="shrink-0 rounded p-1 text-amber-400 hover:text-amber-600"
+        <Link
+          href="/verify-email"
+          className="inline-flex shrink-0 items-center gap-1 rounded-md px-2 py-1 text-sm font-medium text-amber-700 underline-offset-4 hover:bg-amber-100 hover:underline"
         >
-          <X className="h-4 w-4" />
-        </button>
+          Verificar
+          <ArrowRight className="h-4 w-4" />
+        </Link>
       </div>
 
       {step === "idle" && (

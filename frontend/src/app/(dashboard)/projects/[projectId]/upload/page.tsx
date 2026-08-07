@@ -24,8 +24,10 @@ export default function UploadToProjectPage() {
       const token = api.getAccessToken();
       await documentsService.upload(projectId, file, token);
       router.push(`/projects/${projectId}/processing`);
-    } catch {
-      toast.error("Error al subir el archivo. Intenta de nuevo.");
+    } catch (err) {
+      toast.error(
+        err instanceof Error ? err.message : "Error al subir el archivo. Intenta de nuevo.",
+      );
       setLoading(false);
     }
   };

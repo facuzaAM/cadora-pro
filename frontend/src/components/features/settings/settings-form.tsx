@@ -76,6 +76,19 @@ export function SettingsForm() {
                 <Label htmlFor="email">Email</Label>
                 <Input id="email" value={user?.email || ""} disabled />
               </div>
+              {user && !user.email_verified && (
+                <div className="flex items-center justify-between gap-3 rounded-lg border border-amber-200 bg-amber-50 px-4 py-3">
+                  <div>
+                    <p className="text-sm font-medium text-amber-800">Email sin verificar</p>
+                    <p className="text-xs text-amber-700">
+                      Verificá tu email para usar el servicio.
+                    </p>
+                  </div>
+                  <Button variant="outline" size="sm" asChild>
+                    <Link href="/verify-email">Verificar</Link>
+                  </Button>
+                </div>
+              )}
               <div className="space-y-2">
                 <Label htmlFor="full_name">Nombre</Label>
                 <Input id="full_name" {...form.register("full_name")} />

@@ -34,8 +34,10 @@ export default function UploadPage() {
       );
       await documentsService.upload(project.id, file, token);
       router.push(`/projects/${project.id}/processing`);
-    } catch {
-      toast.error("Error al crear el proyecto. Intenta de nuevo.");
+    } catch (err) {
+      toast.error(
+        err instanceof Error ? err.message : "Error al crear el proyecto. Intenta de nuevo.",
+      );
       setLoading(false);
     }
   };

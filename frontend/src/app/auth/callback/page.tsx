@@ -1,35 +1,51 @@
 "use client";
 
-import { Suspense, useEffect } from "react";
+import { Suspense, useEffect, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
+import { Loader2 } from "lucide-react";
+import { useAuth } from "@/hooks/useAuth";
 
 function CallbackContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
+  const { user, loading } = useAuth();
+  const [handled, setHandled] = useState(false);
 
   useEffect(() => {
+    if (handled) return;
     const error = searchParams.get("error");
     if (error) {
+      setHandled(true);
       router.replace(`/login?error=${encodeURIComponent(error)}`);
-    } else {
-      router.replace("/dashboard");
+      return;
     }
-  }, [router, searchParams]);
+    if (loading) return;
+    setHandled(true);
+    if (user) {
+      router.replace(user.email_verified ? "/dashboard" : "/verify-email");
+    } else {
+      router.replace("/login?error=oauth_failed");
+    }
+  }, [router, searchParams, user, loading, handled]);
 
   return (
-    <div className="flex min-h-screen items-center justify-center">
-      <p className="text-muted-foreground">Redirigiendo...</p>
+    <div className="flex min-h-screen flex-col items-center justify-center gap-3">
+      <Loader2 className="h-8 w-8 animate-spin text-primary" />
+      <p className="text-sm text-muted-foreground">Iniciando sesión con Google...</p>
     </div>
   );
 }
 
 export default function AuthCallbackPage() {
   return (
-    <Suspense fallback={
-      <div className="flex min-h-screen items-center justify-center">
-        <p className="text-muted-foreground">Redirigiendo...</p>
-      </div>
-    }>
+    <Suspense
+      fallback={
+        <div className="flex min-h-screen flex-col items-center justify-center gap-3">
+          <Loader2 className="h-8 w-8 animate-spin text-primary" />
+          <p className="text-sm text-muted-foreground">Iniciando sesión con Google...</p>
+        </div>
+      }
+    >
       <CallbackContent />
     </Suspense>
   );

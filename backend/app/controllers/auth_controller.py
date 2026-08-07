@@ -71,6 +71,7 @@ def _auth_response(tokens: TokenResponse, user: User) -> JSONResponse:
             "storage_limit": user.storage_limit,
             "priority_processing": user.priority_processing,
             "is_admin": user.is_admin,
+            "email_verified": user.email_verified,
             "created_at": user.created_at.isoformat() if user.created_at else "",
         },
     })
@@ -205,9 +206,10 @@ async def google_callback(request: Request, db: AsyncSession = Depends(get_db)):
         user = await repo.create(
             email=email, name=name, hashed_password=hashed,
         )
-        user.avatar_url = avatar_url
-        user.email_verified = True
-        await repo._save(user)
+
+    user.avatar_url = avatar_url or user.avatar_url
+    user.email_verified = True
+    await repo._save(user)
 
     service = AuthService(db)
     tokens = await service._build_token(user)
