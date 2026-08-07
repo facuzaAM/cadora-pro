@@ -1,9 +1,10 @@
 from __future__ import annotations
 
-from enum import StrEnum
 from uuid import UUID, uuid4
 
 from pydantic import BaseModel, Field
+
+from app.detection.schemas import DoorType, WindowType
 
 
 class WallElement(BaseModel):
@@ -14,15 +15,9 @@ class WallElement(BaseModel):
     y2: float
 
 
-class DoorElementType(StrEnum):
-    SINGLE = "single"
-    DOUBLE = "double"
-    SLIDING = "sliding"
-
-
 class DoorElement(BaseModel):
     id: UUID = Field(default_factory=uuid4)
-    type: DoorElementType = DoorElementType.SINGLE
+    type: DoorType = DoorType.SINGLE
     x: float
     y: float
     width: float = Field(gt=0)
@@ -30,15 +25,9 @@ class DoorElement(BaseModel):
     swing: str = "right"
 
 
-class WindowElementType(StrEnum):
-    SLIDING = "sliding"
-    FIXED = "fixed"
-    CASEMENT = "casement"
-
-
 class WindowElement(BaseModel):
     id: UUID = Field(default_factory=uuid4)
-    type: WindowElementType = WindowElementType.SLIDING
+    type: WindowType = WindowType.SLIDING
     x: float
     y: float
     width: float = Field(gt=0)
