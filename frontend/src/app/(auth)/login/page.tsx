@@ -3,6 +3,7 @@
 import { useState, use, useEffect } from "react";
 import Link from "next/link";
 import { Logo } from "@/components/shared/logo";
+import { CadCrosshair } from "@/components/features/landing/cad-crosshair";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -53,15 +54,17 @@ export default function LoginPage({
   };
 
   return (
-    <div className="relative flex min-h-screen flex-col items-center justify-center overflow-hidden bg-gradient-to-b from-primary/[0.03] via-background to-background p-4">
-      <div className="absolute inset-0 bg-dot-pattern-sm opacity-50 pointer-events-none" />
-      <div className="absolute -left-32 -top-32 h-64 w-64 animate-blob rounded-full bg-primary/10 blur-3xl pointer-events-none" />
-      <div className="absolute -bottom-32 -right-32 h-64 w-64 animate-blob-delayed rounded-full bg-blue-500/10 blur-3xl pointer-events-none" />
+    <div className="relative flex min-h-screen flex-col items-center justify-center overflow-hidden bg-gradient-to-b from-primary/[0.05] via-background to-background p-4">
+      <div className="absolute inset-0 bg-grid-cad bg-grid-cad-fade pointer-events-none" />
+      <CadCrosshair className="absolute right-[6%] top-1/2 hidden h-32 w-32 -translate-y-1/2 text-primary/25 lg:block pointer-events-none" />
+      <CadCrosshair className="absolute left-[4%] top-[20%] hidden h-20 w-20 text-primary/15 lg:block pointer-events-none" />
+      <div className="absolute -left-24 top-1/4 h-56 w-56 animate-blob rounded-full bg-primary/10 blur-3xl pointer-events-none" />
+      <div className="absolute -right-24 bottom-0 h-56 w-56 animate-blob-delayed rounded-full bg-emerald-500/10 blur-3xl pointer-events-none" />
       <div className="relative">
         <Link href="/" className="mb-8 flex justify-center">
           <Logo />
         </Link>
-      <Card className="w-full max-w-sm">
+      <Card className="w-full max-w-md">
         <CardHeader className="text-center">
           <CardTitle>Iniciar Sesión</CardTitle>
           <CardDescription>Ingresa a tu cuenta de Cadora</CardDescription>
