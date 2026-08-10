@@ -62,7 +62,7 @@ function RegisterContent() {
   const handleGoogle = async () => {
     setGoogleLoading(true);
     try {
-      await signInWithGoogle();
+      await signInWithGoogle(plan && plan !== "free" ? plan : undefined);
     } catch {
       setGoogleLoading(false);
     }

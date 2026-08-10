@@ -10,6 +10,7 @@ from app.models.project import Project
 from app.models.user import User
 from app.repositories.user_repository import UserRepository
 from app.services.account_service import AccountService
+from app.services.plan_config import get_plan
 from app.utils.dependencies import get_current_user
 
 router = APIRouter()
@@ -69,9 +70,28 @@ async def admin_stats(
 ):
     total_users = (await db.execute(select(func.count(User.id)))).scalar_one()
     total_projects = (await db.execute(select(func.count(Project.id)))).scalar_one()
+
+    paid_plan_rows = (
+        await db.execute(
+            select(User.subscription_plan).where(
+                User.subscription_plan != "free",
+                User.subscription_status == "active",
+            )
+        )
+    ).scalars().all()
+    paying_users = len(paid_plan_rows)
+    mrr = sum(get_plan(plan_name).price for plan_name in paid_plan_rows)
+
+    total_conversions = (
+        await db.execute(select(func.coalesce(func.sum(User.conversions_used), 0)))
+    ).scalar_one()
+
     return {
         "total_users": total_users,
         "total_projects": total_projects,
+        "paying_users": paying_users,
+        "mrr": mrr,
+        "total_conversions_used": total_conversions,
     }
 
 

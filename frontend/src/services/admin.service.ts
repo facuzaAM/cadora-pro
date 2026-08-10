@@ -19,6 +19,9 @@ export interface AdminUser {
 export interface AdminStats {
   total_users: number;
   total_projects: number;
+  paying_users: number;
+  mrr: number;
+  total_conversions_used: number;
 }
 
 export const adminService = {

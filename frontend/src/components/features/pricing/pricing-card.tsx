@@ -46,7 +46,7 @@ export function PricingCard({
       return;
     }
     if (!isAuthenticated) {
-      window.location.href = "/login";
+      window.location.href = `/register?plan=${encodeURIComponent(id)}`;
       return;
     }
     if (onSubscribe) {
@@ -86,7 +86,7 @@ export function PricingCard({
             {price === 0 ? "Gratis" : `$${price}`}
           </span>
           {price > 0 && (
-            <span className="text-sm text-muted-foreground">/mes</span>
+            <span className="text-sm text-muted-foreground">USD /mes</span>
           )}
         </div>
       </div>

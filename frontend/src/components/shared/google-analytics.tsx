@@ -33,12 +33,19 @@ export function GoogleAnalytics() {
       />
       <Script id="google-analytics" strategy="afterInteractive">
         {`
-          window.dataLayer = window.dataLayer || [];
-          function gtag(){dataLayer.push(arguments);}
-          gtag('js', new Date());
-          gtag('config', '${gaId}', {
-            page_path: window.location.pathname,
-          });
+          (function () {
+            var disabled = true;
+            try {
+              disabled = localStorage.getItem('cadora_cookie_consent') !== 'accepted';
+            } catch (e) {}
+            if (disabled) window['ga-disable-${gaId}'] = true;
+            window.dataLayer = window.dataLayer || [];
+            function gtag(){dataLayer.push(arguments);}
+            gtag('js', new Date());
+            gtag('config', '${gaId}', {
+              page_path: window.location.pathname,
+            });
+          })();
         `}
       </Script>
     </>

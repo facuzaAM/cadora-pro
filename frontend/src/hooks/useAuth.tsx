@@ -27,7 +27,7 @@ interface AuthState {
   loading: boolean;
   signIn: (email: string, password: string, redirectTo?: string) => Promise<void>;
   signUp: (email: string, password: string, name: string, redirectTo?: string) => Promise<void>;
-  signInWithGoogle: () => Promise<void>;
+  signInWithGoogle: (plan?: string) => Promise<void>;
   signOut: () => Promise<void>;
   refreshUser: () => Promise<void>;
 }
@@ -120,15 +120,19 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     invalidateCache("billing");
     scheduleRefresh();
     localStorage.setItem("cadora_onboarding", "pending");
+    const destination = redirectTo || "/dashboard";
     if (data.user.email_verified === false) {
-      router.push("/verify-email");
+      router.push(`/verify-email?redirectTo=${encodeURIComponent(destination)}`);
       return;
     }
-    router.push(redirectTo || "/dashboard");
+    router.push(destination);
   };
 
-  const signInWithGoogle = async () => {
-    window.location.href = `${api.getBaseUrl()}/auth/google`;
+  const signInWithGoogle = async (plan?: string) => {
+    const base = `${api.getBaseUrl()}/auth/google`;
+    window.location.href = plan
+      ? `${base}?plan=${encodeURIComponent(plan)}`
+      : base;
   };
 
   const signOut = async () => {

@@ -9,6 +9,8 @@ import {
   ShieldCheck,
   Mail,
   Loader2,
+  DollarSign,
+  CreditCard,
 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -103,6 +105,30 @@ export default function AdminPage() {
       />
 
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+        <Card>
+          <CardContent className="flex items-center gap-3 p-5">
+            <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-emerald-500/10">
+              <DollarSign className="h-5 w-5 text-emerald-500" />
+            </div>
+            <div>
+              <p className="text-2xl font-bold tabular-nums">
+                {stats?.mrr != null ? `$${stats.mrr}` : "—"}
+              </p>
+              <p className="text-xs text-muted-foreground">MRR (USD)</p>
+            </div>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardContent className="flex items-center gap-3 p-5">
+            <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-primary/10">
+              <CreditCard className="h-5 w-5 text-primary" />
+            </div>
+            <div>
+              <p className="text-2xl font-bold tabular-nums">{stats?.paying_users ?? "—"}</p>
+              <p className="text-xs text-muted-foreground">Clientes pagos</p>
+            </div>
+          </CardContent>
+        </Card>
         <Card>
           <CardContent className="flex items-center gap-3 p-5">
             <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-primary/10">

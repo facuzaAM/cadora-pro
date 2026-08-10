@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useState, use } from "react";
 import { toast } from "sonner";
 import {
   CreditCard,
@@ -28,9 +28,23 @@ function formatBytes(bytes: number): string {
   return `${Math.round(mb)} MB`;
 }
 
-export default function BillingPage() {
+export default function BillingPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ reason?: string }>;
+}) {
+  const params = use(searchParams);
   const [sub, setSub] = useState<Subscription | null>(null);
   const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    if (params.reason === "limit_reached") {
+      toast.error(
+        "Alcanzaste el límite de conversiones de tu plan. Actualizá tu plan para seguir usando el servicio.",
+        { duration: 6000 },
+      );
+    }
+  }, [params.reason]);
 
   useEffect(() => {
     const token = api.getAccessToken();

@@ -32,6 +32,7 @@ from app.schemas.auth import (
 )
 from app.services.account_service import AccountService
 from app.services.auth_service import AuthService
+from app.services.plan_config import PLANS
 from app.utils.dependencies import ACCESS_TOKEN_COOKIE, get_current_user
 from app.utils.rate_limit import rate_limit
 
@@ -165,6 +166,20 @@ async def google_login(request: Request):
         max_age=600,
         path="/",
     )
+    # Preserve paid-plan intent through the OAuth round-trip so a signup from
+    # the pricing page lands back on the checkout instead of the dashboard.
+    plan = (request.query_params.get("plan") or "").strip().lower()
+    if plan in PLANS and plan != "free":
+        resp.set_cookie(
+            key="oauth_plan",
+            value=plan,
+            httponly=True,
+            secure=_cookie_secure(),
+            samesite=_cookie_samesite(),
+            domain=_cookie_domain(),
+            max_age=600,
+            path="/",
+        )
     return resp
 
 
@@ -240,7 +255,11 @@ async def google_callback(request: Request, db: AsyncSession = Depends(get_db)):
     service = AuthService(db)
     tokens = await service._build_token(user)
 
-    resp = _frontend_redirect("/auth/callback")
+    # Land back on the pricing checkout when the user started the flow there.
+    plan = request.cookies.get("oauth_plan", "")
+    callback_path = "/auth/callback" + (f"?plan={plan}" if plan else "")
+    resp = _frontend_redirect(callback_path)
+    resp.delete_cookie("oauth_plan", path="/", domain=_cookie_domain())
     resp.set_cookie(
         key=REFRESH_COOKIE,
         value=tokens.refresh_token,

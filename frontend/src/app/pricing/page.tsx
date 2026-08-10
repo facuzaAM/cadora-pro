@@ -4,7 +4,8 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import * as Sentry from "@sentry/nextjs";
 import Script from "next/script";
 import { Suspense } from "react";
-import { useSearchParams } from "next/navigation";
+import { useSearchParams, useRouter } from "next/navigation";
+import { toast } from "sonner";
 import { PricingCard } from "@/components/features/pricing/pricing-card";
 import { LandingNav } from "@/components/features/landing/landing-nav";
 import { SiteFooter } from "@/components/layout/site-footer";
@@ -13,6 +14,7 @@ import { PLANS as DISPLAY_PLANS } from "@/lib/constants";
 import { billingService, type Plan } from "@/services/billing.service";
 import { api } from "@/services/api";
 import { decodeJwtPayload } from "@/lib/jwt";
+import { useAuth } from "@/hooks/useAuth";
 
 function getUserIdFromToken(): string | undefined {
   const token = api.getAccessToken();
@@ -31,7 +33,9 @@ export default function PricingPage() {
 
 function PricingContent() {
   const searchParams = useSearchParams();
+  const router = useRouter();
   const requestedPlan = searchParams.get("plan");
+  const { refreshUser } = useAuth();
   const [plans, setPlans] = useState<Plan[]>([]);
   const [userPlan, setUserPlan] = useState<string | undefined>();
   const [isAuthenticated, setIsAuthenticated] = useState(false);
@@ -71,6 +75,21 @@ function PricingContent() {
     if (paddleLoaded) initPaddle();
   }, [paddleLoaded, initPaddle]);
 
+  const handleCheckoutCompleted = useCallback(async () => {
+    toast.success("Suscripción activada. ¡Bienvenido a Cadora!");
+    try {
+      await refreshUser();
+    } finally {
+      router.push("/billing");
+    }
+  }, [refreshUser, router]);
+
+  const eventCallback = useCallback((event: Paddle.CheckoutEvent) => {
+    if (event.name === "checkout.completed") {
+      void handleCheckoutCompleted();
+    }
+  }, [handleCheckoutCompleted]);
+
   useEffect(() => {
     if (autoOpenedRef.current || !paddleReady || !isAuthenticated || !requestedPlan) return;
     if (userPlan === requestedPlan) return;
@@ -86,8 +105,9 @@ function PricingContent() {
         displayMode: "overlay",
         theme: "light",
       },
+      eventCallback,
     });
-  }, [paddleReady, isAuthenticated, requestedPlan, userPlan, plans]);
+  }, [paddleReady, isAuthenticated, requestedPlan, userPlan, plans, eventCallback]);
 
   const handleSubscribe = useCallback(async (planId: string) => {
     if (!window.Paddle || !paddleReady) return;
@@ -102,8 +122,9 @@ function PricingContent() {
         displayMode: "overlay",
         theme: "light",
       },
+      eventCallback,
     });
-  }, [paddleReady, plans]);
+  }, [paddleReady, plans, eventCallback]);
 
   return (
     <div className="flex min-h-screen flex-col">

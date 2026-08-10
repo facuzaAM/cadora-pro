@@ -1,7 +1,7 @@
 import { type NextRequest, NextResponse } from "next/server";
 import { decodeJwtPayload } from "@/lib/jwt";
 
-const protectedRoutes = ["/dashboard", "/projects", "/settings", "/profile", "/billing"];
+const protectedRoutes = ["/dashboard", "/projects", "/settings", "/profile", "/billing", "/admin"];
 
 function isTokenValid(token: string): boolean {
   const payload = decodeJwtPayload(token);

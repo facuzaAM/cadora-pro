@@ -55,7 +55,12 @@ class PaddleService:
     @staticmethod
     def _get_client() -> Client | None:
         if not settings.PADDLE_API_KEY:
-            logger.warning("PADDLE_API_KEY no configurado; operaciones de billing deshabilitadas")
+            logger.error(
+                "PADDLE_API_KEY no configurado: el customer portal y la "
+                "cancelación de suscripciones están deshabilitados. "
+                "Agregalo al .env de producción para activar la gestión de "
+                "facturación."
+            )
             return None
         environment = (
             Environment.SANDBOX

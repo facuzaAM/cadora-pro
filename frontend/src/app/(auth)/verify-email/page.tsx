@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, use } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { Mail, RefreshCw, AlertCircle, Loader2 } from "lucide-react";
@@ -10,8 +10,20 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { useAuth } from "@/hooks/useAuth";
 import { api } from "@/services/api";
 
-export default function VerifyEmailPage() {
+function safeInternalRedirect(value?: string): string {
+  if (!value) return "/dashboard";
+  if (!value.startsWith("/") || value.startsWith("//")) return "/dashboard";
+  return value;
+}
+
+export default function VerifyEmailPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ redirectTo?: string }>;
+}) {
   const router = useRouter();
+  const params = use(searchParams);
+  const redirectTo = safeInternalRedirect(params.redirectTo);
   const { user, loading, refreshUser } = useAuth();
   const [code, setCode] = useState("");
   const [sending, setSending] = useState(false);
@@ -63,7 +75,7 @@ export default function VerifyEmailPage() {
     try {
       await api.post("/auth/verify-email", { code }, api.getAccessToken());
       await refreshUser();
-      router.replace("/dashboard");
+      router.replace(redirectTo);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Código incorrecto o expirado");
     } finally {
@@ -146,7 +158,7 @@ export default function VerifyEmailPage() {
             </div>
 
             <div className="text-center">
-              <Button variant="ghost" size="sm" onClick={() => router.push("/dashboard")}>
+              <Button variant="ghost" size="sm" onClick={() => router.push(redirectTo)}>
                 Hacerlo más tarde
               </Button>
             </div>

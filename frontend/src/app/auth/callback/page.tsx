@@ -22,6 +22,15 @@ function CallbackContent() {
     if (loading) return;
     setHandled(true);
     if (user) {
+      const plan = searchParams.get("plan");
+      if (plan) {
+        router.replace(
+          user.email_verified
+            ? `/pricing?plan=${encodeURIComponent(plan)}`
+            : `/verify-email?redirectTo=${encodeURIComponent(`/pricing?plan=${encodeURIComponent(plan)}`)}`,
+        );
+        return;
+      }
       router.replace(user.email_verified ? "/dashboard" : "/verify-email");
     } else {
       router.replace("/login?error=oauth_failed");
