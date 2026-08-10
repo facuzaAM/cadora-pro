@@ -38,7 +38,7 @@ export interface EditorText {
 }
 
 export interface EditorDetection extends EditorElements {
-  status: "completed" | "processing" | "pending";
+  status: "completed" | "processing" | "pending" | "error";
   ocr_texts: EditorText[];
   ocr_measurements: EditorText[];
   image_width: number;

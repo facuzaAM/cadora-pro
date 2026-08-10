@@ -12,6 +12,7 @@ import type { EditorElements, EditorDetection } from "@/types/editor";
 import { toast } from "sonner";
 
 const POLL_INTERVAL_MS = 3000;
+const MAX_WAIT_MS = 4 * 60 * 1000;
 
 export default function EditorPage() {
   const router = useRouter();
@@ -25,6 +26,7 @@ export default function EditorPage() {
   const [savedElements, setSavedElements] = useState<EditorElements | null>(null);
   const [saving, setSaving] = useState(false);
   const [exporting, setExporting] = useState(false);
+  const [attempt, setAttempt] = useState(0);
 
   const imageUrl = detection ? editorService.previewUrl(projectId, token) : null;
 
@@ -45,12 +47,34 @@ export default function EditorPage() {
   useEffect(() => {
     let stopped = false;
     let timer: ReturnType<typeof setInterval> | null = null;
+    const startedAt = Date.now();
+
+    const stop = () => {
+      stopped = true;
+      if (timer) {
+        clearInterval(timer);
+        timer = null;
+      }
+    };
 
     const poll = async (): Promise<boolean> => {
+      if (stopped) return true;
       try {
         const res = await editorService.getDetection(projectId, token);
+        if (res.status === "error") {
+          setError(
+            "No pudimos procesar el plano. Revisá que el archivo sea válido e intentá de nuevo.",
+          );
+          setLoading(false);
+          return true;
+        }
         if (res.status === "completed") {
           await loadSaved(res);
+          return true;
+        }
+        if (Date.now() - startedAt > MAX_WAIT_MS) {
+          setError("El análisis está tardando más de lo esperado. Intentá nuevamente.");
+          setLoading(false);
           return true;
         }
         return false;
@@ -70,6 +94,15 @@ export default function EditorPage() {
           router.replace("/billing");
           return;
         }
+        if (!stopped) {
+          setError(
+            err instanceof ApiError
+              ? err.message
+              : "No pudimos iniciar el análisis del plano.",
+          );
+          setLoading(false);
+        }
+        return;
       }
       const done = await poll();
       if (!done && !stopped) {
@@ -81,18 +114,10 @@ export default function EditorPage() {
       }
     };
 
-    const stop = () => {
-      stopped = true;
-      if (timer) {
-        clearInterval(timer);
-        timer = null;
-      }
-    };
-
     start();
     return stop;
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [projectId, token]);
+  }, [projectId, token, attempt]);
 
   const handleSave = useCallback(
     async (elements: EditorElements) => {
@@ -167,12 +192,24 @@ export default function EditorPage() {
           <AlertCircle className="mb-4 h-8 w-8 text-destructive" />
           <h2 className="text-xl font-bold">No pudimos cargar el plano</h2>
           <p className="mt-2 max-w-md text-sm text-muted-foreground">{error}</p>
-          <button
-            className="mt-4 text-sm text-primary underline-offset-4 hover:underline"
-            onClick={() => router.replace(`/projects/${projectId}/result`)}
-          >
-            Volver al resultado
-          </button>
+          <div className="mt-4 flex items-center gap-4">
+            <button
+              className="text-sm font-medium text-primary underline-offset-4 hover:underline"
+              onClick={() => {
+                setError(null);
+                setLoading(true);
+                setAttempt((a) => a + 1);
+              }}
+            >
+              Reintentar
+            </button>
+            <button
+              className="text-sm text-muted-foreground underline-offset-4 hover:underline"
+              onClick={() => router.replace(`/projects/${projectId}/result`)}
+            >
+              Volver al resultado
+            </button>
+          </div>
         </div>
       )}
 

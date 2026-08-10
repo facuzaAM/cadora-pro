@@ -139,10 +139,10 @@ async def _detect_project_background(user_id: UUID, project_id: UUID) -> None:
         try:
             async with async_session_factory() as session:
                 repo = ProjectRepository(session)
-                await repo.update_status(project_id, "document_uploaded")
+                await repo.update_status(project_id, "error")
                 await session.commit()
         except Exception:
-            logger.exception("No se pudo resetear el estado del proyecto %s", project_id)
+            logger.exception("No se pudo marcar como error el proyecto %s", project_id)
     finally:
         for p in temp_paths:
             if p and os.path.exists(p):
@@ -192,6 +192,8 @@ async def get_detection(
     project = await _get_project(user, project_id, db)
 
     if project.detection_result is None:
+        if project.status == "error":
+            return {"status": "error"}
         status = "processing" if project.status == "detection_running" else "pending"
         return {"status": status}
 
