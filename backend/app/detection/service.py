@@ -119,6 +119,13 @@ class DetectionService:
         return DetectionService._limit_max_dim(DetectionService._load_image(path))
 
     @staticmethod
+    def _load_image(path: Path) -> np.ndarray:
+        image = cv2.imread(str(path))
+        if image is None:
+            raise ValueError(f"No se pudo cargar la imagen: {path}")
+        return cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
+
+    @staticmethod
     def _limit_max_dim(image: np.ndarray, max_dim: int = None) -> np.ndarray:
         if max_dim is None:
             max_dim = DetectionService.DETECT_MAX_DIM
