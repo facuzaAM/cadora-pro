@@ -76,11 +76,11 @@ function RegisterContent() {
       <CadCrosshair className="absolute left-[4%] top-[20%] hidden h-20 w-20 text-primary/15 lg:block pointer-events-none" />
       <div className="absolute -left-24 top-1/4 h-56 w-56 animate-blob rounded-full bg-primary/10 blur-3xl pointer-events-none" />
       <div className="absolute -right-24 bottom-0 h-56 w-56 animate-blob-delayed rounded-full bg-emerald-500/10 blur-3xl pointer-events-none" />
-      <div className="relative">
+      <div className="relative w-full max-w-lg">
         <Link href="/" className="mb-8 flex justify-center">
           <Logo />
         </Link>
-      <Card className="w-full max-w-lg">
+      <Card className="w-full">
         <CardHeader className="text-center">
           <CardTitle>Crear Cuenta</CardTitle>
           <CardDescription>Regístrate para empezar a usar Cadora</CardDescription>
