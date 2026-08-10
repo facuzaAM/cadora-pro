@@ -80,7 +80,7 @@ function RegisterContent() {
         <Link href="/" className="mb-8 flex justify-center">
           <Logo />
         </Link>
-      <Card className="w-full max-w-md">
+      <Card className="w-full max-w-lg">
         <CardHeader className="text-center">
           <CardTitle>Crear Cuenta</CardTitle>
           <CardDescription>Regístrate para empezar a usar Cadora</CardDescription>

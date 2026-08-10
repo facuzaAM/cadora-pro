@@ -64,7 +64,7 @@ export default function LoginPage({
         <Link href="/" className="mb-8 flex justify-center">
           <Logo />
         </Link>
-      <Card className="w-full max-w-md">
+      <Card className="w-full max-w-lg">
         <CardHeader className="text-center">
           <CardTitle>Iniciar Sesión</CardTitle>
           <CardDescription>Ingresa a tu cuenta de Cadora</CardDescription>
