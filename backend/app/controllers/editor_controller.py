@@ -6,16 +6,12 @@ import uuid as _uuid
 from uuid import UUID
 
 import cv2
-from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Request, Response
+from fastapi import APIRouter, Depends, HTTPException, Request, Response
 from sqlalchemy.ext.asyncio import AsyncSession
 from starlette.status import HTTP_400_BAD_REQUEST, HTTP_404_NOT_FOUND
 
 from app.config import settings
-from app.database import async_session_factory, get_db
-from app.detection.pipeline import (
-    run_full_pipeline,
-    serialize_detection,
-)
+from app.database import get_db
 from app.detection.schemas import (
     DoorDetectionResult,
     LineDetectionResult,
@@ -24,10 +20,9 @@ from app.detection.schemas import (
 from app.detection.service import DetectionService
 from app.editor.schemas import ElementsPayload
 from app.models.user import User
-from app.ocr.service import OcrService
 from app.repositories.document_repository import DocumentRepository
 from app.repositories.project_repository import ProjectRepository
-from app.services.plan_enforcer import consume_conversion, enforce_conversion_limit
+from app.services.plan_enforcer import enforce_conversion_limit
 from app.services.storage_service import StorageService
 from app.utils.dependencies import get_current_user
 from app.utils.rate_limit import rate_limit
@@ -35,8 +30,6 @@ from app.utils.rate_limit import rate_limit
 logger = logging.getLogger(__name__)
 
 router = APIRouter()
-detection_service = DetectionService()
-ocr_service = OcrService()
 storage = StorageService()
 
 PREVIEW_DIR = "previews"
@@ -93,77 +86,20 @@ async def _ensure_preview(docs, project_id: UUID) -> bytes:
             os.remove(path)
 
 
-async def _detect_project_background(user_id: UUID, project_id: UUID) -> None:
-    temp_paths = []
-    try:
-        async with async_session_factory() as session:
-            doc_repo = DocumentRepository(session)
-            docs = await doc_repo.list_by_project(project_id)
-            for doc in docs:
-                safe_name = os.path.basename(doc.filename).replace("/", "").replace("\\", "")
-                tag = _uuid.uuid4().hex[:8]
-                fd, path = tempfile.mkstemp(
-                    suffix=f"_{safe_name}", prefix=f"{user_id}_{project_id}_det_{tag}_"
-                )
-                os.close(fd)
-                content = await storage.download_bytes(
-                    settings.STORAGE_BUCKET, doc.storage_path,
-                )
-                with open(path, "wb") as f:
-                    f.write(content)
-                temp_paths.append(path)
-
-            lines_result, doors_result, windows_result, ocr_result = await run_full_pipeline(
-                temp_paths, detection_service, ocr_service,
-            )
-            payload = serialize_detection(
-                lines_result, doors_result, windows_result, ocr_result,
-            )
-
-            repo = ProjectRepository(session)
-            if not await consume_conversion(session, user_id):
-                await repo.update_status(project_id, "document_uploaded")
-                await session.commit()
-                logger.warning(
-                    "Detección completada pero el usuario %s no tenía conversiones "
-                    "disponibles (race); proyecto %s vuelto a document_uploaded",
-                    user_id, project_id,
-                )
-                return
-
-            await repo.set_detection_result(project_id, payload)
-            await repo.update_status(project_id, "detection_completed")
-            await session.commit()
-    except Exception:
-        logger.exception("Detección falló para proyecto %s", project_id)
-        try:
-            async with async_session_factory() as session:
-                repo = ProjectRepository(session)
-                await repo.update_status(project_id, "error")
-                await session.commit()
-        except Exception:
-            logger.exception("No se pudo marcar como error el proyecto %s", project_id)
-    finally:
-        for p in temp_paths:
-            if p and os.path.exists(p):
-                os.remove(p)
-
-
 @router.post("/{project_id}/detection/run")
 @rate_limit(settings.RATE_LIMIT_DETECTION)
 async def run_detection(
     request: Request,
-    background_tasks: BackgroundTasks,
     project_id: UUID,
     user: User = Depends(enforce_conversion_limit),
     db: AsyncSession = Depends(get_db),
 ):
-    """Start detection in the background (idempotent). Returns status immediately."""
+    """Queue detection for the background worker (idempotent). Returns status immediately."""
     project = await _get_project(user, project_id, db)
 
     if project.detection_result is not None:
         return {"status": "completed"}
-    if project.status == "detection_running":
+    if project.status in ("detection_running", "detection_processing"):
         return {"status": "processing"}
 
     doc_repo = DocumentRepository(db)
@@ -176,7 +112,7 @@ async def run_detection(
 
     repo = ProjectRepository(db)
     await repo.update_status(project_id, "detection_running")
-    background_tasks.add_task(_detect_project_background, user.id, project_id)
+    await db.commit()
     return {"status": "processing"}
 
 
@@ -194,7 +130,11 @@ async def get_detection(
     if project.detection_result is None:
         if project.status == "error":
             return {"status": "error"}
-        status = "processing" if project.status == "detection_running" else "pending"
+        status = (
+            "processing"
+            if project.status in ("detection_running", "detection_processing")
+            else "pending"
+        )
         return {"status": status}
 
     payload = project.detection_result

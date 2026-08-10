@@ -2,6 +2,8 @@ export type ProjectStatus =
   | "created"
   | "document_uploaded"
   | "processing"
+  | "detection_running"
+  | "detection_processing"
   | "detection_completed"
   | "cad_generated"
   | "error";

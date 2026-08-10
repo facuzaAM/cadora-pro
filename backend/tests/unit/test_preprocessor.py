@@ -187,5 +187,22 @@ class TestOcrPipeline:
             cv2.rectangle(gray, (x, 80), (x + 40, 100), 0, -1)
         result = pp.ocr_pipeline(gray)
         assert result.ndim == 2
+
+    def test_resize_for_ocr_caps_large_images(self, pp: ImagePreprocessor):
+        img = np.full((6000, 8000), 255, dtype=np.uint8)
+        result = pp.resize_for_ocr(img)
+        h, w = result.shape[:2]
+        assert max(h, w) <= pp.OCR_MAX_DIM
+        assert h < 6000 and w < 8000
+
+    def test_resize_for_ocr_upscales_small_images(self, pp: ImagePreprocessor):
+        img = np.full((300, 400), 255, dtype=np.uint8)
+        result = pp.resize_for_ocr(img)
+        assert max(result.shape[:2]) >= pp.OCR_MIN_UPSCALE
+
+    def test_resize_for_ocr_keeps_mid_size_images(self, pp: ImagePreprocessor):
+        img = np.full((1500, 2000), 255, dtype=np.uint8)
+        result = pp.resize_for_ocr(img)
+        assert result.shape == (1500, 2000)
         unique = set(np.unique(result))
         assert unique <= {0, 255}

@@ -36,6 +36,8 @@ const statusConfig: Record<
   created: { label: "Creado", variant: "secondary", icon: FileText },
   document_uploaded: { label: "Documento subido", variant: "secondary", icon: FileText },
   processing: { label: "Procesando", variant: "warning", icon: RefreshCw },
+  detection_running: { label: "Procesando", variant: "warning", icon: RefreshCw },
+  detection_processing: { label: "Procesando", variant: "warning", icon: RefreshCw },
   detection_completed: { label: "Detección lista", variant: "success", icon: CheckCircle2 },
   cad_generated: { label: "Completado", variant: "success", icon: CheckCircle2 },
   error: { label: "Error", variant: "destructive", icon: AlertCircle },

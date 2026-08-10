@@ -15,6 +15,8 @@ const statusMap: Record<ProjectStatus, { label: string; variant: "success" | "wa
   created: { label: "Creado", variant: "secondary" },
   document_uploaded: { label: "Documento subido", variant: "secondary" },
   processing: { label: "Procesando", variant: "warning" },
+  detection_running: { label: "Procesando", variant: "warning" },
+  detection_processing: { label: "Procesando", variant: "warning" },
   detection_completed: { label: "Detección lista", variant: "success" },
   cad_generated: { label: "Completado", variant: "success" },
   error: { label: "Error", variant: "default" },

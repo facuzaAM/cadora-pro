@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import asyncio
 import logging
 
 from app.detection.schemas import (
@@ -74,21 +75,35 @@ def _merge_ocr_results(results: list[OcrResult]) -> OcrResult:
     return merged
 
 
+async def _process_file(
+    path: str,
+    detection_service: DetectionService,
+    ocr_service: OcrService,
+) -> tuple[LineDetectionResult, DoorDetectionResult, WindowDetectionResult, OcrResult]:
+    """Run detection (single preprocessing pass) and OCR for one file.
+
+    Both workloads are dispatched concurrently; detection and OCR each push
+    their heavy work to the thread pool, so this halves wall-clock time.
+    """
+    detection = detection_service.process_file_all(path)
+    ocr = ocr_service.process_file(path)
+    (lines, doors, windows), ocr_result = await asyncio.gather(detection, ocr)
+    return lines, doors, windows, ocr_result
+
+
 async def run_full_pipeline(
     temp_paths: list[str],
     detection_service: DetectionService,
     ocr_service: OcrService,
 ) -> tuple[LineDetectionResult, DoorDetectionResult, WindowDetectionResult, OcrResult]:
-    line_results = []
-    door_results = []
-    window_results = []
-    ocr_results = []
+    results = await asyncio.gather(
+        *(_process_file(path, detection_service, ocr_service) for path in temp_paths)
+    )
 
-    for path in temp_paths:
-        line_results.append(await detection_service.process_file(path))
-        door_results.append(await detection_service.process_file_doors(path))
-        window_results.append(await detection_service.process_file_windows(path))
-        ocr_results.append(await ocr_service.process_file(path))
+    line_results = [r[0] for r in results]
+    door_results = [r[1] for r in results]
+    window_results = [r[2] for r in results]
+    ocr_results = [r[3] for r in results]
 
     return (
         _merge_line_results(line_results),

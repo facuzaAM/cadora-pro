@@ -16,6 +16,12 @@ class ImagePreprocessor:
 
     TARGET_DPI = 300
 
+    # OCR work resolution. Images larger than this are downscaled so OCR and
+    # denoising never blow up on huge uploads (e.g. 6000×8000 scans).
+    OCR_MAX_DIM = 3000
+    # Very small images are upscaled so thin text remains legible to OCR.
+    OCR_MIN_UPSCALE = 1400
+
     # ── colour / contrast ────────────────────────────────────────────────
 
     def to_grayscale(self, image: np.ndarray) -> np.ndarray:
@@ -93,6 +99,24 @@ class ImagePreprocessor:
 
     # ── geometry helpers ─────────────────────────────────────────────────
 
+    def resize_for_ocr(self, image: np.ndarray) -> np.ndarray:
+        """Resize to a bounded work resolution for OCR.
+
+        Caps the largest side at ``OCR_MAX_DIM`` so heavy uploads never
+        exhaust memory, and upscales very small images so text is readable.
+        """
+        h, w = image.shape[:2]
+        max_side = max(h, w)
+        if max_side > self.OCR_MAX_DIM:
+            scale = self.OCR_MAX_DIM / max_side
+            size = (int(w * scale), int(h * scale))
+            return cv2.resize(image, size, interpolation=cv2.INTER_AREA)
+        if max_side < self.OCR_MIN_UPSCALE:
+            scale = self.OCR_MIN_UPSCALE / max_side
+            size = (int(w * scale), int(h * scale))
+            return cv2.resize(image, size, interpolation=cv2.INTER_CUBIC)
+        return image
+
     def resize_to_dpi(
         self, image: np.ndarray, current_dpi: int = 72,
     ) -> np.ndarray:
@@ -153,7 +177,7 @@ class ImagePreprocessor:
     def ocr_pipeline(self, image: np.ndarray, dpi: int = 72) -> np.ndarray:
         """Preprocessing optimised for OCR text extraction."""
         gray = self.to_grayscale(image)
-        gray = self.resize_to_dpi(gray, dpi)
+        gray = self.resize_for_ocr(gray)
         gray = self.enhance_contrast(gray)
         gray = self.denoise(gray)
         binary = self.binarize_auto(gray)

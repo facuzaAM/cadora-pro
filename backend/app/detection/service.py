@@ -24,6 +24,10 @@ class DetectionService:
     blocking the FastAPI event loop.
     """
 
+    # Max image dimension used for detection and preview. Uploads are
+    # downscaled to this cap so processing time and memory stay bounded.
+    DETECT_MAX_DIM = 2000
+
     def __init__(self):
         self.preprocessor = ImagePreprocessor()
         self.detector = LineDetector()
@@ -35,6 +39,38 @@ class DetectionService:
     ) -> LineDetectionResult:
         image = await asyncio.to_thread(self._load_image_from_file, file_path)
         return await asyncio.to_thread(self._process_image, image)
+
+    async def process_file_all(
+        self, file_path: str | Path,
+    ) -> tuple[LineDetectionResult, DoorDetectionResult, WindowDetectionResult]:
+        """Detect lines, doors and windows in one pass.
+
+        Loads and preprocesses the image a single time, then runs the line,
+        door and window detectors against the shared intermediate result.
+        """
+        image = await asyncio.to_thread(self._load_image_from_file, file_path)
+        return await asyncio.to_thread(self._process_image_all, image)
+
+    def _process_image_all(
+        self, image: np.ndarray,
+    ) -> tuple[LineDetectionResult, DoorDetectionResult, WindowDetectionResult]:
+        binary = self.preprocessor.detect_pipeline(image)
+        lines, grouped, intersections, w, h = self.detector.detect(image, binary=binary)
+
+        line_result = LineDetectionResult(
+            lines=lines,
+            grouped_lines=grouped,
+            intersections=intersections,
+            image_width=w,
+            image_height=h,
+        )
+        line_result.horizontal = [line for line in lines if line.category.value == "horizontal"]
+        line_result.vertical = [line for line in lines if line.category.value == "vertical"]
+        line_result.diagonal = [line for line in lines if line.category.value == "diagonal"]
+
+        doors = self.door_detector.detect(image, grouped, lines, binary=binary)
+        windows = self.window_detector.detect(image, grouped, binary=binary)
+        return line_result, doors, windows
 
     def _process_image(self, image: np.ndarray) -> LineDetectionResult:
         binary = self.preprocessor.detect_pipeline(image)
@@ -79,15 +115,20 @@ class DetectionService:
         path = Path(file_path)
         if path.suffix.lower() in (".pdf",):
             images = DetectionService._pdf_to_images(path)
-            return images[0]
-        return DetectionService._load_image(path)
+            return DetectionService._limit_max_dim(images[0])
+        return DetectionService._limit_max_dim(DetectionService._load_image(path))
 
     @staticmethod
-    def _load_image(path: Path) -> np.ndarray:
-        image = cv2.imread(str(path))
-        if image is None:
-            raise ValueError(f"No se pudo cargar la imagen: {path}")
-        return cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
+    def _limit_max_dim(image: np.ndarray, max_dim: int = None) -> np.ndarray:
+        if max_dim is None:
+            max_dim = DetectionService.DETECT_MAX_DIM
+        h, w = image.shape[:2]
+        max_side = max(h, w)
+        if max_side <= max_dim:
+            return image
+        scale = max_dim / max_side
+        size = (int(w * scale), int(h * scale))
+        return cv2.resize(image, size, interpolation=cv2.INTER_AREA)
 
     @staticmethod
     def _pdf_to_images(path: Path, dpi: int = 200) -> list[np.ndarray]:

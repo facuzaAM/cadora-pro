@@ -43,6 +43,8 @@ const statusConfig: Record<
   created: { label: "Creado", variant: "secondary", icon: FileText },
   document_uploaded: { label: "Subido", variant: "secondary", icon: FileText },
   processing: { label: "Procesando", variant: "warning", icon: Loader2 },
+  detection_running: { label: "Procesando", variant: "warning", icon: Loader2 },
+  detection_processing: { label: "Procesando", variant: "warning", icon: Loader2 },
   detection_completed: { label: "Detección lista", variant: "success", icon: CheckCircle2 },
   cad_generated: { label: "Completado", variant: "success", icon: CheckCircle2 },
   error: { label: "Error", variant: "destructive", icon: AlertCircle },
@@ -143,8 +145,19 @@ export function ConversionHistory() {
 
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase();
+    const matchesStatus = (status: ProjectStatus) => {
+      if (statusFilter === "all") return true;
+      if (statusFilter === "processing") {
+        return (
+          status === "processing" ||
+          status === "detection_running" ||
+          status === "detection_processing"
+        );
+      }
+      return status === statusFilter;
+    };
     return rows
-      .filter((r) => (statusFilter === "all" ? true : r.project.status === statusFilter))
+      .filter((r) => matchesStatus(r.project.status))
       .filter((r) => !q || r.project.name.toLowerCase().includes(q) || r.filename.toLowerCase().includes(q));
   }, [rows, query, statusFilter]);
 
@@ -229,7 +242,10 @@ export function ConversionHistory() {
           {filtered.slice(0, visible).map((row) => {
         const cfg = statusConfig[row.project.status] || statusConfig.created;
         const StatusIcon = cfg.icon;
-        const isProcessing = row.project.status === "processing";
+        const isProcessing =
+          row.project.status === "processing" ||
+          row.project.status === "detection_running" ||
+          row.project.status === "detection_processing";
         const isCompleted = row.project.status === "cad_generated";
 
         return (

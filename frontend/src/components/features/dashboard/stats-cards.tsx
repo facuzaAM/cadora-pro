@@ -33,7 +33,10 @@ export function StatsCards() {
     ]).then(([projects, sub]) => {
       const total = projects.length;
       const processing = projects.filter(
-        (p) => p.status === "processing",
+        (p) =>
+          p.status === "processing" ||
+          p.status === "detection_running" ||
+          p.status === "detection_processing",
       ).length;
 
       setStats([

@@ -3,7 +3,6 @@ from uuid import UUID
 
 import pytest
 
-import app.controllers.editor_controller as ec
 from app.database import async_session_factory
 from app.detection.schemas import (
     Door,
@@ -86,12 +85,7 @@ async def test_detection_status_mapping(client):
 
 
 @pytest.mark.asyncio
-async def test_detection_run_starts_processing(client, monkeypatch):
-    async def _noop(*args, **kwargs):
-        return None
-
-    monkeypatch.setattr(ec, "_detect_project_background", _noop)
-
+async def test_detection_run_starts_processing(client):
     token = await _register(client)
     project_id = await _create_project(client, token)
     await _add_document(project_id)
@@ -108,6 +102,36 @@ async def test_detection_run_starts_processing(client, monkeypatch):
         await client.get(f"/api/v1/projects/{project_id}/detection", headers=headers)
     ).json()
     assert body["status"] == "processing"
+
+
+@pytest.mark.asyncio
+async def test_detection_run_is_idempotent(client):
+    token = await _register(client)
+    project_id = await _create_project(client, token)
+    await _add_document(project_id)
+    headers = {"Authorization": f"Bearer {token}"}
+
+    first = await client.post(
+        f"/api/v1/projects/{project_id}/detection/run",
+        headers=headers,
+    )
+    second = await client.post(
+        f"/api/v1/projects/{project_id}/detection/run",
+        headers=headers,
+    )
+    assert first.status_code == 200 and second.status_code == 200
+    assert first.json()["status"] == second.json()["status"] == "processing"
+
+    async with async_session_factory() as session:
+        repo = ProjectRepository(session)
+        await repo.update_status(project_id, "detection_processing")
+        await session.commit()
+
+    again = await client.post(
+        f"/api/v1/projects/{project_id}/detection/run",
+        headers=headers,
+    )
+    assert again.json()["status"] == "processing"
 
 
 @pytest.mark.asyncio
