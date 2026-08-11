@@ -154,6 +154,15 @@ class TestRemoveGridLines:
         unique = set(np.unique(result))
         assert unique <= {0, 255}
 
+    def test_keeps_single_long_line(self, pp: ImagePreprocessor):
+        """A single full-width line is a wall, not a grid — never removed."""
+        binary = np.full((200, 200), 255, dtype=np.uint8)
+        binary[100, :] = 0
+        binary[:, 100] = 0
+        result = pp.remove_grid_lines(binary)
+        assert np.any(result[100, :] == 0)  # horizontal wall kept
+        assert np.any(result[:, 100] == 0)  # vertical wall kept
+
 
 class TestDetectPipeline:
     def test_end_to_end_synthetic_floor_plan(self, pp: ImagePreprocessor):
@@ -167,6 +176,37 @@ class TestDetectPipeline:
         unique = set(np.unique(result))
         assert unique <= {0, 255}
         assert result.shape == img.shape[:2]
+
+    def test_walls_survive_pipeline(self, pp: ImagePreprocessor):
+        """Regression: the pipeline must NOT erase walls/doors/windows.
+
+        This is a guard against polarity bugs (e.g. an inverted adaptive
+        threshold) and over-aggressive grid removal that wiped out real
+        geometry.
+        """
+        img = np.full((900, 1200, 3), 255, dtype=np.uint8)
+        cv2.rectangle(img, (150, 150), (1050, 750), (0, 0, 0), 6)
+        cv2.line(img, (150, 450), (1050, 450), (0, 0, 0), 6)
+        cv2.line(img, (150, 450), (450, 450), (255, 255, 255), 6)
+        cv2.line(img, (550, 450), (1050, 450), (255, 255, 255), 6)
+        cv2.line(img, (450, 450), (450, 520), (0, 0, 0), 5)
+
+        before = np.count_nonzero(cv2.cvtColor(img, cv2.COLOR_BGR2GRAY) < 128)
+        result = pp.detect_pipeline(img)
+        after = np.count_nonzero(result < 128)
+
+        # Allow the terminal dilation to grow the ink a little, but the walls
+        # must all survive: at least 90% of the input ink stays present.
+        assert after >= before * 0.9
+
+    def test_adaptive_polarity_matches_otsu(self, pp: ImagePreprocessor):
+        """binarize_adaptive must produce dark ink on white, like otsu."""
+        gray = np.full((120, 120), 200, dtype=np.uint8)
+        cv2.rectangle(gray, (30, 30), (90, 90), 120, 4)  # thin wall ring
+        otsu = pp.binarize_otsu(gray)
+        adaptive = pp.binarize_adaptive(gray)
+        assert np.mean(otsu[30:90, 30:90] < 128) > 0.1  # wall ring is dark
+        assert np.mean(adaptive[30:90, 30:90] < 128) > 0.1
 
 
 class TestOcrPipeline:

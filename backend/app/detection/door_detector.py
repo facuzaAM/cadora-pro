@@ -76,43 +76,155 @@ class DoorDetector:
         return max(80.0, min(180.0, mean))
 
     @staticmethod
+    def _line_stroke_bounds(
+        gray: np.ndarray, line: LineSegment, threshold: float,
+    ) -> tuple[int, int]:
+        """Return the perpendicular dark-run bounds of the line's own stroke.
+
+        Works even when the detected centreline is a pixel or two off the
+        true stroke: we first snap to the nearest dark pixel at the midpoint,
+        then walk out to the contiguous run's edges.
+        """
+        h, w = gray.shape[:2]
+        if line.category == LineCategory.VERTICAL:
+            x = int(round((line.x1 + line.x2) / 2.0))
+            y = int(round((line.y1 + line.y2) / 2.0))
+            if not (0 <= y < h) or x < 0 or x >= w:
+                return 0, -1
+            row = gray[y]
+            lo, hi = x, x
+            for d in range(0, 16):
+                if 0 <= x - d < w and row[x - d] < threshold:
+                    lo = x - d
+                    break
+            for d in range(0, 16):
+                if 0 <= x + d < w and row[x + d] < threshold:
+                    hi = x + d
+                    break
+            if row[lo] >= threshold:  # no ink at all near the centreline
+                return 0, -1
+            while lo > 0 and row[lo - 1] < threshold:
+                lo -= 1
+            while hi < w - 1 and row[hi + 1] < threshold:
+                hi += 1
+            return lo, hi
+        # HORIZONTAL
+        y = int(round((line.y1 + line.y2) / 2.0))
+        x = int(round((line.x1 + line.x2) / 2.0))
+        if not (0 <= x < w) or y < 0 or y >= h:
+            return 0, -1
+        col = gray[:, x]
+        lo, hi = y, y
+        for d in range(0, 16):
+            if 0 <= y - d < h and col[y - d] < threshold:
+                lo = y - d
+                break
+        for d in range(0, 16):
+            if 0 <= y + d < h and col[y + d] < threshold:
+                hi = y + d
+                break
+        if col[lo] >= threshold:
+            return 0, -1
+        while lo > 0 and col[lo - 1] < threshold:
+            lo -= 1
+        while hi < h - 1 and col[hi + 1] < threshold:
+            hi += 1
+        return lo, hi
+
+    @staticmethod
     def _is_wall_edge(line: LineSegment, gray: np.ndarray, threshold: float) -> bool:
         if line.category not in (LineCategory.HORIZONTAL, LineCategory.VERTICAL):
             return False
 
+        # A leaf is rejected when a parallel stroke runs immediately next to
+        # it (double-line wall). We locate the line's own stroke and probe
+        # beyond its edge, so the result is robust to centreline offsets.
+        stroke_lo, stroke_hi = DoorDetector._line_stroke_bounds(gray, line, threshold)
+        if stroke_lo > stroke_hi:
+            return False
         if line.category == LineCategory.VERTICAL:
-            x = int(round((line.x1 + line.x2) / 2.0))
             y_min, y_max = min(line.y1, line.y2), max(line.y1, line.y2)
             if y_max - y_min < 20:
                 return False
-            left_counts = 0
-            right_counts = 0
-            for t in [0.2, 0.5, 0.8]:
-                y = int(y_min + t * (y_max - y_min))
-                if y < 0 or y >= gray.shape[0] or x < 2 or x > gray.shape[1] - 3:
-                    continue
-                if gray[y, x - 2] < threshold:
-                    left_counts += 1
-                if gray[y, x + 2] < threshold:
-                    right_counts += 1
-            return left_counts >= 2 or right_counts >= 2
+            left = DoorDetector._beyond_stroke_counts(
+                gray, stroke_lo - 1, -1, y_min, y_max, threshold,
+                is_horizontal=False,
+            )
+            right = DoorDetector._beyond_stroke_counts(
+                gray, stroke_hi + 1, 1, y_min, y_max, threshold,
+                is_horizontal=False,
+            )
+            return left >= 2 or right >= 2
 
         else:  # HORIZONTAL
-            y = int(round((line.y1 + line.y2) / 2.0))
             x_min, x_max = min(line.x1, line.x2), max(line.x1, line.x2)
             if x_max - x_min < 20:
                 return False
-            up_counts = 0
-            down_counts = 0
-            for t in [0.2, 0.5, 0.8]:
-                x = int(x_min + t * (x_max - x_min))
-                if y < 2 or y > gray.shape[0] - 3 or x < 0 or x >= gray.shape[1]:
-                    continue
-                if gray[y - 2, x] < threshold:
-                    up_counts += 1
-                if gray[y + 2, x] < threshold:
-                    down_counts += 1
-            return up_counts >= 2 or down_counts >= 2
+            up = DoorDetector._beyond_stroke_counts(
+                gray, stroke_lo - 1, -1, x_min, x_max, threshold,
+                is_horizontal=True,
+            )
+            down = DoorDetector._beyond_stroke_counts(
+                gray, stroke_hi + 1, 1, x_min, x_max, threshold,
+                is_horizontal=True,
+            )
+            return up >= 2 or down >= 2
+
+    @staticmethod
+    def _beyond_stroke_counts(
+        gray: np.ndarray, start: int, direction: int, lo: int, hi: int,
+        threshold: float, is_horizontal: bool,
+    ) -> int:
+        """Count sample points that see a parallel stroke beyond `start`.
+
+        Probes a few px outward from the line's own stroke edge; if nothing
+        dark is found within the probe window the line is an isolated leaf.
+        """
+        h, w = gray.shape[:2]
+        hits = 0
+        for t in [0.2, 0.5, 0.8]:
+            along = int(lo + t * (hi - lo))
+            found = False
+            for d in range(0, 12):
+                if is_horizontal:
+                    coord = start + direction * d
+                    if coord < 0 or coord >= h:
+                        break
+                    found = gray[coord, along] < threshold
+                else:
+                    coord = start + direction * d
+                    if coord < 0 or coord >= w:
+                        break
+                    found = gray[along, coord] < threshold
+                if found:
+                    break
+            if found:
+                hits += 1
+        return hits
+
+    @staticmethod
+    def _band_is_dark(
+        gray: np.ndarray, fixed_coord: int, p: int,
+        is_horizontal: bool, threshold: float, radius: int = 2,
+    ) -> bool:
+        """True when any pixel in the ±radius band is dark.
+
+        Scans a small band instead of a single pixel so the result is robust
+        to walls whose centerline is a few pixels off the detector's ideal
+        position, while still detecting 1px-thin walls.
+        """
+        h, w = gray.shape[:2]
+        if is_horizontal:
+            lo = max(0, fixed_coord - radius)
+            hi = min(h - 1, fixed_coord + radius)
+            band = gray[lo:hi + 1, p]
+        else:
+            lo = max(0, fixed_coord - radius)
+            hi = min(w - 1, fixed_coord + radius)
+            band = gray[p, lo:hi + 1]
+        if band.size == 0:
+            return False
+        return bool(np.min(band) < threshold)
 
     @staticmethod
     def _find_gap_on_line(
@@ -128,10 +240,9 @@ class DoorDetector:
         in_gap = False
         start = lo
         for p in range(lo, hi + 1):
-            if is_horizontal:
-                is_white = gray[fixed_coord, p] > threshold
-            else:
-                is_white = gray[p, fixed_coord] > threshold
+            is_white = not DoorDetector._band_is_dark(
+                gray, fixed_coord, p, is_horizontal, threshold,
+            )
             if is_white and not in_gap:
                 start = p
                 in_gap = True
@@ -146,6 +257,11 @@ class DoorDetector:
         for s, e in runs:
             gap_width = e - s
             if gap_width < MIN_DOOR_W or gap_width > MAX_DOOR_W:
+                continue
+            # A real doorway is flanked by wall on both sides. Reject runs
+            # that bleed into the background beyond the wall's own extent
+            # (e.g. the area above the top wall of a plan).
+            if s <= lo or e >= hi:
                 continue
             d = abs((s + e) / 2.0 - hinge_pos)
             if d < best_dist:
@@ -469,8 +585,12 @@ class DoorDetector:
             in_dark = False
             h, w = gray.shape[:2]
             for x in range(max(0, x1), min(w, x2)):
-                pix = float(gray[cy, x]) if 0 <= cy < h else 255
-                if pix < threshold:
+                if 0 <= cy < h:
+                    band = gray[max(0, cy - 2):min(h, cy + 3), x]
+                    dark = bool(np.min(band) < threshold) if band.size else False
+                else:
+                    dark = False
+                if dark:
                     if not in_dark:
                         dark_runs += 1
                         in_dark = True
@@ -487,8 +607,12 @@ class DoorDetector:
             in_dark = False
             h, w = gray.shape[:2]
             for y in range(max(0, y1), min(h, y2)):
-                pix = float(gray[y, cx]) if 0 <= cx < w else 255
-                if pix < threshold:
+                if 0 <= cx < w:
+                    band = gray[y, max(0, cx - 2):min(w, cx + 3)]
+                    dark = bool(np.min(band) < threshold) if band.size else False
+                else:
+                    dark = False
+                if dark:
                     if not in_dark:
                         dark_runs += 1
                         in_dark = True

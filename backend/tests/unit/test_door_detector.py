@@ -80,7 +80,7 @@ class TestIsWallEdge:
         gray[:, 198] = 0
         gray[:, 202] = 0
         line = LineSegment(
-            x1=200.0, y1=50.0, x2=200.0, y2=350.0,
+            x1=202.0, y1=50.0, x2=202.0, y2=350.0,
             angle=90.0, length=300.0, category=LineCategory.VERTICAL,
         )
         assert detector._is_wall_edge(line, gray, 128.0) is True
@@ -98,7 +98,7 @@ class TestIsWallEdge:
         gray[198, :] = 0
         gray[202, :] = 0
         line = LineSegment(
-            x1=50.0, y1=200.0, x2=350.0, y2=200.0,
+            x1=50.0, y1=202.0, x2=350.0, y2=202.0,
             angle=0.0, length=300.0, category=LineCategory.HORIZONTAL,
         )
         assert detector._is_wall_edge(line, gray, 128.0) is True

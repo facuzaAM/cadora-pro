@@ -12,6 +12,10 @@ class ImagePreprocessor:
       - Scanned paper plans (photos, flatbed scans)
       - Digital CAD exports
       - Low-contrast or noisy sources
+
+    Every binary output follows a single invariant polarity: **dark ink on a
+    white background** (walls are black, background is white). The detection
+    engines all depend on that contract.
     """
 
     TARGET_DPI = 300
@@ -38,15 +42,10 @@ class ImagePreprocessor:
     def denoise(self, gray: np.ndarray) -> np.ndarray:
         return cv2.fastNlMeansDenoising(gray, h=10)
 
-    def remove_salt_pepper(self, binary: np.ndarray, ksize: int = 3) -> np.ndarray:
-        kernel = cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (ksize, ksize))
-        opened = cv2.morphologyEx(binary, cv2.MORPH_OPEN, kernel)
-        closed = cv2.morphologyEx(opened, cv2.MORPH_CLOSE, kernel)
-        return closed
-
     # ── binarisation ─────────────────────────────────────────────────────
 
     def binarize_otsu(self, gray: np.ndarray) -> np.ndarray:
+        # THRESH_BINARY: dark strokes -> 0 (black ink), background -> 255.
         _, binary = cv2.threshold(
             gray, 0, 255, cv2.THRESH_BINARY + cv2.THRESH_OTSU,
         )
@@ -56,13 +55,17 @@ class ImagePreprocessor:
         self, gray: np.ndarray,
         block_size: int = 31, c: int = 10,
     ) -> np.ndarray:
+        # THRESH_BINARY (NOT _INV): dark strokes -> 0, the same polarity as
+        # binarize_otsu, so every later stage sees dark ink on white.
         return cv2.adaptiveThreshold(
             gray, 255, cv2.ADAPTIVE_THRESH_GAUSSIAN_C,
-            cv2.THRESH_BINARY_INV, block_size, c,
+            cv2.THRESH_BINARY, block_size, c,
         )
 
     def binarize_auto(self, gray: np.ndarray) -> np.ndarray:
         """Pick the best binarisation for the image.
+
+        Both branches return the same polarity: dark ink on white.
 
         Strategy: compute contrast (std dev). High contrast → Otsu.
         Low contrast (AI / photo) → adaptive with wider block.
@@ -74,16 +77,38 @@ class ImagePreprocessor:
         c = 10 if std > 30 else 15
         return self.binarize_adaptive(gray, block_size=block, c=c)
 
+    # ── polarity helper ──────────────────────────────────────────────────
+
+    @staticmethod
+    def _ink(binary: np.ndarray) -> np.ndarray:
+        """Return the ink-as-foreground (white) representation.
+
+        All morphological cleanup is done on this representation so the dark
+        ink on white polarity is never accidentally inverted.
+        """
+        return cv2.bitwise_not(binary)
+
     # ── morphological cleanup ────────────────────────────────────────────
 
-    def close_gaps(self, binary: np.ndarray, ksize: int = 3) -> np.ndarray:
+    def remove_salt_pepper(self, binary: np.ndarray, ksize: int = 3) -> np.ndarray:
+        # Closing the ink fills tiny white holes (salt) inside dark strokes.
+        # Speckle (pepper) is removed downstream by thin_noise's area filter.
+        # Crucially we never OPEN the ink: an opening kernel >= 3px would erase
+        # 1px-thin features such as window glass lines.
         kernel = np.ones((ksize, ksize), np.uint8)
-        return cv2.morphologyEx(binary, cv2.MORPH_CLOSE, kernel)
+        closed = cv2.morphologyEx(self._ink(binary), cv2.MORPH_CLOSE, kernel)
+        return cv2.bitwise_not(closed)
+
+    def close_gaps(self, binary: np.ndarray, ksize: int = 3) -> np.ndarray:
+        """Bridge small gaps between line segments (scan artifacts)."""
+        kernel = np.ones((ksize, ksize), np.uint8)
+        closed = cv2.morphologyEx(self._ink(binary), cv2.MORPH_CLOSE, kernel)
+        return cv2.bitwise_not(closed)
 
     def thin_noise(self, binary: np.ndarray, min_area: int = 30) -> np.ndarray:
         """Remove small connected components (speckle / texture)."""
         num_labels, labels, stats, _ = cv2.connectedComponentsWithStats(
-            cv2.bitwise_not(binary), connectivity=8,
+            self._ink(binary), connectivity=8,
         )
         mask = np.zeros_like(binary)
         for i in range(1, num_labels):
@@ -95,7 +120,8 @@ class ImagePreprocessor:
     def dilate_lines(self, binary: np.ndarray, ksize: int = 2) -> np.ndarray:
         """Slight dilation to reconnect broken line segments."""
         kernel = np.ones((ksize, ksize), np.uint8)
-        return cv2.dilate(binary, kernel, iterations=1)
+        dilated = cv2.dilate(self._ink(binary), kernel, iterations=1)
+        return cv2.bitwise_not(dilated)
 
     # ── geometry helpers ─────────────────────────────────────────────────
 
@@ -128,7 +154,7 @@ class ImagePreprocessor:
         return cv2.resize(image, (w, h), interpolation=cv2.INTER_CUBIC)
 
     def deskew(self, binary: np.ndarray) -> np.ndarray:
-        coords = np.column_stack(np.where(binary > 0))
+        coords = np.column_stack(np.where(self._ink(binary) > 0))
         if len(coords) == 0:
             return binary
         angle = cv2.minAreaRect(coords)[-1]
@@ -147,13 +173,48 @@ class ImagePreprocessor:
         )
 
     def remove_grid_lines(self, binary: np.ndarray) -> np.ndarray:
-        inv = cv2.bitwise_not(binary)
-        h_kernel = cv2.getStructuringElement(cv2.MORPH_RECT, (40, 1))
-        v_kernel = cv2.getStructuringElement(cv2.MORPH_RECT, (1, 40))
-        h_lines = cv2.morphologyEx(inv, cv2.MORPH_OPEN, h_kernel)
-        v_lines = cv2.morphologyEx(inv, cv2.MORPH_OPEN, v_kernel)
-        lines = cv2.bitwise_or(h_lines, v_lines)
-        return cv2.bitwise_not(cv2.subtract(inv, lines))
+        """Remove a background graph-paper lattice without touching walls.
+
+        A line counts as a grid line only when it spans nearly the full image
+        in its own direction AND there are at least three of them with regular
+        spacing in both orientations. Short or irregular lines — genuine
+        walls — are never removed.
+        """
+        if binary.ndim != 2:
+            raise ValueError("remove_grid_lines espera una imagen binaria 2D")
+
+        h, w = binary.shape[:2]
+        if h < 100 or w < 100:
+            return binary
+
+        ink = self._ink(binary)
+        row_ink = np.count_nonzero(ink, axis=1)
+        col_ink = np.count_nonzero(ink, axis=0)
+
+        grid_rows = np.where(row_ink >= int(w * 0.9))[0]
+        grid_cols = np.where(col_ink >= int(h * 0.9))[0]
+
+        if not self._regular_lattice(grid_rows) or not self._regular_lattice(grid_cols):
+            return binary
+
+        mask = np.zeros_like(binary)
+        mask[grid_rows, :] = 255
+        mask[:, grid_cols] = 255
+        return cv2.bitwise_or(binary, mask)
+
+    @staticmethod
+    def _regular_lattice(lines: np.ndarray) -> bool:
+        """True when >=3 lines have a consistent (low-variance) spacing."""
+        if len(lines) < 3:
+            return False
+        diffs = np.diff(lines)
+        median = float(np.median(diffs))
+        if median <= 0:
+            return False
+        if np.all(diffs == 0):
+            return False
+        spread = float(np.max(np.abs(diffs - median)))
+        return spread <= median * 0.25
 
     # ── full pipelines ───────────────────────────────────────────────────
 

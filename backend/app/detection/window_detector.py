@@ -23,6 +23,9 @@ MIN_DARK_RATIO = 0.08
 ARC_MIN_R = 15
 ARC_MAX_R = 120
 WALL_HALF = 1
+WALL_SCAN_OFFSETS = [0]
+BAND_RADIUS = 2
+SOLID_WALL_RATIO = 0.55
 ARC_HIT_RATIO = 0.12
 
 
@@ -108,6 +111,53 @@ class WindowDetector:
         return result
 
     @staticmethod
+    def _band_dark_ratio(
+        gray: np.ndarray, fixed_coord: int, p: int,
+        horizontal: bool, threshold: float, radius: int = BAND_RADIUS,
+    ) -> float:
+        """Fraction of dark pixels in the ±radius band around the scan line.
+
+        A solid wall has a ratio near 1.0, an empty doorway near 0.0, and a
+        window gap with thin glass lines somewhere in between — which lets the
+        gap scan distinguish "glass inside a window" from "solid wall".
+        """
+        h, w = gray.shape[:2]
+        if horizontal:
+            lo = max(0, fixed_coord - radius)
+            hi = min(h - 1, fixed_coord + radius)
+            band = gray[lo:hi + 1, p]
+        else:
+            lo = max(0, fixed_coord - radius)
+            hi = min(w - 1, fixed_coord + radius)
+            band = gray[p, lo:hi + 1]
+        if band.size == 0:
+            return 1.0
+        return float(np.mean(band < threshold))
+
+    @staticmethod
+    def _band_is_dark(
+        gray: np.ndarray, fixed_coord: int, p: int,
+        horizontal: bool, threshold: float, radius: int = BAND_RADIUS,
+    ) -> bool:
+        """True when any pixel in the ±radius band is dark.
+
+        Used to detect the presence of glass lines inside a candidate gap;
+        the gap boundary itself is decided by ``_band_dark_ratio``.
+        """
+        h, w = gray.shape[:2]
+        if horizontal:
+            lo = max(0, fixed_coord - radius)
+            hi = min(h - 1, fixed_coord + radius)
+            band = gray[lo:hi + 1, p]
+        else:
+            lo = max(0, fixed_coord - radius)
+            hi = min(w - 1, fixed_coord + radius)
+            band = gray[p, lo:hi + 1]
+        if band.size == 0:
+            return False
+        return bool(np.min(band) < threshold)
+
+    @staticmethod
     def _find_gaps_at_offset(
         gray: np.ndarray, center: int,
         lo: int, hi: int, horizontal: bool,
@@ -115,7 +165,13 @@ class WindowDetector:
     ) -> list[tuple[int, int]]:
         candidates: dict[tuple[int, int], bool] = {}
 
-        for offset in [WALL_HALF, -WALL_HALF]:
+        limit = gray.shape[1] if horizontal else gray.shape[0]
+        lo = max(0, min(lo, limit - 1))
+        hi = min(limit - 1, max(hi, 0))
+        if hi < lo:
+            return []
+
+        for offset in WALL_SCAN_OFFSETS:
             fc = center + offset
             if fc < 0:
                 continue
@@ -128,34 +184,25 @@ class WindowDetector:
             start = lo
             p = lo
             while p <= hi:
-                is_wall = gray[fc, p] < threshold if horizontal else gray[p, fc] < threshold
+                is_wall = WindowDetector._band_dark_ratio(
+                    gray, fc, p, horizontal, threshold,
+                ) > SOLID_WALL_RATIO
                 if not is_wall and not in_gap:
                     start = p
                     in_gap = True
                     p += 1
                 elif is_wall and in_gap:
-                    thin_line = False
-                    if p + 1 <= hi:
-                        if horizontal:
-                            next_pix = gray[fc, p + 1] < threshold
-                        else:
-                            next_pix = gray[p + 1, fc] < threshold
-                        if not next_pix:
-                            thin_line = True
-                    if thin_line:
-                        p += 1
-                        continue
                     wp = p - start
                     if wp >= MIN_WINDOW_W:
                         left_ok = (start - 1) >= lo
                         right_ok = p <= hi
                         if left_ok and right_ok:
-                            if horizontal:
-                                left_wall = gray[fc, start - 1] < threshold
-                                right_wall = gray[fc, p] < threshold
-                            else:
-                                left_wall = gray[start - 1, fc] < threshold
-                                right_wall = gray[p, fc] < threshold
+                            left_wall = WindowDetector._band_dark_ratio(
+                                gray, fc, start - 1, horizontal, threshold,
+                            ) > SOLID_WALL_RATIO
+                            right_wall = WindowDetector._band_dark_ratio(
+                                gray, fc, p, horizontal, threshold,
+                            ) > SOLID_WALL_RATIO
                             if left_wall and right_wall:
                                 candidates[(start, p - 1)] = True
                     in_gap = False
@@ -165,10 +212,9 @@ class WindowDetector:
                 if wp >= MIN_WINDOW_W:
                     left_ok = (start - 1) >= lo
                     if left_ok:
-                        if horizontal:
-                            left_wall = gray[fc, start - 1] < threshold
-                        else:
-                            left_wall = gray[start - 1, fc] < threshold
+                        left_wall = WindowDetector._band_dark_ratio(
+                            gray, fc, start - 1, horizontal, threshold,
+                        ) > SOLID_WALL_RATIO
                         if left_wall:
                             candidates[(start, hi)] = True
 
@@ -315,10 +361,9 @@ class WindowDetector:
         start = gs
         dark_total = 0
         for p in range(gs, ge + 1):
-            if horizontal:
-                is_dark = gray[fixed_coord, p] < threshold
-            else:
-                is_dark = gray[p, fixed_coord] < threshold
+            is_dark = WindowDetector._band_is_dark(
+                gray, fixed_coord, p, horizontal, threshold,
+            )
             if is_dark:
                 dark_total += 1
             if is_dark and not in_run:

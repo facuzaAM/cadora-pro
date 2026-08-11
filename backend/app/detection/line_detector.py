@@ -65,16 +65,19 @@ class LineDetector:
 
     def _hough_lines(self, edges: np.ndarray) -> list[RawLine]:
         h, w = edges.shape[:2]
-        # Adapt minLineLength to image size (1-2% of diagonal)
+        # Adapt Hough parameters to image size. The accumulator threshold is
+        # scaled with the diagonal so large scans don't produce a noisy wall of
+        # tiny segments while small images still detect short strokes.
         diag = math.sqrt(h ** 2 + w ** 2)
         adaptive_min_len = max(15, int(diag * 0.01))
         adaptive_gap = max(5, int(diag * 0.005))
+        adaptive_threshold = max(25, int(diag * 0.015))
 
         lines = cv2.HoughLinesP(
             edges,
             rho=1,
             theta=math.pi / 180,
-            threshold=40,
+            threshold=adaptive_threshold,
             minLineLength=adaptive_min_len,
             maxLineGap=adaptive_gap,
         )
