@@ -28,7 +28,7 @@ from app.models.project import Project
 from app.ocr.service import OcrService
 from app.repositories.document_repository import DocumentRepository
 from app.repositories.project_repository import ProjectRepository
-from app.services.plan_enforcer import consume_conversion
+from app.services.plan_enforcer import charge_project_conversion
 from app.services.storage_service import StorageService
 
 logger = logging.getLogger(__name__)
@@ -100,7 +100,7 @@ async def _process_detection(session, project_id: UUID, user_id: UUID) -> None:
         )
 
         repo = ProjectRepository(session)
-        if not await consume_conversion(session, user_id):
+        if not await charge_project_conversion(session, project_id, user_id):
             await repo.update_status(project_id, "document_uploaded")
             await session.commit()
             logger.warning(

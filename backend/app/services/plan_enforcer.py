@@ -7,6 +7,7 @@ from starlette.status import HTTP_402_PAYMENT_REQUIRED, HTTP_403_FORBIDDEN
 
 from app.config import settings
 from app.database import get_db
+from app.models.project import Project
 from app.models.user import User
 from app.repositories.user_repository import UserRepository
 from app.services.plan_config import get_plan
@@ -34,10 +35,13 @@ async def _degrade_if_past_due(user: User, db: AsyncSession) -> None:
     await repo._save(user)
 
 
-async def enforce_conversion_limit(
-    user: User = Depends(get_current_user),
-    db: AsyncSession = Depends(get_db),
-) -> User:
+async def prepare_user_for_conversion(user: User, db: AsyncSession) -> None:
+    """Run the checks that gate any conversion work (email, past-due, reset).
+
+    Split out of ``enforce_conversion_limit`` so callers that must allow
+    already-paid conversions (one per project) can reuse the checks without
+    hard-failing on the quota.
+    """
     if settings.ENVIRONMENT == "production" and not user.email_verified:
         raise HTTPException(
             status_code=HTTP_403_FORBIDDEN,
@@ -48,6 +52,13 @@ async def enforce_conversion_limit(
     if _maybe_reset_monthly(user):
         repo = UserRepository(db)
         await repo._save(user)
+
+
+async def enforce_conversion_limit(
+    user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+) -> User:
+    await prepare_user_for_conversion(user, db)
     if user.conversions_limit > 0 and user.conversions_used >= user.conversions_limit:
         raise HTTPException(
             status_code=HTTP_402_PAYMENT_REQUIRED,
@@ -55,6 +66,33 @@ async def enforce_conversion_limit(
                    "Actualiza tu plan para seguir usando el servicio.",
         )
     return user
+
+
+async def charge_project_conversion(
+    db: AsyncSession, project_id, user_id
+) -> bool:
+    """Charge at most ONE conversion per project.
+
+    A plan should cost a single conversion end-to-end (detection or export,
+    whichever runs first). Re-running detection or re-exporting the same
+    project is free. Returns False only when the user hit their limit and no
+    conversion could be charged.
+    """
+    claimed = await db.execute(
+        update(Project)
+        .where(Project.id == project_id, Project.conversion_charged.is_(False))
+        .values(conversion_charged=True)
+    )
+    await db.commit()
+    if claimed.rowcount != 1:  # type: ignore[attr-defined]
+        return True  # already charged by a previous detection/export.
+    if await consume_conversion(db, user_id):
+        return True
+    await db.execute(
+        update(Project).where(Project.id == project_id).values(conversion_charged=False)
+    )
+    await db.commit()
+    return False
 
 
 async def consume_conversion(db: AsyncSession, user_id) -> bool:

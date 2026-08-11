@@ -40,7 +40,10 @@ from app.ocr.service import OcrService
 from app.repositories.document_repository import DocumentRepository
 from app.repositories.project_repository import ProjectRepository
 from app.services.plan_config import get_plan
-from app.services.plan_enforcer import consume_conversion, enforce_conversion_limit
+from app.services.plan_enforcer import (
+    charge_project_conversion,
+    prepare_user_for_conversion,
+)
 from app.services.storage_service import StorageService
 from app.utils.dependencies import get_current_user
 from app.utils.rate_limit import rate_limit
@@ -155,7 +158,7 @@ async def generate_cad(
     request: Request,
     project_id: UUID,
     body: CadGenerateRequest = CadGenerateRequest(),
-    user: User = Depends(enforce_conversion_limit),
+    user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
     """Run full detection pipeline and generate a DXF/DWG file."""
@@ -165,6 +168,18 @@ async def generate_cad(
     project = await project_repo.get_by_id(project_id)
     if not project or project.user_id != user.id:
         raise HTTPException(status_code=HTTP_404_NOT_FOUND, detail="Proyecto no encontrado")
+
+    # A project pays a single conversion (detection or export, whichever runs
+    # first). Re-exporting an already-paid project is free, so we only enforce
+    # the quota when the project hasn't been charged yet.
+    if not project.conversion_charged:
+        await prepare_user_for_conversion(user, db)
+        if user.conversions_limit > 0 and user.conversions_used >= user.conversions_limit:
+            raise HTTPException(
+                status_code=HTTP_402_PAYMENT_REQUIRED,
+                detail="Has alcanzado el límite de conversiones de tu plan. "
+                       "Actualiza tu plan para seguir usando el servicio.",
+            )
 
     ext = "dwg" if fmt == "dwg" else "dxf"
     cache_key = _cad_cache_path(project_id, fmt)
@@ -247,7 +262,7 @@ async def generate_cad(
             content_type=content_type,
         )
 
-        if not await consume_conversion(db, user.id):
+        if not await charge_project_conversion(db, project_id, user.id):
             await project_repo.update_status(project_id, "error")
             raise HTTPException(
                 status_code=HTTP_402_PAYMENT_REQUIRED,

@@ -8,7 +8,11 @@ from uuid import UUID
 import cv2
 from fastapi import APIRouter, Depends, HTTPException, Request, Response
 from sqlalchemy.ext.asyncio import AsyncSession
-from starlette.status import HTTP_400_BAD_REQUEST, HTTP_404_NOT_FOUND
+from starlette.status import (
+    HTTP_400_BAD_REQUEST,
+    HTTP_402_PAYMENT_REQUIRED,
+    HTTP_404_NOT_FOUND,
+)
 
 from app.config import settings
 from app.database import get_db
@@ -22,7 +26,7 @@ from app.editor.schemas import ElementsPayload
 from app.models.user import User
 from app.repositories.document_repository import DocumentRepository
 from app.repositories.project_repository import ProjectRepository
-from app.services.plan_enforcer import enforce_conversion_limit
+from app.services.plan_enforcer import prepare_user_for_conversion
 from app.services.storage_service import StorageService
 from app.utils.dependencies import get_current_user
 from app.utils.rate_limit import rate_limit
@@ -91,7 +95,7 @@ async def _ensure_preview(docs, project_id: UUID) -> bytes:
 async def run_detection(
     request: Request,
     project_id: UUID,
-    user: User = Depends(enforce_conversion_limit),
+    user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
     """Queue detection for the background worker (idempotent). Returns status immediately."""
@@ -101,6 +105,17 @@ async def run_detection(
         return {"status": "completed"}
     if project.status in ("detection_running", "detection_processing"):
         return {"status": "processing"}
+
+    # First detection of the project consumes the plan conversion (charged by
+    # the worker). Already-paid projects can re-detect freely.
+    if not project.conversion_charged:
+        await prepare_user_for_conversion(user, db)
+        if user.conversions_limit > 0 and user.conversions_used >= user.conversions_limit:
+            raise HTTPException(
+                status_code=HTTP_402_PAYMENT_REQUIRED,
+                detail="Has alcanzado el límite de conversiones de tu plan. "
+                       "Actualiza tu plan para seguir usando el servicio.",
+            )
 
     doc_repo = DocumentRepository(db)
     docs = await doc_repo.list_by_project(project_id)

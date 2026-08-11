@@ -121,6 +121,20 @@ class TestGroupCollinear:
         assert h_merged[0].x1 <= 0
         assert h_merged[0].x2 >= 120
 
+    def test_merges_chained_collinear_segments(self, detector: LineDetector):
+        def seg(x1, x2):
+            return LineSegment(
+                id=__import__("uuid").uuid4(), x1=x1, y1=100, x2=x2, y2=100,
+                angle=0.0, length=float(x2 - x1), category=LineCategory.HORIZONTAL,
+            )
+
+        lines = [seg(0, 40), seg(50, 90), seg(100, 140)]
+        result = detector._group_collinear(lines)
+        h_merged = [line for line in result if line.category == LineCategory.HORIZONTAL]
+        assert len(h_merged) == 1, "segmentos fragmentados de un mismo muro deben unirse en cadena"
+        assert h_merged[0].x1 == 0
+        assert h_merged[0].x2 == 140
+
     def test_empty_input(self, detector: LineDetector):
         assert detector._group_collinear([]) == []
 

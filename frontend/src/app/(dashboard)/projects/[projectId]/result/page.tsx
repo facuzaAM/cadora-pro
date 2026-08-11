@@ -57,11 +57,12 @@ function ResultContent() {
         await cadService.generate(projectId, "dxf", token);
         markReady();
       } catch (err) {
-        generatedRef.current = false;
         if (err instanceof ApiError && err.status === 402) {
+          generatedRef.current = true;
           toast.error("Alcanzaste el límite de conversiones de tu plan");
           return;
         }
+        generatedRef.current = false;
         if (err instanceof ApiError && err.status === 409) {
           return;
         }

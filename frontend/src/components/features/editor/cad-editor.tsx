@@ -227,11 +227,35 @@ export function CadEditor({
         const hit = hitTest(pos.x, pos.y);
         if (hit) {
           setSelected(hit);
+          const initial =
+            hit.kind === "wall"
+              ? {
+                  kind: "wall" as const,
+                  id: hit.id,
+                  x1: walls.find((w) => w.id === hit.id)?.x1,
+                  y1: walls.find((w) => w.id === hit.id)?.y1,
+                  x2: walls.find((w) => w.id === hit.id)?.x2,
+                  y2: walls.find((w) => w.id === hit.id)?.y2,
+                }
+              : hit.kind === "door"
+                ? {
+                    kind: "door" as const,
+                    id: hit.id,
+                    x: doors.find((d) => d.id === hit.id)?.x,
+                    y: doors.find((d) => d.id === hit.id)?.y,
+                  }
+                : {
+                    kind: "window" as const,
+                    id: hit.id,
+                    x: windows.find((w) => w.id === hit.id)?.x,
+                    y: windows.find((w) => w.id === hit.id)?.y,
+                  };
           draftRef.current = {
             kind: "move",
             startX: pos.x,
             startY: pos.y,
             id: hit.id,
+            initial,
           };
           e.preventDefault();
         } else {
@@ -255,7 +279,7 @@ export function CadEditor({
         setSelected(null);
       }
     },
-    [tool, toUser, hitTest],
+    [tool, toUser, hitTest, walls, doors, windows],
   );
 
   const handlePointerMove = useCallback(
@@ -330,24 +354,38 @@ export function CadEditor({
         return;
       }
 
-      if (draft.kind === "move") {
+      if (draft.kind === "move" && draft.initial) {
         const dx = pos.x - draft.startX;
         const dy = pos.y - draft.startY;
-        if (selected?.kind === "wall") {
+        const ini = draft.initial as {
+          kind: "wall" | "door" | "window";
+          id: string;
+          x1?: number;
+          y1?: number;
+          x2?: number;
+          y2?: number;
+          x?: number;
+          y?: number;
+        };
+        if (ini.kind === "wall" && ini.x1 !== undefined && ini.y1 !== undefined && ini.x2 !== undefined && ini.y2 !== undefined) {
           setWalls((prev) =>
             prev.map((w) =>
-              w.id === selected.id
-                ? { ...w, x1: w.x1 + dx, y1: w.y1 + dy, x2: w.x2 + dx, y2: w.y2 + dy }
+              w.id === selected?.id
+                ? { ...w, x1: ini.x1! + dx, y1: ini.y1! + dy, x2: ini.x2! + dx, y2: ini.y2! + dy }
                 : w,
             ),
           );
-        } else if (selected?.kind === "door") {
+        } else if (ini.kind === "door" && ini.x !== undefined && ini.y !== undefined) {
           setDoors((prev) =>
-            prev.map((d) => (d.id === selected.id ? { ...d, x: d.x + dx, y: d.y + dy } : d)),
+            prev.map((d) =>
+              d.id === selected?.id ? { ...d, x: ini.x! + dx, y: ini.y! + dy } : d,
+            ),
           );
-        } else if (selected?.kind === "window") {
+        } else if (ini.kind === "window" && ini.x !== undefined && ini.y !== undefined) {
           setWindows((prev) =>
-            prev.map((w) => (w.id === selected.id ? { ...w, x: w.x + dx, y: w.y + dy } : w)),
+            prev.map((w) =>
+              w.id === selected?.id ? { ...w, x: ini.x! + dx, y: ini.y! + dy } : w,
+            ),
           );
         }
         return;

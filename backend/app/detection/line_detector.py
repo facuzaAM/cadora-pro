@@ -136,25 +136,33 @@ class LineDetector:
         if len(lines) <= 1:
             return lines
 
-        used = [False] * len(lines)
-        merged: list[LineSegment] = []
+        # Union-find: merge segments that are collinear and close. Chaining
+        # through intermediate segments joins fragmented walls (a broken by
+        # text/hatching) into a single clean wall, instead of stopping at the
+        # first segment each line is compared against.
+        parent = list(range(len(lines)))
+
+        def find(x: int) -> int:
+            while parent[x] != x:
+                parent[x] = parent[parent[x]]
+                x = parent[x]
+            return x
 
         for i in range(len(lines)):
-            if used[i]:
-                continue
-            group = [lines[i]]
-            used[i] = True
             for j in range(i + 1, len(lines)):
-                if used[j]:
-                    continue
                 if self._are_collinear_and_close(lines[i], lines[j]):
-                    group.append(lines[j])
-                    used[j] = True
-            if len(group) == 1:
-                merged.append(group[0])
-            else:
-                merged.append(self._merge_group(group))
-        return merged
+                    ri, rj = find(i), find(j)
+                    if ri != rj:
+                        parent[rj] = ri
+
+        groups: dict[int, list[LineSegment]] = {}
+        for idx, line in enumerate(lines):
+            groups.setdefault(find(idx), []).append(line)
+
+        return [
+            self._merge_group(group) if len(group) > 1 else group[0]
+            for group in groups.values()
+        ]
 
     def _are_collinear_and_close(self, a: LineSegment, b: LineSegment) -> bool:
         angle_diff = abs(a.angle - b.angle)
