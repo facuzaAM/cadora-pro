@@ -55,6 +55,23 @@ class Plan:
     doors: list[GTDoor] = field(default_factory=list)
     windows: list[GTWindow] = field(default_factory=list)
     grid: bool = False
+    double_line: bool = False
+    labels: list[tuple[str, tuple[int, int], float]] = field(default_factory=list)
+
+    STROKE_GAP = 4   # half-distance from wall centre to each stroke line
+    STROKE_W = 2
+
+    def _stroke_positions(self, wall: GTWall) -> list[tuple[int, int, int, int]]:
+        """Return the (x1, y1, x2, y2) of the ink strokes that make a wall."""
+        if wall.y1 == wall.y2:  # horizontal
+            return [(int(wall.x1), int(wall.y1) - self.STROKE_GAP,
+                     int(wall.x2), int(wall.y2) - self.STROKE_GAP),
+                    (int(wall.x1), int(wall.y1) + self.STROKE_GAP,
+                     int(wall.x2), int(wall.y2) + self.STROKE_GAP)]
+        return [(int(wall.x1) - self.STROKE_GAP, int(wall.y1),
+                 int(wall.x2) - self.STROKE_GAP, int(wall.y2)),
+                (int(wall.x1) + self.STROKE_GAP, int(wall.y1),
+                 int(wall.x2) + self.STROKE_GAP, int(wall.y2))]
 
     def render(self) -> np.ndarray:
         img = np.full((self.size[1], self.size[0], 3), 255, dtype=np.uint8)
@@ -64,29 +81,63 @@ class Plan:
             for gy in range(0, self.size[1], 50):
                 cv2.line(img, (0, gy), (self.size[0], gy), (200, 200, 200), 1)
         for wall in self.walls:
-            cv2.line(img, (int(wall.x1), int(wall.y1)),
-                     (int(wall.x2), int(wall.y2)), (0, 0, 0), 4)
+            if self.double_line:
+                for x1, y1, x2, y2 in self._stroke_positions(wall):
+                    cv2.line(img, (x1, y1), (x2, y2), (0, 0, 0), self.STROKE_W)
+            else:
+                cv2.line(img, (int(wall.x1), int(wall.y1)),
+                         (int(wall.x2), int(wall.y2)), (0, 0, 0), 4)
         for win in self.windows:
             self._draw_window(img, win)
         for d in self.doors:
             self._draw_door(img, d)
+        for text, (tx, ty), scale in self.labels:
+            cv2.putText(
+                img, text, (tx, ty), cv2.FONT_HERSHEY_SIMPLEX,
+                scale, (0, 0, 0), 2, cv2.LINE_AA,
+            )
         return img
+
+    def _erase_strokes(self, img: np.ndarray, wall: GTWall,
+                       a: int, b: int, horizontal: bool) -> None:
+        """Erase both strokes of a double-line wall between positions a and b."""
+        if horizontal:
+            for off in (-self.STROKE_GAP, self.STROKE_GAP):
+                cv2.line(img, (a, int(wall.y1) + off),
+                         (b, int(wall.y2) + off), (255, 255, 255), self.STROKE_W + 2)
+        else:
+            for off in (-self.STROKE_GAP, self.STROKE_GAP):
+                cv2.line(img, (int(wall.x1) + off, a),
+                         (int(wall.x2) + off, b), (255, 255, 255), self.STROKE_W + 2)
 
     def _draw_window(self, img: np.ndarray, w: GTWindow) -> None:
         # The wall is broken by a frame (erased region); two thin glass lines
-        # sit at the frame's inner edges, a few px apart, like a CAD symbol.
+        # sit inside the gap, like a CAD symbol. On double-line walls both
+        # strokes are broken and the glass runs between them.
         if w.horizontal:
             y = int(w.y)
             x1, x2 = int(w.x - w.width / 2), int(w.x + w.width / 2)
-            cv2.line(img, (x1, y), (x2, y), (255, 255, 255), 8)
-            cv2.line(img, (x1, y - 2), (x2, y - 2), (0, 0, 0), 1)
-            cv2.line(img, (x1, y + 2), (x2, y + 2), (0, 0, 0), 1)
+            if self.double_line:
+                wall = GTWall(x1, y, x2, y)
+                self._erase_strokes(img, wall, x1, x2, True)
+                cv2.line(img, (x1, y - 2), (x2, y - 2), (0, 0, 0), 1)
+                cv2.line(img, (x1, y + 2), (x2, y + 2), (0, 0, 0), 1)
+            else:
+                cv2.line(img, (x1, y), (x2, y), (255, 255, 255), 8)
+                cv2.line(img, (x1, y - 2), (x2, y - 2), (0, 0, 0), 1)
+                cv2.line(img, (x1, y + 2), (x2, y + 2), (0, 0, 0), 1)
         else:
             x = int(w.x)
             y1, y2 = int(w.y - w.width / 2), int(w.y + w.width / 2)
-            cv2.line(img, (x, y1), (x, y2), (255, 255, 255), 8)
-            cv2.line(img, (x - 2, y1), (x - 2, y2), (0, 0, 0), 1)
-            cv2.line(img, (x + 2, y1), (x + 2, y2), (0, 0, 0), 1)
+            if self.double_line:
+                wall = GTWall(x, y1, x, y2)
+                self._erase_strokes(img, wall, y1, y2, False)
+                cv2.line(img, (x - 2, y1), (x - 2, y2), (0, 0, 0), 1)
+                cv2.line(img, (x + 2, y1), (x + 2, y2), (0, 0, 0), 1)
+            else:
+                cv2.line(img, (x, y1), (x, y2), (255, 255, 255), 8)
+                cv2.line(img, (x - 2, y1), (x - 2, y2), (0, 0, 0), 1)
+                cv2.line(img, (x + 2, y1), (x + 2, y2), (0, 0, 0), 1)
 
     def _draw_door(self, img: np.ndarray, d: GTDoor) -> None:
         half = d.width / 2
@@ -96,14 +147,22 @@ class Plan:
             # swing arc drawn in the quadrant the detector scans (180-270).
             x = int(d.x)
             top = int(d.y - half)
-            cv2.line(img, (x, top), (x, int(d.y + half)), (255, 255, 255), 6)
+            if self.double_line:
+                wall = GTWall(x, top, x, int(d.y + half))
+                self._erase_strokes(img, wall, top, int(d.y + half), False)
+            else:
+                cv2.line(img, (x, top), (x, int(d.y + half)), (255, 255, 255), 6)
             cv2.line(img, (x, top), (x + r, top), (0, 0, 0), 4)
             cv2.ellipse(img, (x, top), (r, r), 0, 180, 270, (0, 0, 0), 2)
         else:
             # Door in a horizontal wall: leaf hinged at the left end.
             y = int(d.y)
             left = int(d.x - half)
-            cv2.line(img, (left, y), (int(d.x + half), y), (255, 255, 255), 6)
+            if self.double_line:
+                wall = GTWall(left, y, int(d.x + half), y)
+                self._erase_strokes(img, wall, left, int(d.x + half), True)
+            else:
+                cv2.line(img, (left, y), (int(d.x + half), y), (255, 255, 255), 6)
             cv2.line(img, (left, y), (left, y + r), (0, 0, 0), 4)
             cv2.ellipse(img, (left, y), (r, r), 0, 90, 180, (0, 0, 0), 2)
 
@@ -176,6 +235,43 @@ def build_plans() -> list[Plan]:
             ],
             windows=[
                 GTWindow(x=350, y=600, width=90, horizontal=True),
+            ],
+        ),
+        Plan(
+            name="double_walls",
+            size=(s, s),
+            double_line=True,
+            walls=[
+                GTWall(200, 200, 1000, 200),
+                GTWall(200, 1000, 1000, 1000),
+                GTWall(200, 200, 200, 1000),
+                GTWall(1000, 200, 1000, 1000),
+                GTWall(500, 200, 500, 1000),
+                GTWall(200, 600, 1000, 600),
+            ],
+            doors=[
+                GTDoor(x=500, y=320, width=70, vertical_wall=True),
+                GTDoor(x=720, y=600, width=70),
+            ],
+            windows=[
+                GTWindow(x=500, y=760, width=90, horizontal=False),
+                GTWindow(x=350, y=600, width=90, horizontal=True),
+            ],
+        ),
+        Plan(
+            name="text_annotations",
+            size=(s, s),
+            walls=[
+                GTWall(200, 200, 1000, 200),
+                GTWall(200, 1000, 1000, 1000),
+                GTWall(200, 200, 200, 1000),
+                GTWall(1000, 200, 1000, 1000),
+            ],
+            labels=[
+                ("COCINA", (350, 450), 1.0),
+                ("DORMITORIO", (620, 700), 0.9),
+                ("SALON", (400, 850), 1.0),
+                ("AREA 120 m2", (260, 920), 0.8),
             ],
         ),
     ]

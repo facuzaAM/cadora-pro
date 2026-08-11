@@ -12,6 +12,8 @@ from app.detection.schemas import Intersection, LineCategory, LineSegment
 ANGLE_TOLERANCE = 5.0
 MIN_LINE_LENGTH = 20
 GROUP_DISTANCE_THRESHOLD = 30
+TEXT_MAX_LEN = 400
+TEXT_MIN_RUN_FRACTION = 0.3
 
 
 @dataclass
@@ -35,9 +37,12 @@ class LineDetector:
             binary = self._preprocess(image)
         edges = self._edge_detection(binary)
         raw = self._hough_lines(edges)
+        raw += self._hough_short_lines(edges)
+        raw = self._dedupe_lines(raw)
         filtered = self._filter_noise(raw)
         classified = [self._to_domain(line) for line in filtered]
         grouped = self._group_collinear(classified)
+        grouped = self._filter_text_lines(grouped, binary)
         intersections = self._find_intersections(grouped, image.shape)
 
         h, w = image.shape[:2]
@@ -88,10 +93,93 @@ class LineDetector:
             for line in lines
         ]
 
+    def _hough_short_lines(self, edges: np.ndarray) -> list[RawLine]:
+        """Second Hough pass with a relaxed accumulator threshold.
+
+        Door leaves and swing arcs are short strokes (~30-70px); on large
+        scans the adaptive threshold used for walls can sit just above their
+        vote count, so they vanish. A lower threshold recovers them, and the
+        collinear grouping merges them with any overlapping segments.
+        """
+        h, w = edges.shape[:2]
+        diag = math.sqrt(h ** 2 + w ** 2)
+        adaptive_min_len = max(10, int(diag * 0.005))
+        adaptive_gap = max(8, int(diag * 0.01))
+        adaptive_threshold = max(8, int(diag * 0.008))
+
+        lines = cv2.HoughLinesP(
+            edges,
+            rho=1,
+            theta=math.pi / 180,
+            threshold=adaptive_threshold,
+            minLineLength=adaptive_min_len,
+            maxLineGap=adaptive_gap,
+        )
+        if lines is None:
+            return []
+        return [
+            RawLine(x1=int(line[0]), y1=int(line[1]), x2=int(line[2]), y2=int(line[3]))
+            for line in lines
+        ]
+
     # ── filtering ───────────────────────────────────────────────────────
 
     def _filter_noise(self, lines: list[RawLine]) -> list[RawLine]:
         return [line for line in lines if self._line_length(line) >= MIN_LINE_LENGTH]
+
+    @staticmethod
+    def _dedupe_lines(lines: list[RawLine]) -> list[RawLine]:
+        """Drop near-duplicate segments produced by overlapping Hough passes.
+
+        Two segments are duplicates when they are nearly collinear, close to
+        each other, and cover mostly the same span. The longer one wins.
+        """
+        result: list[RawLine] = []
+        ordered = sorted(
+            lines, key=lambda ln: LineDetector._line_length(ln), reverse=True,
+        )
+        for line in ordered:
+            duplicate = False
+            for kept in result:
+                if LineDetector._segments_close(line, kept):
+                    duplicate = True
+                    break
+            if not duplicate:
+                result.append(line)
+        return result
+
+    @staticmethod
+    def _segments_close(a: RawLine, b: RawLine, dist_tol: float = 5.0) -> bool:
+        da = math.hypot(a.x2 - a.x1, a.y2 - a.y1)
+        db = math.hypot(b.x2 - b.x1, b.y2 - b.y1)
+        if da == 0 or db == 0:
+            return False
+
+        # direction vectors; must point the same way (within 12deg)
+        ua = ((a.x2 - a.x1) / da, (a.y2 - a.y1) / da)
+        ub = ((b.x2 - b.x1) / db, (b.y2 - b.y1) / db)
+        dot = abs(ua[0] * ub[0] + ua[1] * ub[1])
+        if dot < 0.95:
+            return False
+
+        # perpendicular distance from b's endpoints to a's line
+        def perp_dist(px: float, py: float) -> float:
+            return abs(ua[1] * (px - a.x1) - ua[0] * (py - a.y1))
+
+        if perp_dist(b.x1, b.y1) > dist_tol and perp_dist(b.x2, b.y2) > dist_tol:
+            return False
+
+        # overlapping span coverage
+        a1 = a.x1 * ua[0] + a.y1 * ua[1]
+        a2 = a.x2 * ua[0] + a.y2 * ua[1]
+        b1 = b.x1 * ua[0] + b.y1 * ua[1]
+        b2 = b.x2 * ua[0] + b.y2 * ua[1]
+        lo = max(min(a1, a2), min(b1, b2))
+        hi = min(max(a1, a2), max(b1, b2))
+        if hi - lo <= 0:
+            return False
+        overlap = hi - lo
+        return overlap >= 0.5 * min(da, db)
 
     # ── classification ──────────────────────────────────────────────────
 
@@ -251,6 +339,60 @@ class LineDetector:
                 if d > best[0]:
                     best = (d, p1, p2)
         return (best[1], best[2], best[0])
+
+    def _filter_text_lines(
+        self, lines: list[LineSegment], binary: np.ndarray,
+    ) -> list[LineSegment]:
+        """Drop short axis-aligned grouped lines whose ink is fragmented.
+
+        Text labels (room names, dimensions) often line up into a plausible
+        "wall": the collinear merger chains the glyphs of a word into one
+        short segment. A real wall is a contiguous stroke, while a word is a
+        row of isolated glyphs — so the longest contiguous dark run along the
+        line stays a small fraction of its length.
+        """
+        result: list[LineSegment] = []
+        for line in lines:
+            if (
+                line.category in (LineCategory.HORIZONTAL, LineCategory.VERTICAL)
+                and line.length < TEXT_MAX_LEN
+                and not self._is_solid_along(line, binary)
+            ):
+                continue
+            result.append(line)
+        return result
+
+    @staticmethod
+    def _is_solid_along(
+        line: LineSegment, binary: np.ndarray, band: int = 2,
+    ) -> bool:
+        """True when a large contiguous dark run spans the line's length."""
+        h, w = binary.shape[:2]
+        if line.category == LineCategory.HORIZONTAL:
+            y = int(round((line.y1 + line.y2) / 2.0))
+            x1, x2 = int(min(line.x1, line.x2)), int(max(line.x1, line.x2))
+            if not (0 <= y < h) or x2 >= w:
+                return True
+            col_has_ink = (binary[max(0, y - band):y + band + 1, x1:x2 + 1]
+                           .min(axis=0) < 128)
+        elif line.category == LineCategory.VERTICAL:
+            x = int(round((line.x1 + line.x2) / 2.0))
+            y1, y2 = int(min(line.y1, line.y2)), int(max(line.y1, line.y2))
+            if not (0 <= x < w) or y2 >= h:
+                return True
+            col_has_ink = (binary[y1:y2 + 1, max(0, x - band):x + band + 1]
+                           .min(axis=1) < 128)
+        else:
+            return True
+
+        n = len(col_has_ink)
+        if n == 0:
+            return False
+        longest = cur = 0
+        for has_ink in col_has_ink:
+            cur = cur + 1 if has_ink else 0
+            longest = max(longest, cur)
+        return longest / n >= TEXT_MIN_RUN_FRACTION
 
     # ── intersections ───────────────────────────────────────────────────
 

@@ -23,9 +23,11 @@ MIN_DARK_RATIO = 0.08
 ARC_MIN_R = 15
 ARC_MAX_R = 120
 WALL_HALF = 1
-WALL_SCAN_OFFSETS = [0]
 BAND_RADIUS = 2
+GLASS_BAND_RADIUS = 4
 SOLID_WALL_RATIO = 0.55
+STROKE_SCAN_RADIUS = 12
+MAX_WALL_STROKE = 10
 ARC_HIT_RATIO = 0.12
 
 
@@ -60,11 +62,38 @@ class WindowDetector:
             for win in found:
                 key = f"{win.wall_gap_x1:.0f}_{win.wall_gap_y1:.0f}_"
                 key += f"{win.wall_gap_x2:.0f}_{win.wall_gap_y2:.0f}"
-                if key not in seen_gaps:
-                    windows.append(win)
-                    seen_gaps.add(key)
+                if key in seen_gaps:
+                    continue
+                if any(self._overlaps(win, prev) for prev in windows):
+                    continue
+                windows.append(win)
+                seen_gaps.add(key)
 
         return WindowDetectionResult(windows=windows, image_width=w, image_height=h)
+
+    @staticmethod
+    def _overlaps(a: Window, b: Window) -> bool:
+        """True when two windows share the same wall span within tolerance.
+
+        A wall broken by a door/gap can yield several near-parallel grouped
+        lines (one per fragment); each reports the same opening, so windows
+        that cover the same gap along the same wall are duplicates.
+        """
+        if a.orientation != b.orientation:
+            return False
+        if a.orientation == Orientation.HORIZONTAL:
+            if abs(a.y - b.y) > MAX_WALL_STROKE:
+                return False
+            lo = max(a.wall_gap_x1, b.wall_gap_x1)
+            hi = min(a.wall_gap_x2, b.wall_gap_x2)
+        else:
+            if abs(a.x - b.x) > MAX_WALL_STROKE:
+                return False
+            lo = max(a.wall_gap_y1, b.wall_gap_y1)
+            hi = min(a.wall_gap_y2, b.wall_gap_y2)
+        overlap = hi - lo
+        shorter = min(a.width, b.width)
+        return shorter > 0 and overlap / shorter > 0.5
 
     @staticmethod
     def _preprocess(image: np.ndarray) -> np.ndarray:
@@ -96,10 +125,36 @@ class WindowDetector:
             hi = min(h_img - 1, int(max(wall.y1, wall.y2)) + MAX_WINDOW_W)
             is_horizontal = False
 
-        gaps = self._find_gaps_at_offset(gray, center, lo, hi, is_horizontal, threshold)
+        # The grouped wall may be the merged centreline of a double-line wall
+        # (CAD style) whose centre carries no ink. Find the actual strokes and
+        # scan along each of them for gaps.
+        strokes = self._wall_strokes(gray, wall, threshold)
+        if not strokes:
+            return []
+
+        merged: list[tuple[int, int]] = []
+        for offset, thickness in strokes:
+            fc = center + offset
+            if fc < 0:
+                continue
+            if is_horizontal and fc >= gray.shape[0]:
+                continue
+            if not is_horizontal and fc >= gray.shape[1]:
+                continue
+            radius = max(1, thickness // 2)
+            wall_threshold = max(
+                0.3, min(0.8, 0.7 * thickness / (2 * radius + 1)),
+            )
+            gaps = self._find_gaps_at_offset(
+                gray, fc, lo, hi, is_horizontal, threshold,
+                radius=radius, wall_threshold=wall_threshold,
+            )
+            merged.extend(gaps)
+
+        merged = self._merge_spans(merged)
 
         result: list[Window] = []
-        for gs, ge in gaps:
+        for gs, ge in merged:
             gap_w = ge - gs
             if gap_w < MIN_WINDOW_W:
                 continue
@@ -109,6 +164,100 @@ class WindowDetector:
             if win is not None:
                 result.append(win)
         return result
+
+    @staticmethod
+    def _wall_strokes(
+        gray: np.ndarray, wall: LineSegment, threshold: float,
+    ) -> list[tuple[int, int]]:
+        """Return (perpendicular offset from centreline, thickness) per stroke.
+
+        Samples the wall at several points and keeps the profile with the most
+        ink, so a sample that falls inside a window gap doesn't hide the wall's
+        true stroke structure. Oversized runs (perpendicular walls crossing the
+        sample) are discarded so a junction never inflates the wall's strokes.
+        """
+        if wall.category == LineCategory.HORIZONTAL:
+            center = int(round((wall.y1 + wall.y2) / 2.0))
+            x_min, x_max = int(min(wall.x1, wall.x2)), int(max(wall.x1, wall.x2))
+            is_horizontal = True
+        else:
+            center = int(round((wall.x1 + wall.x2) / 2.0))
+            y_min, y_max = int(min(wall.y1, wall.y2)), int(max(wall.y1, wall.y2))
+            is_horizontal = False
+
+        best: list[tuple[int, int]] = []
+        best_ink = 0
+        for t in (0.1, 0.3, 0.5, 0.7, 0.9):
+            along = int(
+                (x_min + t * (x_max - x_min))
+                if is_horizontal else (y_min + t * (y_max - y_min))
+            )
+            profile = WindowDetector._perpendicular_profile(
+                gray, center, along, is_horizontal, threshold,
+            )
+            strokes = [
+                (int(round((lo + hi) / 2 - center)), hi - lo + 1)
+                for lo, hi in profile if hi - lo + 1 <= MAX_WALL_STROKE
+            ]
+            ink = sum(thickness for _, thickness in strokes)
+            if ink > best_ink:
+                best_ink = ink
+                best = strokes
+        return best
+
+    @staticmethod
+    def _perpendicular_profile(
+        gray: np.ndarray, center: int, along: int,
+        is_horizontal: bool, threshold: float,
+        radius: int = STROKE_SCAN_RADIUS,
+    ) -> list[tuple[int, int]]:
+        """Dark runs perpendicular to the wall at a given position.
+
+        Returns [(run_lo, run_hi)] in perpendicular coordinates.
+        """
+        h, w = gray.shape[:2]
+        if is_horizontal:
+            lo = max(0, center - radius)
+            hi = min(h - 1, center + radius)
+            if lo > hi:
+                return []
+            col = gray[lo:hi + 1, along]
+        else:
+            lo = max(0, center - radius)
+            hi = min(w - 1, center + radius)
+            if lo > hi:
+                return []
+            col = gray[along, lo:hi + 1]
+        dark = col < threshold
+        runs: list[tuple[int, int]] = []
+        i = 0
+        n = len(dark)
+        while i < n:
+            if dark[i]:
+                j = i
+                while j + 1 < n and dark[j + 1]:
+                    j += 1
+                runs.append((i, j))
+                i = j + 1
+            else:
+                i += 1
+        return [(lo + s, lo + e) for s, e in runs]
+
+    @staticmethod
+    def _merge_spans(spans: list[tuple[int, int]]) -> list[tuple[int, int]]:
+        if not spans:
+            return []
+        ordered = sorted(spans)
+        merged: list[tuple[int, int]] = []
+        cur_s, cur_e = ordered[0]
+        for s, e in ordered[1:]:
+            if s <= cur_e + 4:  # overlapping / nearly-touching gaps
+                cur_e = max(cur_e, e)
+            else:
+                merged.append((cur_s, cur_e))
+                cur_s, cur_e = s, e
+        merged.append((cur_s, cur_e))
+        return merged
 
     @staticmethod
     def _band_dark_ratio(
@@ -162,6 +311,8 @@ class WindowDetector:
         gray: np.ndarray, center: int,
         lo: int, hi: int, horizontal: bool,
         threshold: float = 128.0,
+        radius: int = BAND_RADIUS,
+        wall_threshold: float = SOLID_WALL_RATIO,
     ) -> list[tuple[int, int]]:
         candidates: dict[tuple[int, int], bool] = {}
 
@@ -171,52 +322,51 @@ class WindowDetector:
         if hi < lo:
             return []
 
-        for offset in WALL_SCAN_OFFSETS:
-            fc = center + offset
-            if fc < 0:
-                continue
-            if horizontal and fc >= gray.shape[0]:
-                continue
-            if not horizontal and fc >= gray.shape[1]:
-                continue
+        fc = center
+        if fc < 0:
+            return []
+        if horizontal and fc >= gray.shape[0]:
+            return []
+        if not horizontal and fc >= gray.shape[1]:
+            return []
 
-            in_gap = False
-            start = lo
-            p = lo
-            while p <= hi:
-                is_wall = WindowDetector._band_dark_ratio(
-                    gray, fc, p, horizontal, threshold,
-                ) > SOLID_WALL_RATIO
-                if not is_wall and not in_gap:
-                    start = p
-                    in_gap = True
-                    p += 1
-                elif is_wall and in_gap:
-                    wp = p - start
-                    if wp >= MIN_WINDOW_W:
-                        left_ok = (start - 1) >= lo
-                        right_ok = p <= hi
-                        if left_ok and right_ok:
-                            left_wall = WindowDetector._band_dark_ratio(
-                                gray, fc, start - 1, horizontal, threshold,
-                            ) > SOLID_WALL_RATIO
-                            right_wall = WindowDetector._band_dark_ratio(
-                                gray, fc, p, horizontal, threshold,
-                            ) > SOLID_WALL_RATIO
-                            if left_wall and right_wall:
-                                candidates[(start, p - 1)] = True
-                    in_gap = False
+        in_gap = False
+        start = lo
+        p = lo
+        while p <= hi:
+            is_wall = WindowDetector._band_dark_ratio(
+                gray, fc, p, horizontal, threshold, radius,
+            ) > wall_threshold
+            if not is_wall and not in_gap:
+                start = p
+                in_gap = True
                 p += 1
-            if in_gap:
-                wp = hi - start + 1
+            elif is_wall and in_gap:
+                wp = p - start
                 if wp >= MIN_WINDOW_W:
                     left_ok = (start - 1) >= lo
-                    if left_ok:
+                    right_ok = p <= hi
+                    if left_ok and right_ok:
                         left_wall = WindowDetector._band_dark_ratio(
-                            gray, fc, start - 1, horizontal, threshold,
-                        ) > SOLID_WALL_RATIO
-                        if left_wall:
-                            candidates[(start, hi)] = True
+                            gray, fc, start - 1, horizontal, threshold, radius,
+                        ) > wall_threshold
+                        right_wall = WindowDetector._band_dark_ratio(
+                            gray, fc, p, horizontal, threshold, radius,
+                        ) > wall_threshold
+                        if left_wall and right_wall:
+                            candidates[(start, p - 1)] = True
+                in_gap = False
+            p += 1
+        if in_gap:
+            wp = hi - start + 1
+            if wp >= MIN_WINDOW_W:
+                left_ok = (start - 1) >= lo
+                if left_ok:
+                    left_wall = WindowDetector._band_dark_ratio(
+                        gray, fc, start - 1, horizontal, threshold, radius,
+                    ) > wall_threshold
+                    if left_wall:
+                        candidates[(start, hi)] = True
 
         return list(candidates.keys())
 
@@ -284,11 +434,18 @@ class WindowDetector:
         is_horizontal: bool, center: int,
         threshold: float = 128.0,
     ) -> tuple[WindowType, float]:
-        glass_lines = len(dark_runs)
+        # Along-gap runs can collapse into one when the scan band covers both
+        # glass strokes, so count the glass perpendicular to the wall too.
+        gap_center = (gs + ge) / 2.0
+        perp_runs = self._perpendicular_profile(
+            gray, center, int(round(gap_center)), is_horizontal, threshold,
+            radius=GLASS_BAND_RADIUS,
+        )
+        glass_lines = max(len(dark_runs), len(perp_runs))
 
         if glass_lines >= 2:
             run_thicknesses = [e - s for s, e in dark_runs]
-            avg_thickness = sum(run_thicknesses) / len(run_thicknesses)
+            avg_thickness = sum(run_thicknesses) / len(run_thicknesses) if run_thicknesses else 0
             if avg_thickness < 6:
                 return WindowType.SLIDING, 0.7
             return WindowType.SLIDING, 0.6

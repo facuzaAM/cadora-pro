@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import math
+
 import cv2
 import numpy as np
 
@@ -154,23 +156,108 @@ class ImagePreprocessor:
         return cv2.resize(image, (w, h), interpolation=cv2.INTER_CUBIC)
 
     def deskew(self, binary: np.ndarray) -> np.ndarray:
-        coords = np.column_stack(np.where(self._ink(binary) > 0))
-        if len(coords) == 0:
-            return binary
-        angle = cv2.minAreaRect(coords)[-1]
-        if angle < -45:
-            angle = 90 + angle
-        angle = -angle
-        if abs(angle) < 0.3:
+        """Correct small rotations so axis-aligned detection can run.
+
+        Floor plans are scanned/CAD-exported almost axis-aligned; a 0.3-1.0
+        degree tilt is enough to pixelate walls and break the gap scanning of
+        the door/window detectors. We estimate the dominant skew from long
+        near-horizontal/near-vertical lines and rotate it back, filling the
+        border with the background colour.
+        """
+        angle = self._estimate_skew(binary)
+        if abs(angle) < 0.15:
             return binary
         h, w = binary.shape[:2]
         center = (w // 2, h // 2)
         matrix = cv2.getRotationMatrix2D(center, angle, 1.0)
         return cv2.warpAffine(
             binary, matrix, (w, h),
-            flags=cv2.INTER_CUBIC,
-            borderMode=cv2.BORDER_REPLICATE,
+            flags=cv2.INTER_NEAREST,
+            borderValue=255,
         )
+
+    @staticmethod
+    def _estimate_skew(binary: np.ndarray) -> float:
+        """Return the dominant rotation angle in degrees from long lines."""
+        h, w = binary.shape[:2]
+        if h < 200 or w < 200:
+            return 0.0
+        diag = float(np.hypot(h, w))
+        # Binary invariant is dark ink on white bg, but HoughLines votes on
+        # non-zero pixels, so feed it the ink (inverted) representation. The
+        # 1-deg theta step biases the median onto a whole degree and made
+        # already-aligned plans rotate by ~1 deg, so use a finer step and
+        # weight every line by its vote count so short noise (arcs, corners)
+        # can never outvote the long wall edges.
+        lines = cv2.HoughLinesWithAccumulator(
+            cv2.bitwise_not(binary), rho=1, theta=np.pi / 720,
+            threshold=int(diag * 0.08),
+        )
+        if lines is None:
+            return 0.0
+        deviations: list[float] = []
+        weights: list[float] = []
+        best_line: tuple[float, float] | None = None
+        best_vote = 0.0
+        for rho, theta, vote in np.asarray(lines).reshape(-1, 3):
+            deg = math.degrees(theta)
+            if 78 <= deg <= 102:
+                deviations.append(deg - 90)
+            elif deg <= 12:
+                deviations.append(deg)
+            elif deg >= 168:
+                deviations.append(deg - 180)
+            else:
+                continue
+            weights.append(float(vote))
+            if vote > best_vote:
+                best_vote = float(vote)
+                best_line = (float(rho), float(theta))
+        if len(deviations) < 4:
+            return 0.0
+        dev_arr = np.asarray(deviations)
+        w_arr = np.asarray(weights)
+        order = np.argsort(dev_arr)
+        dev_arr, w_arr = dev_arr[order], w_arr[order]
+        total = w_arr.sum()
+        half = total / 2.0
+        cumulative = np.cumsum(w_arr)
+        idx = int(np.searchsorted(cumulative, half))
+        idx = min(idx, len(dev_arr) - 1)
+        median = float(dev_arr[idx])
+
+        refined = ImagePreprocessor._refine_best_line(binary, best_line)
+        if refined is not None and abs(refined - median) <= 2.0:
+            return refined
+        return median
+
+    @staticmethod
+    def _refine_best_line(
+        binary: np.ndarray, best_line: tuple[float, float] | None,
+    ) -> float | None:
+        """Fit the strongest near-axis line's ink for sub-degree accuracy.
+
+        HoughLines quantizes theta (here 0.25 deg), which leaves a residual
+        tilt that can drift a wall out of the door/window scan band. Fitting
+        the ink of the strongest wall edge with cv2.fitLine recovers the
+        angle to a fraction of a degree.
+        """
+        if best_line is None:
+            return None
+        rho, theta = best_line
+        ink = cv2.bitwise_not(binary)
+        ys, xs = np.nonzero(ink)
+        if xs.size < 20:
+            return None
+        cos, sin = math.cos(theta), math.sin(theta)
+        d = np.abs(xs * cos + ys * sin - rho)
+        mask = d <= 4
+        pts = np.stack([xs[mask], ys[mask]], axis=1).astype(np.float32)
+        if len(pts) < 100:
+            return None
+        vx, vy = cv2.fitLine(pts, cv2.DIST_L2, 0, 0.01, 0.01).flatten()[:2]
+        angle = math.degrees(math.atan2(vy, vx))
+        return float(((angle + 45.0) % 90.0) - 45.0)
 
     def remove_grid_lines(self, binary: np.ndarray) -> np.ndarray:
         """Remove a background graph-paper lattice without touching walls.
@@ -231,6 +318,7 @@ class ImagePreprocessor:
         binary = self.remove_salt_pepper(binary, ksize=3)
         binary = self.close_gaps(binary, ksize=3)
         binary = self.thin_noise(binary, min_area=20)
+        binary = self.deskew(binary)
         binary = self.remove_grid_lines(binary)
         binary = self.dilate_lines(binary, ksize=2)
         return binary
