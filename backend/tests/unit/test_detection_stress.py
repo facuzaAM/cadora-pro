@@ -168,7 +168,8 @@ def _staircase_image(n: int = 8) -> np.ndarray:
     y0, x0, x1 = 180, 320, 500
     step = (700 - y0) / n
     for i in range(n):
-        cv2.line(img, (x0, int(y0 + round(step) * i)), (x1, int(y0 + round(step) * i)), (0, 0, 0), 4)
+        y = int(y0 + round(step) * i)
+        cv2.line(img, (x0, y), (x1, y), (0, 0, 0), 4)
     return img
 
 

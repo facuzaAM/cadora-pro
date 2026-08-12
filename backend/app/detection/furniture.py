@@ -118,16 +118,16 @@ STAIR_SPACING_DEV = 0.45
 STAIR_LEN_RATIO = 2.2
 
 
-def _perpendicular_coord(line: LineSegment) -> float:
-    return (line.y1 + line.y2) / 2 if line.category == LineCategory.HORIZONTAL else (
-        (line.x1 + line.x2) / 2
+def _perpendicular_coord(ln: LineSegment) -> float:
+    return (ln.y1 + ln.y2) / 2 if ln.category == LineCategory.HORIZONTAL else (
+        (ln.x1 + ln.x2) / 2
     )
 
 
-def _span(line: LineSegment) -> tuple[float, float]:
-    if line.category == LineCategory.HORIZONTAL:
-        return min(line.x1, line.x2), max(line.x1, line.x2)
-    return min(line.y1, line.y2), max(line.y1, line.y2)
+def _span(ln: LineSegment) -> tuple[float, float]:
+    if ln.category == LineCategory.HORIZONTAL:
+        return min(ln.x1, ln.x2), max(ln.x1, ln.x2)
+    return min(ln.y1, ln.y2), max(ln.y1, ln.y2)
 
 
 def _same_stair_family(a: LineSegment, b: LineSegment) -> bool:
@@ -151,7 +151,7 @@ def _same_stair_family(a: LineSegment, b: LineSegment) -> bool:
 def _is_stair_cluster(group: list[LineSegment]) -> bool:
     if len(group) < STAIR_SUCCESSIVE_MIN:
         return False
-    coords = sorted(_perpendicular_coord(l) for l in group)
+    coords = sorted(_perpendicular_coord(ln) for ln in group)
     diffs = [coords[i + 1] - coords[i] for i in range(len(coords) - 1)]
     median = float(np.median(diffs)) if diffs else 0.0
     if median <= 0:
@@ -166,7 +166,10 @@ def remove_stairs(lines: list[LineSegment]) -> list[LineSegment]:
 
     to_drop: set[int] = set()
     for cat in (LineCategory.HORIZONTAL, LineCategory.VERTICAL):
-        candidates = [l for l in lines if l.category == cat and STAIR_MIN_LEN <= l.length <= STAIR_MAX_LEN]
+        candidates = [
+            ln for ln in lines
+            if ln.category == cat and STAIR_MIN_LEN <= ln.length <= STAIR_MAX_LEN
+        ]
         groups: list[list[LineSegment]] = []
         for c in candidates:
             placed = False
@@ -179,8 +182,8 @@ def remove_stairs(lines: list[LineSegment]) -> list[LineSegment]:
                 groups.append([c])
         for g in groups:
             if _is_stair_cluster(g):
-                to_drop.update(id(l) for l in g)
+                to_drop.update(id(ln) for ln in g)
 
     if not to_drop:
         return lines
-    return [l for l in lines if id(l) not in to_drop]
+    return [ln for ln in lines if id(ln) not in to_drop]
