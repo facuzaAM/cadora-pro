@@ -110,6 +110,7 @@ def _build_verification_email(name: str, code: str) -> str:
 
 
 def _build_reset_email(name: str, code: str) -> str:
+    reset_url = f"{settings.FRONTEND_URL or 'https://cadora.pro'}/reset-password"
     return (
         '<div style="font-family:Arial,sans-serif;max-width:480px;'
         'margin:0 auto;padding:24px;">'
@@ -127,6 +128,16 @@ def _build_reset_email(name: str, code: str) -> str:
         'letter-spacing:8px;color:#1a1a1a;margin:0;">'
         f"{code}</p></div>"
         '<p style="color:#555;line-height:1.6;font-size:14px;">'
+        "Ingresalo en la página de restablecimiento para "
+        "definir tu nueva contraseña.</p>"
+        '<p style="text-align:center;margin:24px 0;">'
+        f'<a href="{reset_url}" '
+        'style="display:inline-block;background:#2563eb;color:#ffffff;'
+        'text-decoration:none;font-weight:bold;padding:12px 28px;'
+        'border-radius:8px;">Ingresar código</a></p>'
+        '<p style="color:#555;line-height:1.6;font-size:14px;">'
+        f"O entrá a <a href=\"{reset_url}\" "
+        'style="color:#2563eb;">cadora.pro/reset-password</a>. '
         "Este código expira en <strong>15 minutos</strong>. "
         "Si no solicitaste este cambio, "
         "podés ignorar este email.</p>"

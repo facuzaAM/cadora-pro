@@ -1,7 +1,8 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { Logo } from "@/components/shared/logo";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -12,6 +13,7 @@ import { ArrowLeft, Mail, CheckCircle } from "lucide-react";
 import { api } from "@/services/api";
 
 export default function ForgotPasswordPage() {
+  const router = useRouter();
   const [email, setEmail] = useState("");
   const [submitted, setSubmitted] = useState(false);
   const [loading, setLoading] = useState(false);
@@ -33,6 +35,14 @@ export default function ForgotPasswordPage() {
     }
   };
 
+  // Move straight to the code-entry page so the user always has a place to
+  // type the code they receive by email.
+  useEffect(() => {
+    if (!submitted) return;
+    const timer = setTimeout(() => router.push("/reset-password"), 2500);
+    return () => clearTimeout(timer);
+  }, [submitted, router]);
+
   if (submitted) {
     return (
       <div className="flex min-h-screen flex-col items-center justify-center p-4">
@@ -53,6 +63,9 @@ export default function ForgotPasswordPage() {
             <Button className="w-full" asChild>
               <Link href="/reset-password">Ingresar código</Link>
             </Button>
+            <p className="text-center text-sm text-muted-foreground">
+              Te redirigimos a la página para ingresar el código...
+            </p>
             <Button variant="outline" className="w-full" asChild>
               <Link href="/login">Volver a Iniciar Sesión</Link>
             </Button>
