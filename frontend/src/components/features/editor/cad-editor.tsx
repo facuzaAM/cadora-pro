@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { Move, Pencil, DoorClosed, AppWindow, RotateCw, FlipHorizontal2, Trash2 } from "lucide-react";
+import { Move, Pencil, DoorClosed, AppWindow, RotateCw, FlipHorizontal2, Trash2, Image as ImageIcon } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -153,6 +153,44 @@ export function CadEditor({
   );
 
   const strokeW = clamp(width / 500, 2, 6);
+
+  const [exportingPng, setExportingPng] = useState(false);
+
+  const exportPng = useCallback(() => {
+    const svg = svgRef.current;
+    if (!svg) return;
+    try {
+      const clone = svg.cloneNode(true) as SVGSVGElement;
+      clone.setAttribute("width", String(width));
+      clone.setAttribute("height", String(height));
+      const data = new XMLSerializer().serializeToString(clone);
+      const blob = new Blob([data], { type: "image/svg+xml;charset=utf-8" });
+      const url = URL.createObjectURL(blob);
+      const img = new Image();
+      img.onload = () => {
+        try {
+          const scale = 2;
+          const canvas = document.createElement("canvas");
+          canvas.width = width * scale;
+          canvas.height = height * scale;
+          const ctx = canvas.getContext("2d");
+          if (!ctx) return;
+          ctx.fillStyle = "#ffffff";
+          ctx.fillRect(0, 0, canvas.width, canvas.height);
+          ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+          const a = document.createElement("a");
+          a.href = canvas.toDataURL("image/png");
+          a.download = "cadora-plano.png";
+          a.click();
+        } finally {
+          URL.revokeObjectURL(url);
+        }
+      };
+      img.src = url;
+    } catch {
+      setExportingPng(false);
+    }
+  }, [width, height]);
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
@@ -615,6 +653,15 @@ export function CadEditor({
           <Badge variant="secondary">{walls.length} muros</Badge>
           <Badge variant="secondary">{doors.length} puertas</Badge>
           <Badge variant="secondary">{windows.length} ventanas</Badge>
+          <Button
+            variant="outline"
+            size="sm"
+            disabled={exportingPng}
+            onClick={() => { setExportingPng(true); exportPng(); }}
+          >
+            <ImageIcon className="mr-1.5 h-4 w-4" />
+            PNG
+          </Button>
           {dirty && <Badge variant="outline" className="text-amber-500">sin guardar</Badge>}
         </div>
       </div>
