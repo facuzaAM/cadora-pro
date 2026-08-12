@@ -1,9 +1,10 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { Move, Pencil, DoorClosed, AppWindow, RotateCw, FlipHorizontal2, Trash2, Image as ImageIcon, ZoomIn, ZoomOut, Maximize2 } from "lucide-react";
+import { Move, Pencil, DoorClosed, AppWindow, RotateCw, FlipHorizontal2, Trash2, Image as ImageIcon, FileText, ZoomIn, ZoomOut, Maximize2 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
+import { jsPDF } from "jspdf";
 import { Badge } from "@/components/ui/badge";
 import type {
   EditorArc,
@@ -221,41 +222,70 @@ export function CadEditor({
     setDirty(true);
   }, [walls, doors, windows]);
 
-  const exportPng = useCallback(() => {
+  const renderCanvas = useCallback((): Promise<HTMLCanvasElement | null> => {
     const svg = svgRef.current;
-    if (!svg) return;
-    try {
-      const clone = svg.cloneNode(true) as SVGSVGElement;
-      clone.setAttribute("width", String(width));
-      clone.setAttribute("height", String(height));
-      const data = new XMLSerializer().serializeToString(clone);
-      const blob = new Blob([data], { type: "image/svg+xml;charset=utf-8" });
-      const url = URL.createObjectURL(blob);
-      const img = new Image();
-      img.onload = () => {
-        try {
-          const scale = 2;
-          const canvas = document.createElement("canvas");
-          canvas.width = width * scale;
-          canvas.height = height * scale;
-          const ctx = canvas.getContext("2d");
-          if (!ctx) return;
-          ctx.fillStyle = "#ffffff";
-          ctx.fillRect(0, 0, canvas.width, canvas.height);
-          ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
-          const a = document.createElement("a");
-          a.href = canvas.toDataURL("image/png");
-          a.download = "cadora-plano.png";
-          a.click();
-        } finally {
-          URL.revokeObjectURL(url);
-        }
-      };
-      img.src = url;
-    } catch {
-      setExportingPng(false);
-    }
+    if (!svg) return Promise.resolve(null);
+    return new Promise((resolve) => {
+      try {
+        const clone = svg.cloneNode(true) as SVGSVGElement;
+        clone.setAttribute("width", String(width));
+        clone.setAttribute("height", String(height));
+        const data = new XMLSerializer().serializeToString(clone);
+        const blob = new Blob([data], { type: "image/svg+xml;charset=utf-8" });
+        const url = URL.createObjectURL(blob);
+        const img = new Image();
+        img.onload = () => {
+          try {
+            const scale = 2;
+            const canvas = document.createElement("canvas");
+            canvas.width = width * scale;
+            canvas.height = height * scale;
+            const ctx = canvas.getContext("2d");
+            if (!ctx) return resolve(null);
+            ctx.fillStyle = "#ffffff";
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+            ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+            resolve(canvas);
+          } finally {
+            URL.revokeObjectURL(url);
+          }
+        };
+        img.onerror = () => resolve(null);
+        img.src = url;
+      } catch {
+        resolve(null);
+      }
+    });
   }, [width, height]);
+
+  const exportPng = useCallback(() => {
+    setExportingPng(true);
+    void renderCanvas().then((canvas) => {
+      try {
+        if (!canvas) return;
+        const a = document.createElement("a");
+        a.href = canvas.toDataURL("image/png");
+        a.download = "cadora-plano.png";
+        a.click();
+      } finally {
+        setExportingPng(false);
+      }
+    });
+  }, [renderCanvas]);
+
+  const exportPdf = useCallback(() => {
+    setExportingPng(true);
+    void renderCanvas().then((canvas) => {
+      try {
+        if (!canvas) return;
+        const doc = new jsPDF({ orientation: width >= height ? "l" : "p", unit: "px", format: [canvas.width, canvas.height] });
+        doc.addImage(canvas.toDataURL("image/png"), "PNG", 0, 0, canvas.width, canvas.height);
+        doc.save("cadora-plano.pdf");
+      } finally {
+        setExportingPng(false);
+      }
+    });
+  }, [renderCanvas, width, height]);
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
@@ -780,6 +810,15 @@ export function CadEditor({
           >
             <ImageIcon className="mr-1.5 h-4 w-4" />
             PNG
+          </Button>
+          <Button
+            variant="outline"
+            size="sm"
+            disabled={exportingPng}
+            onClick={exportPdf}
+          >
+            <FileText className="mr-1.5 h-4 w-4" />
+            PDF
           </Button>
           {dirty && <Badge variant="outline" className="text-amber-500">sin guardar</Badge>}
         </div>
