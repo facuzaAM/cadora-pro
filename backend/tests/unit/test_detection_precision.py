@@ -57,6 +57,17 @@ def test_grid_removed_but_walls_kept(service: DetectionService) -> None:
     assert metrics["walls"] == (1.0, 1.0)
 
 
+def test_feature_iou_and_type(service: DetectionService) -> None:
+    """Door/window position-IoU and type must be accurate, not just recalled."""
+    plan = next(p for p in build_plans() if p.name == "doors_windows")
+    metrics = validate_plan(plan, service)
+    assert metrics["feature_iou"] >= 0.35, f"feature IoU {metrics['feature_iou']:.3f}"
+    assert metrics["type_accuracy"] is not None
+    assert metrics["type_accuracy"] >= 0.5, (
+        f"type accuracy {metrics['type_accuracy']}"
+    )
+
+
 def test_wall_iou_pixel(service: DetectionService) -> None:
     """Walls must overlap the true geometry at pixel level (not just centres)."""
     plan = next(p for p in build_plans() if p.name == "doors_windows")

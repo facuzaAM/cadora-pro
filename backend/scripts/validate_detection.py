@@ -38,6 +38,7 @@ class GTDoor:
     y: float
     width: float
     vertical_wall: bool = False
+    type: str = "single"
 
 
 @dataclass
@@ -46,6 +47,7 @@ class GTWindow:
     y: float
     width: float
     horizontal: bool = True
+    type: str = "sliding"
 
 
 @dataclass
@@ -339,6 +341,28 @@ def _window_match(det: Window, gt: GTWindow) -> bool:
     return abs(det.x - gt.x) <= 40 and abs(det.y - gt.y) <= 40
 
 
+def _feature_box_iou(
+    det_x: float, det_y: float, det_w: float,
+    gt_x: float, gt_y: float, gt_w: float, gt_h: float,
+) -> float:
+    """IoU of two axis-aligned gap boxes (position + extent accuracy)."""
+    gt_h = det_h = gt_h or 0.4 * gt_w
+    ix = min(det_x + det_w / 2, gt_x + gt_w / 2) - max(det_x - det_w / 2, gt_x - gt_w / 2)
+    iy = min(det_y + det_h / 2, gt_y + gt_h / 2) - max(det_y - det_h / 2, gt_y - gt_h / 2)
+    inter = max(0.0, ix) * max(0.0, iy)
+    det_area, gt_area = max(1e-6, det_w * det_h), max(1e-6, gt_w * gt_h)
+    union = det_area + gt_area - inter
+    return inter / union if union > 0 else 0.0
+
+
+def _door_iou(det: Door, gt: GTDoor) -> float:
+    return _feature_box_iou(det.x, det.y, det.width, gt.x, gt.y, gt.width, gt.width)
+
+
+def _window_iou(det: Window, gt: GTWindow) -> float:
+    return _feature_box_iou(det.x, det.y, det.width, gt.x, gt.y, gt.width, gt.width * 0.4)
+
+
 def _report(name: str, tp: int, fp: int, fn: int) -> tuple[float, float]:
     precision = tp / (tp + fp) if tp + fp else 0.0
     recall = tp / (tp + fn) if tp + fn else 0.0
@@ -376,6 +400,8 @@ class Metrics(TypedDict):
     doors: tuple[float, float]
     windows: tuple[float, float]
     walls_iou: float
+    feature_iou: float
+    type_accuracy: float | None
 
 
 def validate_plan(plan: Plan, service: DetectionService) -> Metrics:
@@ -419,11 +445,36 @@ def validate_plan(plan: Plan, service: DetectionService) -> Metrics:
                    if not any(_window_match(d, gt) for gt in plan.windows))
         win_prec, win_rec = _report("windows", w_tp, w_fp, len(plan.windows) - w_tp)
 
+    # Feature IoU (position + extent) and type accuracy across matched features.
+    feature_ious: list[float] = []
+    type_ok = matched_types = 0
+    for dgt in plan.doors:
+        d_mdet = [x for x in doors.doors if _door_match(x, dgt)]
+        if d_mdet:
+            feature_ious.append(max(_door_iou(x, dgt) for x in d_mdet))
+            matched_types += 1
+            if d_mdet[0].type.value == dgt.type:
+                type_ok += 1
+    for wgt in plan.windows:
+        w_mdet = [x for x in windows.windows if _window_match(x, wgt)]
+        if w_mdet:
+            feature_ious.append(max(_window_iou(x, wgt) for x in w_mdet))
+            matched_types += 1
+            if w_mdet[0].type.value == wgt.type:
+                type_ok += 1
+    feature_iou = (sum(feature_ious) / len(feature_ious)) if feature_ious else 0.0
+    type_accuracy = (type_ok / matched_types) if matched_types else None
+    if feature_ious:
+        print(f"  feature IoU = {feature_iou:.3f}    type accuracy = "
+              f"{(type_accuracy if type_accuracy is not None else 0.0):.2f}")
+
     return {
         "walls": (w_prec, w_rec),
         "doors": (d_prec, d_rec),
         "windows": (win_prec, win_rec),
         "walls_iou": walls_iou,
+        "feature_iou": feature_iou,
+        "type_accuracy": type_accuracy,
     }
 
 
