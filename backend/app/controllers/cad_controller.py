@@ -25,6 +25,7 @@ from app.detection.pipeline import (
     load_detection,
     run_full_pipeline,
     run_ocr_only,
+    serialize_detection,
 )
 from app.detection.schemas import (
     DoorDetectionResult,
@@ -118,13 +119,18 @@ async def _resolve_pipeline(
     project,
     edited_elements,
     temp_paths: list[str],
-) -> tuple[LineDetectionResult, DoorDetectionResult, WindowDetectionResult, OcrResult]:
+) -> tuple[LineDetectionResult, DoorDetectionResult, WindowDetectionResult, OcrResult, bool]:
     """Pick the fastest detection data source for DXF generation.
 
     Priority:
       1. Edited elements (from the online editor) + OCR only.
       2. Cached detection result + OCR only.
       3. Full detection pipeline (first generation).
+
+    The last element of the tuple is a flag: True only when the full detection
+    pipeline ran (case 3), so the caller can persist that fresh result as the
+    project's ``detection_result`` and unify both detection paths (the worker's
+    and the CAD export's) on a single source of truth.
     """
     cached = project.detection_result
 
@@ -142,14 +148,18 @@ async def _resolve_pipeline(
         return (
             *build_detection_results(edited_elements, image_w, image_h),
             ocr_result,
+            False,
         )
 
     if cached:
         lines_result, doors_result, windows_result = load_detection(cached)
         ocr_result = await run_ocr_only(temp_paths, ocr_service)
-        return lines_result, doors_result, windows_result, ocr_result
+        return lines_result, doors_result, windows_result, ocr_result, False
 
-    return await run_full_pipeline(temp_paths, detection_service, ocr_service)
+    return (
+        *await run_full_pipeline(temp_paths, detection_service, ocr_service),
+        True,
+    )
 
 
 @router.post("/generate/{project_id}", response_model=CadGenerateResponse)
@@ -221,9 +231,20 @@ async def generate_cad(
             path = await _download_doc_to_temp(user.id, project_id, doc)
             temp_paths.append(path)
 
-        lines_result, doors_result, windows_result, ocr_result = (
+        lines_result, doors_result, windows_result, ocr_result, persist = (
             await _resolve_pipeline(project, elements, temp_paths)
         )
+
+        # Unify the two detection paths: persist a freshly-computed full
+        # pipeline result so a later detection/editor/export on this project
+        # reuses it (the CAD export no longer does throwaway re-detection).
+        if persist:
+            await project_repo.set_detection_result(
+                project_id,
+                serialize_detection(
+                    lines_result, doors_result, windows_result, ocr_result,
+                ),
+            )
 
         tag = _uuid.uuid4().hex[:8]
         fd, output_path = tempfile.mkstemp(

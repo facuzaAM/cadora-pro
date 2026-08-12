@@ -75,6 +75,16 @@ y `.env.example` en la raíz): `DATABASE_URL`, `JWT_SECRET`, `ENVIRONMENT=produc
 `POSTGRES_PASSWORD`, credenciales de Supabase, `SMTP_*` (emails), `PADDLE_*` (pagos)
 y opcionalmente `SENTRY_DSN` / `GA_ID`.
 
+## Monitoreo
+
+- Sentry (backend + frontend) registra errores y trazas.
+- Health/readiness: `GET /api/v1/health` (DB+storage) y `GET /api/v1/readyz`
+  (DB, devuelve 503 si no está listo) — también usado por los healthchecks de
+  los contenedores.
+- Para detección de caídas externa, configurá un uptime check apuntando a
+  `https://cadora.pro/api/v1/readyz` (p. ej. UptimeRobot / Better Stack) con
+  alerta por email/Slack.
+
 ## Mantenimiento
 
 - **Backups**: cron diario (03:00) vía `backup/backup.sh`: `pg_dump` verificado,

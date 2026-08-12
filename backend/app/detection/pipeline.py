@@ -75,6 +75,14 @@ def _merge_ocr_results(results: list[OcrResult]) -> OcrResult:
     return merged
 
 
+# Process at most N pages concurrently. Detection + OCR hold full-resolution
+# images in memory, so firing off every page of a large multi-page plan at once
+# can exhaust RAM (docker mem_limit). A small cap keeps peak memory bounded
+# while still overlapping I/O between pages.
+MAX_CONCURRENT_PAGES = 2
+_pipeline_semaphore = asyncio.Semaphore(MAX_CONCURRENT_PAGES)
+
+
 async def _process_file(
     path: str,
     detection_service: DetectionService,
@@ -96,9 +104,11 @@ async def run_full_pipeline(
     detection_service: DetectionService,
     ocr_service: OcrService,
 ) -> tuple[LineDetectionResult, DoorDetectionResult, WindowDetectionResult, OcrResult]:
-    results = await asyncio.gather(
-        *(_process_file(path, detection_service, ocr_service) for path in temp_paths)
-    )
+    async def bounded(path: str):
+        async with _pipeline_semaphore:
+            return await _process_file(path, detection_service, ocr_service)
+
+    results = await asyncio.gather(*(bounded(path) for path in temp_paths))
 
     line_results = [r[0] for r in results]
     door_results = [r[1] for r in results]
