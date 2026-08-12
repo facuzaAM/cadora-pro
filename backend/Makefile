@@ -1,8 +1,15 @@
-.PHONY: install dev lint typecheck test migrate migration prod up down logs
+.PHONY: install dev lint typecheck test migrate migration prod up down logs lock
 
 install:
 	pip install -r requirements.txt
 	pip install -e ".[dev]"
+
+# Generate a reproducible dependency lockfile. Run this in the SAME Python
+# version as production (python:3.12) — a lock built on a different version
+# can contain wheels that don't exist for 3.12 and break the Docker build.
+lock:
+	pip install pip-tools
+	pip-compile --annotate --no-header --output-file requirements.lock requirements.txt
 
 dev:
 	uvicorn app.main:app --reload --host 0.0.0.0 --port 8000

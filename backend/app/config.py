@@ -10,6 +10,11 @@ class Settings(BaseSettings):
     DEBUG: bool = False
     ENVIRONMENT: str = "development"
 
+    # When a dedicated `worker` container runs the detection loop, the API
+    # sets this to false so the uvicorn event loop isn't bogged down by
+    # detection jobs. Default true keeps the in-process worker (safe fallback).
+    RUN_DETECTION_WORKER: bool = True
+
     # Database
     DATABASE_URL: str = "postgresql+asyncpg://postgres:postgres@localhost:5432/cadora"
 

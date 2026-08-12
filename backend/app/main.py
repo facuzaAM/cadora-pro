@@ -72,17 +72,23 @@ async def lifespan(app: FastAPI):
     from app.services.cleanup_service import start_cleanup_task
     cleanup_task = await start_cleanup_task()
 
-    from app.services.detection_worker import start_detection_worker
-    detection_worker = await start_detection_worker()
+    # The in-process worker is the safe default. When a dedicated `worker`
+    # container is active, the API disables it (RUN_DETECTION_WORKER=false) so
+    # detection runs outside the HTTP event loop.
+    detection_worker = None
+    if settings.RUN_DETECTION_WORKER:
+        from app.services.detection_worker import start_detection_worker
+        detection_worker = await start_detection_worker()
 
     yield
 
     cleanup_task.cancel()
     with contextlib.suppress(asyncio.CancelledError):
         await cleanup_task
-    detection_worker.cancel()
-    with contextlib.suppress(asyncio.CancelledError):
-        await detection_worker
+    if detection_worker is not None:
+        detection_worker.cancel()
+        with contextlib.suppress(asyncio.CancelledError):
+            await detection_worker
     await engine.dispose()
 
 

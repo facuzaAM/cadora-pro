@@ -101,6 +101,9 @@ services:
       # Force production mode: never inherit dev values from backend/.env.
       ENVIRONMENT: production
       DEBUG: "false"
+      # Detection runs in the dedicated `worker` container; keep the API event
+      # loop free of heavy detection jobs.
+      RUN_DETECTION_WORKER: "false"
     depends_on:
       db:
         condition: service_healthy
@@ -116,6 +119,38 @@ services:
       timeout: 10s
       start_period: 40s
       retries: 3
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "5"
+
+  worker:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    # Override the Dockerfile entrypoint (migrations + uvicorn): this process
+    # only runs the detection loop. It starts after `api` is healthy so the
+    # schema already applied.
+    entrypoint: ["python", "-m", "app.worker_main"]
+    env_file:
+      - ./backend/.env
+    environment:
+      DATABASE_URL: postgresql+asyncpg://cadora:${POSTGRES_PASSWORD}@db:5432/cadora
+      ENVIRONMENT: production
+      DEBUG: "false"
+    depends_on:
+      db:
+        condition: service_healthy
+      # Start after the API has applied migrations, so the schema exists.
+      api:
+        condition: service_healthy
+    volumes:
+      - uploads_volume:/app/uploads
+    restart: unless-stopped
+    init: true
+    mem_limit: 2g
+    cpus: 2.0
     logging:
       driver: json-file
       options:
