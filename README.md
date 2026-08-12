@@ -85,6 +85,22 @@ y opcionalmente `SENTRY_DSN` / `GA_ID`.
   `https://cadora.pro/api/v1/readyz` (p. ej. UptimeRobot / Better Stack) con
   alerta por email/Slack.
 
+## Entregabilidad de email (to-do en DNS)
+
+La app envía códigos de verificación/reset vía Resend desde `@cadora.pro`. Para
+que esos mails no caigan en spam, hay que configurar en el registrar (Namecheap):
+
+- **DKIM**: agregar el registro TXT `*._domainkey` que muestra el panel de
+  Resend para el dominio.
+- **SPF**: incluir a Resend en el SPF actual. Ej. para Resend se usa
+  `v=spf1 include:spf.efwd.registrar-servers.com include:amazonses.com ~all`
+  (confirmar el `include` que indique Resend). El SPF actual solo autoriza el
+  forwarding del registrar, no a Resend.
+- **DMARC**: crear `_dmarc.cadora.pro` TXT `v=DMARC1; p=none; rua=mailto:...`
+  y luego subir la política a `p=quarantine` cuando las tasas bajen.
+- MX: el actual es solo forwarding de Namecheap; si no se usan buzones propios
+  está bien, pero no es un servidor de email real.
+
 ## Mantenimiento
 
 - **Backups**: cron diario (03:00) vía `backup/backup.sh`: `pg_dump` verificado,
