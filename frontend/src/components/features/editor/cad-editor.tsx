@@ -106,6 +106,26 @@ function clamp(value: number, min: number, max: number): number {
   return Math.min(Math.max(value, min), max);
 }
 
+// Snap distance (in user units) to an existing wall endpoint.
+const SNAP_TO_POINT_PX = 14;
+
+function snapToEndpoints(
+  x: number,
+  y: number,
+  endpoints: Array<[number, number]>,
+): { x: number; y: number } {
+  let best: { x: number; y: number } | null = null;
+  let bd = SNAP_TO_POINT_PX;
+  for (const [ex, ey] of endpoints) {
+    const d = Math.hypot(ex - x, ey - y);
+    if (d < bd) {
+      bd = d;
+      best = { x: ex, y: ey };
+    }
+  }
+  return best ?? { x, y };
+}
+
 export function CadEditor({
   imageUrl,
   width,
@@ -411,7 +431,12 @@ export function CadEditor({
       const pos = toUser(e.clientX, e.clientY);
 
       if (draft.kind === "draw-wall") {
-        const end = snapWallEnd(draft.startX, draft.startY, pos.x, pos.y);
+        let end = snapWallEnd(draft.startX, draft.startY, pos.x, pos.y);
+        // Snap the free end to a nearby existing wall endpoint (clean corners).
+        const eps = walls.flatMap((w) =>
+          [[w.x1, w.y1], [w.x2, w.y2]] as Array<[number, number]>,
+        );
+        end = snapToEndpoints(end.x, end.y, eps);
         setWalls((prev) => {
           const next = prev.filter((w) => w.id !== "__draft__");
           return [
