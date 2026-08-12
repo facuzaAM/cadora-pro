@@ -55,11 +55,19 @@ class DetectionService:
     def _process_image_all(
         self, image: np.ndarray,
     ) -> tuple[LineDetectionResult, DoorDetectionResult, WindowDetectionResult]:
-        binary = self.preprocessor.detect_pipeline(image)
-        lines, grouped, intersections, w, h = self.detector.detect(image, binary=binary)
+        walls_binary, fine_binary = self.preprocessor.detect_pipeline_pair(image)
+        lines, grouped, intersections, w, h = self.detector.detect(image, binary=walls_binary)
 
-        doors = self.door_detector.detect(image, grouped, lines, binary=binary)
-        windows = self.window_detector.detect(image, grouped, binary=binary)
+        # Door/window gap scanning needs the gap-preserving fine binary; the
+        # walls binary has its narrow gaps closed away (see preprocessor).
+        doors = self.door_detector.detect(image, grouped, lines, binary=fine_binary)
+        door_gaps = [
+            (d.wall_gap_x1, d.wall_gap_y1, d.wall_gap_x2, d.wall_gap_y2)
+            for d in doors.doors
+        ]
+        windows = self.window_detector.detect(
+            image, grouped, binary=fine_binary, excluded_gaps=door_gaps,
+        )
 
         # Drop strokes the doors/windows already explain (leaves, arc chords,
         # glass lines) and split walls that were chained through an opening.

@@ -22,10 +22,8 @@ MAX_WINDOW_H = 80
 MIN_DARK_RATIO = 0.08
 ARC_MIN_R = 15
 ARC_MAX_R = 120
-WALL_HALF = 1
 BAND_RADIUS = 2
 GLASS_BAND_RADIUS = 4
-SOLID_WALL_RATIO = 0.55
 STROKE_SCAN_RADIUS = 12
 MAX_WALL_STROKE = 10
 ARC_HIT_RATIO = 0.12
@@ -46,10 +44,12 @@ class WindowDetector:
         image: np.ndarray,
         grouped_lines: list[LineSegment],
         binary: np.ndarray | None = None,
+        excluded_gaps: list[tuple[float, float, float, float]] | None = None,
     ) -> WindowDetectionResult:
         gray = self._preprocess(image) if binary is None else binary
         h, w = image.shape[:2]
         threshold = self._compute_threshold(gray)
+        excluded_gaps = excluded_gaps or []
 
         walls = [line for line in grouped_lines
                  if line.category in (LineCategory.HORIZONTAL, LineCategory.VERTICAL)]
@@ -66,10 +66,36 @@ class WindowDetector:
                     continue
                 if any(self._overlaps(win, prev) for prev in windows):
                     continue
+                # A door's swing arc near its gap can read as a window; a real
+                # window never shares the same opening as a door.
+                if any(self._gap_overlaps(win, eg) for eg in excluded_gaps):
+                    continue
                 windows.append(win)
                 seen_gaps.add(key)
 
         return WindowDetectionResult(windows=windows, image_width=w, image_height=h)
+
+    @staticmethod
+    def _gap_overlaps(
+        win: Window, gap: tuple[float, float, float, float],
+    ) -> bool:
+        """True when a candidate window gap overlaps an excluded (door) gap."""
+        gx1, gy1, gx2, gy2 = gap
+        a_hrz = abs(win.wall_gap_x2 - win.wall_gap_x1) >= abs(win.wall_gap_y2 - win.wall_gap_y1)
+        b_hrz = abs(gx2 - gx1) >= abs(gy2 - gy1)
+        if a_hrz != b_hrz:
+            return False
+        if a_hrz:
+            if abs(win.wall_gap_y1 - gy1) > MAX_WALL_STROKE:
+                return False
+            lo = max(min(win.wall_gap_x1, win.wall_gap_x2), min(gx1, gx2))
+            hi = min(max(win.wall_gap_x1, win.wall_gap_x2), max(gx1, gx2))
+        else:
+            if abs(win.wall_gap_x1 - gx1) > MAX_WALL_STROKE:
+                return False
+            lo = max(min(win.wall_gap_y1, win.wall_gap_y2), min(gy1, gy2))
+            hi = min(max(win.wall_gap_y1, win.wall_gap_y2), max(gy1, gy2))
+        return hi - lo > 0
 
     @staticmethod
     def _overlaps(a: Window, b: Window) -> bool:
@@ -141,13 +167,9 @@ class WindowDetector:
                 continue
             if not is_horizontal and fc >= gray.shape[1]:
                 continue
-            radius = max(1, thickness // 2)
-            wall_threshold = max(
-                0.3, min(0.8, 0.7 * thickness / (2 * radius + 1)),
-            )
             gaps = self._find_gaps_at_offset(
                 gray, fc, lo, hi, is_horizontal, threshold,
-                radius=radius, wall_threshold=wall_threshold,
+                thickness=thickness,
             )
             merged.extend(gaps)
 
@@ -171,39 +193,61 @@ class WindowDetector:
     ) -> list[tuple[int, int]]:
         """Return (perpendicular offset from centreline, thickness) per stroke.
 
-        Samples the wall at several points and keeps the profile with the most
-        ink, so a sample that falls inside a window gap doesn't hide the wall's
-        true stroke structure. Oversized runs (perpendicular walls crossing the
-        sample) are discarded so a junction never inflates the wall's strokes.
+        Samples the wall across its whole span and votes on which strokes are
+        stable. Real wall strokes appear at the same offset in nearly every
+        sample; a window gap's glass lines (two thin strokes whose *combined*
+        ink can exceed a solid single-line wall) only appear in the samples
+        that fall inside the gap. Picking the highest-ink profile would select
+        the glass and fabricate phantom windows everywhere else, so we keep
+        only the strokes present in a majority of samples. Oversized runs
+        (perpendicular walls crossing the sample) are discarded so a junction
+        never inflates the wall's strokes. Returns [] when no stable stroke
+        exists (e.g. a phantom wall with no real ink).
         """
         if wall.category == LineCategory.HORIZONTAL:
             center = int(round((wall.y1 + wall.y2) / 2.0))
-            x_min, x_max = int(min(wall.x1, wall.x2)), int(max(wall.x1, wall.x2))
+            span_lo, span_hi = int(min(wall.x1, wall.x2)), int(max(wall.x1, wall.x2))
             is_horizontal = True
         else:
             center = int(round((wall.x1 + wall.x2) / 2.0))
-            y_min, y_max = int(min(wall.y1, wall.y2)), int(max(wall.y1, wall.y2))
+            span_lo, span_hi = int(min(wall.y1, wall.y2)), int(max(wall.y1, wall.y2))
             is_horizontal = False
 
-        best: list[tuple[int, int]] = []
-        best_ink = 0
-        for t in (0.1, 0.3, 0.5, 0.7, 0.9):
-            along = int(
-                (x_min + t * (x_max - x_min))
-                if is_horizontal else (y_min + t * (y_max - y_min))
-            )
+        span = span_hi - span_lo
+        n = min(9, max(5, span // 120))
+        if span < 40:
+            n = 3
+
+        votes: dict[int, int] = {}
+        thickness: dict[int, int] = {}
+        positions = [
+            int(span_lo + t * span) for t in np.linspace(0.05, 0.95, n)
+        ]
+        for along in positions:
             profile = WindowDetector._perpendicular_profile(
                 gray, center, along, is_horizontal, threshold,
             )
-            strokes = [
-                (int(round((lo + hi) / 2 - center)), hi - lo + 1)
-                for lo, hi in profile if hi - lo + 1 <= MAX_WALL_STROKE
-            ]
-            ink = sum(thickness for _, thickness in strokes)
-            if ink > best_ink:
-                best_ink = ink
-                best = strokes
-        return best
+            for lo, hi in profile:
+                thick = hi - lo + 1
+                if thick > MAX_WALL_STROKE:
+                    continue
+                off = int(round((lo + hi) / 2 - center))
+                # Merge nearby offsets into one stroke cluster (glass lines of
+                # a double wall or two window panes sit 2-4px apart).
+                if votes:
+                    near = min(votes, key=lambda k: abs(k - off))
+                    if abs(near - off) <= 3:
+                        votes[near] += 1
+                        thickness[near] += thick
+                        continue
+                votes[off] = votes.get(off, 0) + 1
+                thickness[off] = thickness.get(off, 0) + thick
+
+        support = max(3, int(n * 0.6))
+        return [
+            (off, thickness[off] // votes[off])
+            for off, count in votes.items() if count >= support
+        ]
 
     @staticmethod
     def _perpendicular_profile(
@@ -260,30 +304,6 @@ class WindowDetector:
         return merged
 
     @staticmethod
-    def _band_dark_ratio(
-        gray: np.ndarray, fixed_coord: int, p: int,
-        horizontal: bool, threshold: float, radius: int = BAND_RADIUS,
-    ) -> float:
-        """Fraction of dark pixels in the ±radius band around the scan line.
-
-        A solid wall has a ratio near 1.0, an empty doorway near 0.0, and a
-        window gap with thin glass lines somewhere in between — which lets the
-        gap scan distinguish "glass inside a window" from "solid wall".
-        """
-        h, w = gray.shape[:2]
-        if horizontal:
-            lo = max(0, fixed_coord - radius)
-            hi = min(h - 1, fixed_coord + radius)
-            band = gray[lo:hi + 1, p]
-        else:
-            lo = max(0, fixed_coord - radius)
-            hi = min(w - 1, fixed_coord + radius)
-            band = gray[p, lo:hi + 1]
-        if band.size == 0:
-            return 1.0
-        return float(np.mean(band < threshold))
-
-    @staticmethod
     def _band_is_dark(
         gray: np.ndarray, fixed_coord: int, p: int,
         horizontal: bool, threshold: float, radius: int = BAND_RADIUS,
@@ -291,7 +311,7 @@ class WindowDetector:
         """True when any pixel in the ±radius band is dark.
 
         Used to detect the presence of glass lines inside a candidate gap;
-        the gap boundary itself is decided by ``_band_dark_ratio``.
+        the gap extent itself is decided by ``_find_gaps_at_offset``.
         """
         h, w = gray.shape[:2]
         if horizontal:
@@ -307,12 +327,42 @@ class WindowDetector:
         return bool(np.min(band) < threshold)
 
     @staticmethod
+    def _column_is_solid(
+        gray: np.ndarray, fc: int, along: int,
+        horizontal: bool, threshold: float, thickness: int,
+    ) -> bool:
+        """True when one dark run spans the wall's full core at this column.
+
+        A solid wall is a single contiguous stroke through its centre, so at
+        any column a single dark run covers the whole core (the wall centre
+        is solid). A window gap replaces the wall with two thin glass lines
+        that leave a white gap at the centre, so no single run covers the
+        core. This distinguishes openings (windows/doors) from solid wall
+        without a fragile ink-ratio threshold.
+        """
+        core_r = max(0, (thickness - 1) // 2)
+        core_len = 2 * core_r + 1
+        lo_c, hi_c = fc - core_r, fc + core_r
+        best = 0
+        for rlo, rhi in WindowDetector._perpendicular_profile(
+            gray, fc, along, horizontal, threshold,
+        ):
+            overlap = min(rhi, hi_c) - max(rlo, lo_c) + 1
+            if overlap > best:
+                best = overlap
+        # A solid wall covers the core; allow a 1px sub-pixel shift (deskew
+        # staircase) to expose one edge row without calling it an opening.
+        # Window glass lines leave a gap at the centre, so no single run
+        # spans nearly the whole core. For a 1-row core there is no slack, so
+        # still require actual ink.
+        return best >= max(1, core_len - 1)
+
+    @staticmethod
     def _find_gaps_at_offset(
         gray: np.ndarray, center: int,
         lo: int, hi: int, horizontal: bool,
         threshold: float = 128.0,
-        radius: int = BAND_RADIUS,
-        wall_threshold: float = SOLID_WALL_RATIO,
+        thickness: int = 4,
     ) -> list[tuple[int, int]]:
         candidates: dict[tuple[int, int], bool] = {}
 
@@ -334,9 +384,9 @@ class WindowDetector:
         start = lo
         p = lo
         while p <= hi:
-            is_wall = WindowDetector._band_dark_ratio(
-                gray, fc, p, horizontal, threshold, radius,
-            ) > wall_threshold
+            is_wall = WindowDetector._column_is_solid(
+                gray, fc, p, horizontal, threshold, thickness,
+            )
             if not is_wall and not in_gap:
                 start = p
                 in_gap = True
@@ -347,12 +397,12 @@ class WindowDetector:
                     left_ok = (start - 1) >= lo
                     right_ok = p <= hi
                     if left_ok and right_ok:
-                        left_wall = WindowDetector._band_dark_ratio(
-                            gray, fc, start - 1, horizontal, threshold, radius,
-                        ) > wall_threshold
-                        right_wall = WindowDetector._band_dark_ratio(
-                            gray, fc, p, horizontal, threshold, radius,
-                        ) > wall_threshold
+                        left_wall = WindowDetector._column_is_solid(
+                            gray, fc, start - 1, horizontal, threshold, thickness,
+                        )
+                        right_wall = WindowDetector._column_is_solid(
+                            gray, fc, p, horizontal, threshold, thickness,
+                        )
                         if left_wall and right_wall:
                             candidates[(start, p - 1)] = True
                 in_gap = False
@@ -362,9 +412,9 @@ class WindowDetector:
             if wp >= MIN_WINDOW_W:
                 left_ok = (start - 1) >= lo
                 if left_ok:
-                    left_wall = WindowDetector._band_dark_ratio(
-                        gray, fc, start - 1, horizontal, threshold, radius,
-                    ) > wall_threshold
+                    left_wall = WindowDetector._column_is_solid(
+                        gray, fc, start - 1, horizontal, threshold, thickness,
+                    )
                     if left_wall:
                         candidates[(start, hi)] = True
 

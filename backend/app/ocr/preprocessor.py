@@ -167,6 +167,10 @@ class ImagePreprocessor:
         angle = self._estimate_skew(binary)
         if abs(angle) < 0.15:
             return binary
+        return self._rotate(binary, angle)
+
+    @staticmethod
+    def _rotate(binary: np.ndarray, angle: float) -> np.ndarray:
         h, w = binary.shape[:2]
         center = (w // 2, h // 2)
         matrix = cv2.getRotationMatrix2D(center, angle, 1.0)
@@ -284,10 +288,26 @@ class ImagePreprocessor:
         if not self._regular_lattice(grid_rows) or not self._regular_lattice(grid_cols):
             return binary
 
-        mask = np.zeros_like(binary)
-        mask[grid_rows, :] = 255
-        mask[:, grid_cols] = 255
-        return cv2.bitwise_or(binary, mask)
+        h_grid_mask = np.zeros_like(ink)
+        h_grid_mask[grid_rows, :] = 255
+        v_grid_mask = np.zeros_like(ink)
+        v_grid_mask[:, grid_cols] = 255
+
+        # Grid lines are 1px and span the image; walls are thick bounded
+        # strokes. A 3-element directional erosion erases the thin grid but
+        # keeps ink that is part of a stroke >=3px tall/wide (a wall crossing
+        # the grid). Erasing only those thin pixels stops a full-column wipe
+        # from punching holes through the walls every grid period.
+        keep_vertical = cv2.erode(ink, np.ones((3, 1), np.uint8))
+        keep_horizontal = cv2.erode(ink, np.ones((1, 3), np.uint8))
+
+        grid = np.zeros_like(ink)
+        grid[(ink == 255) & (h_grid_mask == 255) & (keep_vertical == 0)] = 255
+        grid[(ink == 255) & (v_grid_mask == 255) & (keep_horizontal == 0)] = 255
+
+        result = binary.copy()
+        result[grid == 255] = 255
+        return result
 
     @staticmethod
     def _regular_lattice(lines: np.ndarray) -> bool:
@@ -306,22 +326,55 @@ class ImagePreprocessor:
     # ── full pipelines ───────────────────────────────────────────────────
 
     def detect_pipeline(self, image: np.ndarray) -> np.ndarray:
-        """Preprocessing optimised for line / door / window detection.
+        """Preprocessing optimised for line / wall detection.
 
         Works on any source: CAD export, scan, AI image, photo.
         Output: clean binary image with dark lines on white background.
+
+        Closing and dilation bridge small breaks so fragmented walls group
+        into single clean strokes. Door/window detectors must NOT use this
+        output for gap scanning: the same closing bridges the narrow gap
+        between a window's two glass lines, fusing them into a solid block
+        that reads as wall and hides the opening. Use ``detect_pipeline_pair``
+        which also yields a gap-preserving "fine" binary.
+        """
+        walls, _ = self.detect_pipeline_pair(image)
+        return walls
+
+    def detect_pipeline_pair(
+        self, image: np.ndarray,
+    ) -> tuple[np.ndarray, np.ndarray]:
+        """Return ``(walls_binary, fine_binary)`` from one preprocessing pass.
+
+        Both share the expensive grayscale/contrast/denoise/binarise/deskew
+        work (so they are pixel-aligned), then diverge:
+
+        - ``walls_binary``: closing + dilation bridge small breaks so walls
+          group into clean continuous strokes (line detection).
+        - ``fine_binary``: no closing/dilation, so narrow gaps and 1px-thin
+          glass lines keep their true geometry (door/window gap scanning).
         """
         gray = self.to_grayscale(image)
         gray = self.enhance_contrast(gray)
         gray = self.denoise(gray)
-        binary = self.binarize_auto(gray)
-        binary = self.remove_salt_pepper(binary, ksize=3)
-        binary = self.close_gaps(binary, ksize=3)
-        binary = self.thin_noise(binary, min_area=20)
-        binary = self.deskew(binary)
-        binary = self.remove_grid_lines(binary)
-        binary = self.dilate_lines(binary, ksize=2)
-        return binary
+        base = self.binarize_auto(gray)
+
+        # Deskew the shared base once so both outputs stay aligned.
+        angle = self._estimate_skew(base)
+        if abs(angle) >= 0.15:
+            base = self._rotate(base, angle)
+        base = self.remove_grid_lines(base)
+
+        # Fine: preserve gaps. Only drop speckle; never close or dilate.
+        fine = self.thin_noise(base, min_area=20)
+
+        # Walls: bridge small breaks, then recover stroke solidity.
+        walls = self.remove_salt_pepper(base, ksize=3)
+        walls = self.close_gaps(walls, ksize=3)
+        walls = self.thin_noise(walls, min_area=20)
+        walls = self.dilate_lines(walls, ksize=2)
+
+        return walls, fine
 
     def ocr_pipeline(self, image: np.ndarray, dpi: int = 72) -> np.ndarray:
         """Preprocessing optimised for OCR text extraction."""
