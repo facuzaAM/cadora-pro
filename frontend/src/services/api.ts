@@ -125,6 +125,7 @@ class ApiClient {
       try { body = await res.json(); } catch { body = { detail: `Error ${res.status}` }; }
       throw new ApiError(res.status, body);
     }
+    if (res.status === 204) return undefined as T;
     return res.json();
   }
 

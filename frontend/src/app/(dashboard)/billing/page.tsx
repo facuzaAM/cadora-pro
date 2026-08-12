@@ -47,9 +47,7 @@ export default function BillingPage({
   }, [params.reason]);
 
   useEffect(() => {
-    const token = api.getAccessToken();
-    if (!token) return;
-    billingService.getSubscription(token).then(setSub).finally(() => setLoading(false));
+    billingService.getSubscription().then(setSub).finally(() => setLoading(false));
   }, []);
 
   const handleManage = useCallback(async () => {
