@@ -10,13 +10,16 @@ git fetch origin "$BRANCH"
 git reset --hard "origin/$BRANCH"
 
 # Snapshot the DB before any schema migration runs (entrypoint runs
-# `alembic upgrade head`). If the running "backup" container can reach the DB
-# this aborts the deploy on failure, giving a recoverable point. On a first
-# deploy there is no container yet and the snapshot is skipped.
+# `alembic upgrade head`). A raw pg_dump in the backups volume is the recovery
+# point; the offsite/GPG parts of backup.sh aren't needed here and can fail
+# for unrelated reasons, so we warn (not abort) on a failed snapshot. On a
+# first deploy there is no container yet and the snapshot is skipped.
 echo "→ Backing up database before deployment..."
-if docker compose ps --format '{{.Service}}' | grep -qx "backup"; then
-  docker compose exec -T backup bash /app/backup.sh
-  echo "  ✓ Pre-deploy DB backup created"
+if docker compose ps --format '{{.Service}}' 2>/dev/null | grep -q '^backup$'; then
+  docker compose exec -T backup bash -c \
+    'mkdir -p /backups && pg_dump -h "${POSTGRES_HOST:-db}" -U "${POSTGRES_USER:-postgres}" -d "${POSTGRES_DB:-cadora}" -F c -f "/backups/predeploy_$(date +%Y%m%d_%H%M%S).dump"' \
+    && echo "  ✓ Pre-deploy DB snapshot created" \
+    || echo "  ⚠ No se pudo crear el snapshot pre-deploy (deploy continúa)"
 else
   echo "  ⚠ backup container no está corriendo — se omite snapshot pre-deploy"
 fi
