@@ -14,6 +14,7 @@ import datetime
 import logging
 import os
 import tempfile
+import time
 import uuid as _uuid
 from datetime import UTC
 from uuid import UUID
@@ -75,6 +76,7 @@ async def _claim_pending_project(session) -> tuple[UUID, UUID] | None:
 
 async def _process_detection(session, project_id: UUID, user_id: UUID) -> None:
     temp_paths = []
+    started = time.perf_counter()
     try:
         doc_repo = DocumentRepository(session)
         docs = await doc_repo.list_by_project(project_id)
@@ -97,6 +99,7 @@ async def _process_detection(session, project_id: UUID, user_id: UUID) -> None:
         )
         payload = serialize_detection(
             lines_result, doors_result, windows_result, ocr_result,
+            processing_ms=int((time.perf_counter() - started) * 1000),
         )
 
         repo = ProjectRepository(session)

@@ -86,12 +86,48 @@ async def admin_stats(
         await db.execute(select(func.coalesce(func.sum(User.conversions_used), 0)))
     ).scalar_one()
 
+    from sqlalchemy import Float, cast
+
+    # Detection quality from the stored JSONB  (projects.detection_result['quality']).
+    detected_projects = (
+        await db.execute(
+            select(func.count(Project.id)).where(Project.detection_result.isnot(None))
+        )
+    ).scalar_one()
+    error_projects = (
+        await db.execute(
+            select(func.count(Project.id)).where(Project.status == "error")
+        )
+    ).scalar_one()
+
+    avg_conf_expr = Project.detection_result[("quality", "confidence_avg")].astext
+    avg_confidence_row = (
+        await db.execute(select(func.avg(cast(avg_conf_expr, Float))))
+    ).scalar_one()
+    avg_confidence = round(float(avg_confidence_row), 3) if avg_confidence_row is not None else None
+
+    def _qty(path: str):
+        return cast(Project.detection_result[tuple(path.split("."))].astext, Float)
+
+    total_elements_row = (
+        await db.execute(
+            select(
+                func.sum(_qty("quality.walls") + _qty("quality.doors") + _qty("quality.windows"))
+            )
+        )
+    ).scalar_one()
+    total_elements = int(total_elements_row) if total_elements_row else 0
+
     return {
         "total_users": total_users,
         "total_projects": total_projects,
         "paying_users": paying_users,
         "mrr": mrr,
         "total_conversions_used": total_conversions,
+        "detected_projects": detected_projects,
+        "error_projects": error_projects,
+        "avg_detection_confidence": avg_confidence,
+        "total_detected_elements": total_elements,
     }
 
 

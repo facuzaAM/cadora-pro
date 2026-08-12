@@ -11,6 +11,10 @@ import {
   Loader2,
   DollarSign,
   CreditCard,
+  Crosshair,
+  AlertTriangle,
+  Target,
+  Boxes,
 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -148,6 +152,58 @@ export default function AdminPage() {
             <div>
               <p className="text-2xl font-bold tabular-nums">{stats?.total_projects ?? "—"}</p>
               <p className="text-xs text-muted-foreground">Proyectos</p>
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+
+      {/* Detection quality */}
+      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+        <Card>
+          <CardContent className="flex items-center gap-3 p-5">
+            <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-sky-500/10">
+              <Crosshair className="h-5 w-5 text-sky-500" />
+            </div>
+            <div>
+              <p className="text-2xl font-bold tabular-nums">{stats?.detected_projects ?? "—"}</p>
+              <p className="text-xs text-muted-foreground">Planes detectados</p>
+            </div>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardContent className="flex items-center gap-3 p-5">
+            <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-rose-500/10">
+              <AlertTriangle className="h-5 w-5 text-rose-500" />
+            </div>
+            <div>
+              <p className="text-2xl font-bold tabular-nums">{stats?.error_projects ?? "—"}</p>
+              <p className="text-xs text-muted-foreground">Con errores</p>
+            </div>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardContent className="flex items-center gap-3 p-5">
+            <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-emerald-500/10">
+              <Target className="h-5 w-5 text-emerald-500" />
+            </div>
+            <div>
+              <p className="text-2xl font-bold tabular-nums">
+                {stats?.avg_detection_confidence != null
+                  ? `${Math.round(stats.avg_detection_confidence * 100)}%`
+                  : "—"}
+              </p>
+              <p className="text-xs text-muted-foreground">Confianza media</p>
+            </div>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardContent className="flex items-center gap-3 p-5">
+            <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-violet-500/10">
+              <Boxes className="h-5 w-5 text-violet-500" />
+            </div>
+            <div>
+              <p className="text-2xl font-bold tabular-nums">{stats?.total_detected_elements ?? "—"}</p>
+              <p className="text-xs text-muted-foreground">Elementos detectados</p>
             </div>
           </CardContent>
         </Card>

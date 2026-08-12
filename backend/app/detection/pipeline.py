@@ -136,7 +136,14 @@ def serialize_detection(
     doors_result: DoorDetectionResult,
     windows_result: WindowDetectionResult,
     ocr_result: OcrResult,
+    processing_ms: int | None = None,
 ) -> dict:
+    doors = doors_result.doors
+    windows = windows_result.windows
+    confidences = [d.confidence for d in doors] + [w.confidence for w in windows]
+    confidence_avg = (
+        round(sum(confidences) / len(confidences), 3) if confidences else None
+    )
     return {
         "lines": lines_result.model_dump(mode="json"),
         "doors": doors_result.model_dump(mode="json"),
@@ -153,6 +160,14 @@ def serialize_detection(
             doors_result.image_height,
             windows_result.image_height,
         ),
+        "quality": {
+            "walls": len(lines_result.grouped_lines),
+            "doors": len(doors),
+            "windows": len(windows),
+            "confidence_avg": confidence_avg,
+            "processing_ms": processing_ms,
+            "failed": False,
+        },
     }
 
 

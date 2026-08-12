@@ -22,6 +22,10 @@ export interface AdminStats {
   paying_users: number;
   mrr: number;
   total_conversions_used: number;
+  detected_projects: number;
+  error_projects: number;
+  avg_detection_confidence: number | null;
+  total_detected_elements: number;
 }
 
 export const adminService = {
