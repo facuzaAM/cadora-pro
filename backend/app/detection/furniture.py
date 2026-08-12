@@ -98,6 +98,12 @@ def remove_furniture(
 
     kept: list[LineSegment] = []
     for line in lines:
+        # Keep diagonal strokes: curved walls are diagonal chords, while the
+        # repeated H/V strokes of furniture (beds, tables) are axis-aligned.
+        # Curves are simplified separately by `simplify_curves`.
+        if line.category == LineCategory.DIAGONAL:
+            kept.append(line)
+            continue
         if any(_line_in_box(line, box) for box in boxes):
             continue
         kept.append(line)

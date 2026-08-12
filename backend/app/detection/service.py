@@ -8,6 +8,7 @@ import cv2
 import numpy as np
 from pdf2image import convert_from_path
 
+from app.detection.curves import simplify_curves
 from app.detection.door_detector import DoorDetector
 from app.detection.furniture import remove_furniture, remove_stairs
 from app.detection.line_detector import LineDetector
@@ -77,6 +78,9 @@ class DetectionService:
         grouped = remove_furniture(grouped, fine_binary)
         # Drop repetitive staircase treads read as walls.
         grouped = remove_stairs(grouped)
+        # Turn a noisy curved wall (many tiny diagonal chords) into a few
+        # clean chords that preserve the shape.
+        grouped = simplify_curves(grouped)
         intersections = self.detector._find_intersections(grouped, image.shape)
 
         line_result = LineDetectionResult(

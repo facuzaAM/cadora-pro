@@ -173,6 +173,25 @@ def _staircase_image(n: int = 8) -> np.ndarray:
     return img
 
 
+def _curve_image() -> np.ndarray:
+    """A shell plus a semi-elliptical curved wall (an AI-plan organic shape)."""
+    img = np.full((1000, 1400, 3), 255, np.uint8)
+    cv2.rectangle(img, (80, 80), (1320, 920), (0, 0, 0), 4)
+    cv2.ellipse(img, (700, 500), (300, 160), 0, 0, 180, (0, 0, 0), 4)
+    return img
+
+
+def test_curve_wall_preserved(service) -> None:
+    """A curved wall must survive as clean chords, not be dropped as furniture."""
+    line_result, _, _ = service._process_image_all(_curve_image())
+    diag = [w for w in line_result.grouped_lines if w.category.value == "diagonal"]
+    # The semi-ellipse between x~400..1000 yields several diagonal chords.
+    in_curve = [w for w in diag if 400 < (w.x1 + w.x2) / 2 < 1000]
+    assert len(in_curve) >= 3
+    # It must not be removed entirely (regression: was treated as furniture box).
+    assert len(diag) >= 3
+
+
 def test_stairs_not_walls(service) -> None:
     """Repeated parallel stair treads must not become walls."""
     img = _staircase_image(8)
