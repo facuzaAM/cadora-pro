@@ -25,21 +25,22 @@ jobs:
       (github.event.workflow_run.conclusion == 'success')
 
     steps:
-      - uses: actions/checkout@v4
-        with:
-          ref: ${{ env.DEPLOY_BRANCH }}
-
+      # Deploy with the runner's native SSH client. `appleboy/ssh-action`
+      # downloads a `drone-ssh` binary from GitHub Releases, which has been
+      # intermittently 503ing and breaking deploys; the built-in ssh has no
+      # such external dependency.
       - name: Deploy via SSH
-        uses: appleboy/ssh-action@v1.2.2
-        with:
-          host: ${{ secrets.SSH_HOST }}
-          username: ${{ secrets.SSH_USER }}
-          key: ${{ secrets.SSH_KEY }}
-          port: ${{ secrets.SSH_PORT || 22 }}
-          command_timeout: 30m
-          script: |
-            set -euo pipefail
-            cd "${{ secrets.DEPLOY_PATH }}"
-            git fetch origin ${{ env.DEPLOY_BRANCH }}
-            git reset --hard origin/${{ env.DEPLOY_BRANCH }}
-            bash deploy.sh
+        env:
+          SSH_HOST: ${{ secrets.SSH_HOST }}
+          SSH_USER: ${{ secrets.SSH_USER }}
+          SSH_KEY: ${{ secrets.SSH_KEY }}
+          SSH_PORT: ${{ secrets.SSH_PORT || '22' }}
+          DEPLOY_PATH: ${{ secrets.DEPLOY_PATH }}
+        run: |
+          set -euo pipefail
+          mkdir -p ~/.ssh
+          printf '%s\n' "$SSH_KEY" > ~/.ssh/id_ed25519
+          chmod 600 ~/.ssh/id_ed25519
+          ssh-keyscan -p "$SSH_PORT" "$SSH_HOST" >> ~/.ssh/known_hosts 2>/dev/null || true
+          ssh -p "$SSH_PORT" -o StrictHostKeyChecking=accept-new \
+            "$SSH_USER@$SSH_HOST" "cd '$DEPLOY_PATH' && git fetch origin ${{ env.DEPLOY_BRANCH }} && git reset --hard origin/${{ env.DEPLOY_BRANCH }} && bash deploy.sh main"
