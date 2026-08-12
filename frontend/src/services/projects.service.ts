@@ -2,7 +2,9 @@ import { api } from "./api";
 import type { Project } from "@/types";
 
 export const projectsService = {
-  list: (token?: string) => api.get<Project[]>("/projects", token),
+  // The backend caps this at 100; asking explicitly stops the list being
+  // silently truncated to the default 20 for users with many projects.
+  list: (token?: string) => api.get<Project[]>("/projects", token, { limit: 100 }),
 
   getById: (id: string, token?: string) =>
     api.get<Project>(`/projects/${id}`, token),
