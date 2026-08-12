@@ -10,6 +10,7 @@ from pdf2image import convert_from_path
 
 from app.detection.door_detector import DoorDetector
 from app.detection.line_detector import LineDetector
+from app.detection.refine import refine_walls
 from app.detection.schemas import DoorDetectionResult, LineDetectionResult, WindowDetectionResult
 from app.detection.window_detector import WindowDetector
 from app.ocr.preprocessor import ImagePreprocessor
@@ -57,6 +58,14 @@ class DetectionService:
         binary = self.preprocessor.detect_pipeline(image)
         lines, grouped, intersections, w, h = self.detector.detect(image, binary=binary)
 
+        doors = self.door_detector.detect(image, grouped, lines, binary=binary)
+        windows = self.window_detector.detect(image, grouped, binary=binary)
+
+        # Drop strokes the doors/windows already explain (leaves, arc chords,
+        # glass lines) and split walls that were chained through an opening.
+        grouped = refine_walls(grouped, doors.doors, windows.windows)
+        intersections = self.detector._find_intersections(grouped, image.shape)
+
         line_result = LineDetectionResult(
             lines=lines,
             grouped_lines=grouped,
@@ -64,12 +73,10 @@ class DetectionService:
             image_width=w,
             image_height=h,
         )
-        line_result.horizontal = [line for line in lines if line.category.value == "horizontal"]
-        line_result.vertical = [line for line in lines if line.category.value == "vertical"]
-        line_result.diagonal = [line for line in lines if line.category.value == "diagonal"]
+        line_result.horizontal = [line for line in grouped if line.category.value == "horizontal"]
+        line_result.vertical = [line for line in grouped if line.category.value == "vertical"]
+        line_result.diagonal = [line for line in grouped if line.category.value == "diagonal"]
 
-        doors = self.door_detector.detect(image, grouped, lines, binary=binary)
-        windows = self.window_detector.detect(image, grouped, binary=binary)
         return line_result, doors, windows
 
     def _process_image(self, image: np.ndarray) -> LineDetectionResult:

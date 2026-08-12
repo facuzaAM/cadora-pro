@@ -1,23 +1,13 @@
 "use client";
 
-import { useEffect, useState, type ReactNode } from "react";
+import { type ReactNode } from "react";
+import { usePathname } from "next/navigation";
 
 export function PageTransition({ children }: { children: ReactNode }) {
-  const [visible, setVisible] = useState(false);
-
-  useEffect(() => {
-    const raf = requestAnimationFrame(() => setVisible(true));
-    return () => cancelAnimationFrame(raf);
-  }, []);
+  const pathname = usePathname();
 
   return (
-    <div
-      className="transition-all duration-300 ease-out"
-      style={{
-        opacity: visible ? 1 : 0,
-        transform: visible ? "translateY(0)" : "translateY(8px)",
-      }}
-    >
+    <div key={pathname} className="animate-page-in">
       {children}
     </div>
   );

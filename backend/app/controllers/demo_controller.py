@@ -64,9 +64,9 @@ async def process_demo(
             detection_service = DetectionService()
             ocr_service = OcrService()
 
-            lines_result = await detection_service.process_file(temp_path)
-            doors_result = await detection_service.process_file_doors(temp_path)
-            windows_result = await detection_service.process_file_windows(temp_path)
+            lines_result, doors_result, windows_result = (
+                await detection_service.process_file_all(temp_path)
+            )
             ocr_result = await ocr_service.process_file(temp_path)
         except Exception:
             logger.exception("Error en pipeline de detección OCR")
@@ -90,7 +90,7 @@ async def process_demo(
             _demo_sessions[session_token] = time.time()
 
         return {
-            "walls": [wall.model_dump(mode="json") for wall in lines_result.lines],
+            "walls": [wall.model_dump(mode="json") for wall in lines_result.grouped_lines],
             "doors": [door.model_dump(mode="json") for door in doors_result.doors],
             "windows": [win.model_dump(mode="json") for win in windows_result.windows],
             "ocr_texts": [txt.model_dump(mode="json") for txt in ocr_result.texts],
