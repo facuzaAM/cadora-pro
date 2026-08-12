@@ -14,6 +14,7 @@ export interface EditorDoor {
   width: number;
   rotation: number;
   swing: "right" | "left";
+  confidence?: number;
 }
 
 export interface EditorWindow {
@@ -24,6 +25,7 @@ export interface EditorWindow {
   width: number;
   height: number;
   rotation: number;
+  confidence?: number;
 }
 
 export interface EditorElements {

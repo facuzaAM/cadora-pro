@@ -193,3 +193,6 @@ async def test_detection_completed_payload(client):
     assert len(body["walls"]) == 1
     assert len(body["doors"]) == 1
     assert len(body["windows"]) == 1
+    # Detection quality signal must be exposed to the editor UI.
+    assert "confidence" in body["doors"][0]
+    assert "confidence" in body["windows"][0]

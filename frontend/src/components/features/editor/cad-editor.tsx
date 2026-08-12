@@ -935,6 +935,21 @@ export function CadEditor({
               </span>
             </>
           )}
+          {(selected?.kind === "door" || selected?.kind === "window") && (
+            <span className="text-xs text-muted-foreground">
+              Confianza:{" "}
+              <span
+                className={cn(
+                  "font-medium",
+                  (selected.kind === "door" ? selectedDoor?.confidence : selectedWindow?.confidence) ?? 0 >= 0.65
+                    ? "text-emerald-600"
+                    : "text-amber-500",
+                )}
+              >
+                {Math.round(((selected.kind === "door" ? selectedDoor?.confidence : selectedWindow?.confidence) ?? 0) * 100)}%
+              </span>
+            </span>
+          )}
           <Button variant="destructive" size="sm" onClick={deleteSelected}>
             <Trash2 className="mr-2 h-4 w-4" />
             Eliminar

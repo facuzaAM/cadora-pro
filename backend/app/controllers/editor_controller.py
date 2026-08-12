@@ -176,6 +176,7 @@ async def get_detection(
             "width": d.width,
             "rotation": d.rotation,
             "swing": d.swing,
+            "confidence": d.confidence,
         }
         for d in doors_result.doors
     ]
@@ -188,6 +189,7 @@ async def get_detection(
             "width": w.width,
             "height": w.height,
             "rotation": w.rotation,
+            "confidence": w.confidence,
         }
         for w in windows_result.windows
     ]
