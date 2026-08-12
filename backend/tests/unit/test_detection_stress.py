@@ -159,3 +159,26 @@ def test_interior_walls_survive_degradation(service) -> None:
     assert m["walls"] == (1.0, 1.0)
     assert m["doors"] == (0.0, 0.0)
     assert m["windows"] == (0.0, 0.0)
+
+
+def _staircase_image(n: int = 8) -> np.ndarray:
+    """A shell plus `n` even staircase treads (classic false-wall source)."""
+    img = np.full((800, 1100, 3), 255, np.uint8)
+    cv2.rectangle(img, (60, 60), (1040, 740), (0, 0, 0), 5)
+    y0, x0, x1 = 180, 320, 500
+    step = (700 - y0) / n
+    for i in range(n):
+        cv2.line(img, (x0, int(y0 + round(step) * i)), (x1, int(y0 + round(step) * i)), (0, 0, 0), 4)
+    return img
+
+
+def test_stairs_not_walls(service) -> None:
+    """Repeated parallel stair treads must not become walls."""
+    img = _staircase_image(8)
+    line_result, _, _ = service._process_image_all(img)
+    treads = [
+        w for w in line_result.grouped_lines
+        if w.category.value == "horizontal" and w.length < 400
+    ]
+    # All treads removed: only the shell (long) lines remain.
+    assert treads == []

@@ -9,7 +9,7 @@ import numpy as np
 from pdf2image import convert_from_path
 
 from app.detection.door_detector import DoorDetector
-from app.detection.furniture import remove_furniture
+from app.detection.furniture import remove_furniture, remove_stairs
 from app.detection.line_detector import LineDetector
 from app.detection.refine import refine_walls
 from app.detection.schemas import DoorDetectionResult, LineDetectionResult, WindowDetectionResult
@@ -75,6 +75,8 @@ class DetectionService:
         grouped = refine_walls(grouped, doors.doors, windows.windows)
         # Remove furniture/clutter (beds, tables, columns) read as walls.
         grouped = remove_furniture(grouped, fine_binary)
+        # Drop repetitive staircase treads read as walls.
+        grouped = remove_stairs(grouped)
         intersections = self.detector._find_intersections(grouped, image.shape)
 
         line_result = LineDetectionResult(

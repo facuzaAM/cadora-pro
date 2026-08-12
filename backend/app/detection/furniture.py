@@ -15,7 +15,7 @@ from __future__ import annotations
 import cv2
 import numpy as np
 
-from app.detection.schemas import LineSegment
+from app.detection.schemas import LineCategory, LineSegment
 
 # Furniture bounding-box must be within this fraction of the plan area: big
 # enough to be a real object, small enough that it's not a room.
@@ -102,3 +102,85 @@ def remove_furniture(
             continue
         kept.append(line)
     return kept
+
+
+# ── stairs ──────────────────────────────────────────────────────────────────
+
+# A staircase is many short parallel treads, evenly spaced and of similar
+# length. Real walls are long or few; a cluster of >= this many short parallels
+# is almost certainly a stair (or similar repetitive hatch pattern).
+STAIR_MIN_LEN = 25
+STAIR_MAX_LEN = 300
+STAIR_SUCCESSIVE_MIN = 3
+STAIR_PERP_TOL = 16
+STAIR_SPAN_OVERLAP = 0.4
+STAIR_SPACING_DEV = 0.45
+STAIR_LEN_RATIO = 2.2
+
+
+def _perpendicular_coord(line: LineSegment) -> float:
+    return (line.y1 + line.y2) / 2 if line.category == LineCategory.HORIZONTAL else (
+        (line.x1 + line.x2) / 2
+    )
+
+
+def _span(line: LineSegment) -> tuple[float, float]:
+    if line.category == LineCategory.HORIZONTAL:
+        return min(line.x1, line.x2), max(line.x1, line.x2)
+    return min(line.y1, line.y2), max(line.y1, line.y2)
+
+
+def _same_stair_family(a: LineSegment, b: LineSegment) -> bool:
+    """True when two treads lie on the same staircase (overlapping span, similar length).
+
+    Stair treads are parallel but spaced far apart (the step height), so they
+    are grouped by shared span and length, not by perpendicular proximity.
+    """
+    if a.category != b.category:
+        return False
+    a_lo, a_hi = _span(a)
+    b_lo, b_hi = _span(b)
+    overlap = min(a_hi, b_hi) - max(a_lo, b_lo)
+    shorter = min(a_hi - a_lo, b_hi - b_lo)
+    if shorter <= 0 or overlap < STAIR_SPAN_OVERLAP * shorter:
+        return False
+    ratio = max(a.length, b.length) / max(1.0, min(a.length, b.length))
+    return ratio <= STAIR_LEN_RATIO
+
+
+def _is_stair_cluster(group: list[LineSegment]) -> bool:
+    if len(group) < STAIR_SUCCESSIVE_MIN:
+        return False
+    coords = sorted(_perpendicular_coord(l) for l in group)
+    diffs = [coords[i + 1] - coords[i] for i in range(len(coords) - 1)]
+    median = float(np.median(diffs)) if diffs else 0.0
+    if median <= 0:
+        return False
+    return float(np.max(np.abs(np.asarray(diffs) - median))) <= STAIR_SPACING_DEV * median
+
+
+def remove_stairs(lines: list[LineSegment]) -> list[LineSegment]:
+    """Drop the repetitive parallel treads of a staircase (false walls)."""
+    if len(lines) < STAIR_SUCCESSIVE_MIN:
+        return lines
+
+    to_drop: set[int] = set()
+    for cat in (LineCategory.HORIZONTAL, LineCategory.VERTICAL):
+        candidates = [l for l in lines if l.category == cat and STAIR_MIN_LEN <= l.length <= STAIR_MAX_LEN]
+        groups: list[list[LineSegment]] = []
+        for c in candidates:
+            placed = False
+            for g in groups:
+                if _same_stair_family(c, g[0]):
+                    g.append(c)
+                    placed = True
+                    break
+            if not placed:
+                groups.append([c])
+        for g in groups:
+            if _is_stair_cluster(g):
+                to_drop.update(id(l) for l in g)
+
+    if not to_drop:
+        return lines
+    return [l for l in lines if id(l) not in to_drop]
