@@ -156,6 +156,35 @@ export function CadEditor({
 
   const [exportingPng, setExportingPng] = useState(false);
 
+  const pastRef = useRef<EditorElements[]>([]);
+  const futureRef = useRef<EditorElements[]>([]);
+
+  const checkpoint = useCallback(() => {
+    pastRef.current.push({ walls, doors, windows });
+    if (pastRef.current.length > 60) pastRef.current.shift();
+    futureRef.current = [];
+  }, [walls, doors, windows]);
+
+  const undo = useCallback(() => {
+    const past = pastRef.current.pop();
+    if (!past) return;
+    futureRef.current.push({ walls, doors, windows });
+    setWalls(past.walls);
+    setDoors(past.doors);
+    setWindows(past.windows);
+    setDirty(true);
+  }, [walls, doors, windows]);
+
+  const redo = useCallback(() => {
+    const fut = futureRef.current.pop();
+    if (!fut) return;
+    pastRef.current.push({ walls, doors, windows });
+    setWalls(fut.walls);
+    setDoors(fut.doors);
+    setWindows(fut.windows);
+    setDirty(true);
+  }, [walls, doors, windows]);
+
   const exportPng = useCallback(() => {
     const svg = svgRef.current;
     if (!svg) return;
@@ -194,6 +223,17 @@ export function CadEditor({
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
+      if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "z") {
+        e.preventDefault();
+        if (e.shiftKey) redo();
+        else undo();
+        return;
+      }
+      if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "y") {
+        e.preventDefault();
+        redo();
+        return;
+      }
       if (e.key === "Delete" || e.key === "Backspace") {
         if (selected) {
           e.preventDefault();
@@ -208,7 +248,7 @@ export function CadEditor({
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [selected]);
+  }, [selected, undo, redo]);
 
   const toUser = useCallback((clientX: number, clientY: number) => {
     const svg = svgRef.current;
@@ -297,6 +337,7 @@ export function CadEditor({
             id: hit.id,
             initial,
           };
+          checkpoint();
           e.preventDefault();
         } else {
           setSelected(null);
@@ -306,20 +347,23 @@ export function CadEditor({
 
       if (tool === "wall") {
         draftRef.current = { kind: "draw-wall", startX: pos.x, startY: pos.y, id: null };
+        checkpoint();
         setSelected(null);
         return;
       }
       if (tool === "door") {
         draftRef.current = { kind: "draw-door", startX: pos.x, startY: pos.y, id: null };
+        checkpoint();
         setSelected(null);
         return;
       }
       if (tool === "window") {
         draftRef.current = { kind: "draw-window", startX: pos.x, startY: pos.y, id: null };
+        checkpoint();
         setSelected(null);
       }
     },
-    [tool, toUser, hitTest, walls, doors, windows],
+    [tool, toUser, hitTest, walls, doors, windows, checkpoint],
   );
 
   const handlePointerMove = useCallback(
@@ -552,6 +596,7 @@ export function CadEditor({
 
   const deleteSelected = useCallback(() => {
     if (!selected) return;
+    checkpoint();
     if (selected.kind === "wall") {
       setWalls((prev) => prev.filter((w) => w.id !== selected.id));
     } else if (selected.kind === "door") {
@@ -561,10 +606,11 @@ export function CadEditor({
     }
     setSelected(null);
     setDirty(true);
-  }, [selected]);
+  }, [selected, checkpoint]);
 
   const rotateSelected = useCallback(() => {
     if (!selected) return;
+    checkpoint();
     const step = selected.kind === "wall" ? 45 : 90;
     if (selected.kind === "door") {
       setDoors((prev) =>
@@ -576,17 +622,18 @@ export function CadEditor({
       );
     }
     setDirty(true);
-  }, [selected]);
+  }, [selected, checkpoint]);
 
   const flipSwing = useCallback(() => {
     if (!selected || selected.kind !== "door") return;
+    checkpoint();
     setDoors((prev) =>
       prev.map((d) =>
         d.id === selected.id ? { ...d, swing: d.swing === "right" ? "left" : "right" } : d,
       ),
     );
     setDirty(true);
-  }, [selected]);
+  }, [selected, checkpoint]);
 
   const selectedDoor = useMemo(
     () => doors.find((d) => d.id === selected?.id),
@@ -955,6 +1002,7 @@ export function CadEditor({
                 value={selectedDoor?.type ?? "single"}
                 onChange={(e) => {
                   if (!selectedDoor) return;
+                  checkpoint();
                   setDoors((prev) =>
                     prev.map((d) =>
                       d.id === selectedDoor.id
@@ -985,6 +1033,7 @@ export function CadEditor({
                 value={selectedWindow?.type ?? "sliding"}
                 onChange={(e) => {
                   if (!selectedWindow) return;
+                  checkpoint();
                   setWindows((prev) =>
                     prev.map((w) =>
                       w.id === selectedWindow.id
