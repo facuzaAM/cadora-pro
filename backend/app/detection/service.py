@@ -8,6 +8,7 @@ import cv2
 import numpy as np
 from pdf2image import convert_from_path
 
+from app.detection.arcs import detect_arcs
 from app.detection.curves import simplify_curves
 from app.detection.door_detector import DoorDetector
 from app.detection.furniture import remove_furniture, remove_stairs
@@ -81,11 +82,15 @@ class DetectionService:
         # Turn a noisy curved wall (many tiny diagonal chords) into a few
         # clean chords that preserve the shape.
         grouped = simplify_curves(grouped)
+        # Detect confident circular arcs (curved walls) and replace their
+        # chords with a single Arc primitive.
+        arcs, grouped = detect_arcs(grouped)
         intersections = self.detector._find_intersections(grouped, image.shape)
 
         line_result = LineDetectionResult(
             lines=lines,
             grouped_lines=grouped,
+            arcs=arcs,
             intersections=intersections,
             image_width=w,
             image_height=h,

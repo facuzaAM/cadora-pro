@@ -28,10 +28,20 @@ export interface EditorWindow {
   confidence?: number;
 }
 
+export interface EditorArc {
+  id: string;
+  center_x: number;
+  center_y: number;
+  radius: number;
+  start_angle: number;
+  end_angle: number;
+}
+
 export interface EditorElements {
   walls: EditorWall[];
   doors: EditorDoor[];
   windows: EditorWindow[];
+  arcs?: EditorArc[];
 }
 
 export interface EditorText {
@@ -41,6 +51,7 @@ export interface EditorText {
 
 export interface EditorDetection extends EditorElements {
   status: "completed" | "processing" | "pending" | "error";
+  arcs: EditorArc[];
   ocr_texts: EditorText[];
   ocr_measurements: EditorText[];
   image_width: number;

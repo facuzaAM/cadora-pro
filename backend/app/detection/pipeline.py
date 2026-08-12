@@ -146,6 +146,7 @@ def serialize_detection(
     )
     return {
         "lines": lines_result.model_dump(mode="json"),
+        "arcs": [a.model_dump(mode="json") for a in lines_result.arcs],
         "doors": doors_result.model_dump(mode="json"),
         "windows": windows_result.model_dump(mode="json"),
         "ocr_texts": [t.model_dump(mode="json") for t in ocr_result.texts],

@@ -70,6 +70,7 @@ class CadGenerator:
 
         self._setup_layers()
         self._draw_grid(lines_result.image_width, lines_result.image_height)
+        self._draw_arcs(lines_result.arcs)
         self._draw_walls(lines_result.grouped_lines)
         self._draw_doors(doors_result.doors)
         self._draw_windows(windows_result.windows)
@@ -123,6 +124,23 @@ class CadGenerator:
                     (self._s(line.x2), self._s(line.y2)),
                     dxfattribs={"layer": "Muros"},
                 )
+
+    def _draw_arcs(self, arcs: list) -> None:
+        sv = self._s
+        for arc in arcs:
+            r = sv(arc.radius)
+            if r < 0.01:
+                continue
+            try:
+                self.msp.add_arc(
+                    center=(sv(arc.center_x), sv(arc.center_y)),
+                    radius=r,
+                    start_angle=arc.start_angle,
+                    end_angle=arc.end_angle,
+                    dxfattribs={"layer": "Muros"},
+                )
+            except Exception:
+                logger.exception("No se pudo dibujar un arco de muro")
 
     # ── Doors ────────────────────────────────────────────────────────────────
 

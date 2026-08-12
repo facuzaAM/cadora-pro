@@ -6,6 +6,7 @@ import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import type {
+  EditorArc,
   EditorDoor,
   EditorElements,
   EditorText,
@@ -121,6 +122,7 @@ export function CadEditor({
   const [walls, setWalls] = useState<EditorWall[]>(initial.walls);
   const [doors, setDoors] = useState<EditorDoor[]>(initial.doors);
   const [windows, setWindows] = useState<EditorWindow[]>(initial.windows);
+  const [arcs] = useState<EditorArc[]>(initial.arcs ?? []);
   const [tool, setTool] = useState<EditorTool>("select");
   const [selected, setSelected] = useState<Selected | null>(null);
   const [hoverId, setHoverId] = useState<string | null>(null);
@@ -653,6 +655,27 @@ export function CadEditor({
                 >
                   {m.text}
                 </text>
+              );
+            })}
+          </g>
+
+          <g strokeLinecap="round">
+            {arcs.map((arc) => {
+              const rad = (d: number) => (d * Math.PI) / 180;
+              const x1 = arc.center_x + arc.radius * Math.cos(rad(arc.start_angle));
+              const y1 = arc.center_y + arc.radius * Math.sin(rad(arc.start_angle));
+              const x2 = arc.center_x + arc.radius * Math.cos(rad(arc.end_angle));
+              const y2 = arc.center_y + arc.radius * Math.sin(rad(arc.end_angle));
+              const largeArc = arc.end_angle - arc.start_angle > 180 ? 1 : 0;
+              return (
+                <path
+                  key={arc.id}
+                  d={`M ${x1} ${y1} A ${arc.radius} ${arc.radius} 0 ${largeArc} 1 ${x2} ${y2}`}
+                  fill="none"
+                  stroke="#1e293b"
+                  strokeWidth={strokeW}
+                  opacity={0.9}
+                />
               );
             })}
           </g>

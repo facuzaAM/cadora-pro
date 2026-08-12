@@ -182,14 +182,28 @@ def _curve_image() -> np.ndarray:
 
 
 def test_curve_wall_preserved(service) -> None:
-    """A curved wall must survive as clean chords, not be dropped as furniture."""
+    """A curved wall must survive as an Arc, not be dropped as furniture."""
     line_result, _, _ = service._process_image_all(_curve_image())
-    diag = [w for w in line_result.grouped_lines if w.category.value == "diagonal"]
-    # The semi-ellipse between x~400..1000 yields several diagonal chords.
-    in_curve = [w for w in diag if 400 < (w.x1 + w.x2) / 2 < 1000]
-    assert len(in_curve) >= 3
-    # It must not be removed entirely (regression: was treated as furniture box).
-    assert len(diag) >= 3
+    # The semi-ellipse must be detected as at least one circular arc.
+    assert len(line_result.arcs) >= 1
+    for a in line_result.arcs:
+        assert a.radius > 0
+        assert a.end_angle > a.start_angle
+
+
+def test_curve_exported_as_dxf_arc(service, tmp_path) -> None:
+    """The DXF export draws curved walls as ARC entities."""
+    import ezdxf
+
+    from app.cad.generator import CadGenerator
+    from app.ocr.schemas import OcrResult
+
+    lines, doors, windows = service._process_image_all(_curve_image())
+    assert len(lines.arcs) >= 1
+    out = tmp_path / "curve.dxf"
+    CadGenerator().generate(lines, doors, windows, OcrResult(texts=[]), str(out))
+    doc = ezdxf.readfile(str(out))
+    assert len(doc.modelspace().query("ARC")) >= 1
 
 
 def test_stairs_not_walls(service) -> None:

@@ -30,12 +30,22 @@ class Intersection(BaseModel):
     lines: list[UUID]
 
 
+class Arc(BaseModel):
+    id: UUID = Field(default_factory=uuid4)
+    center_x: float
+    center_y: float
+    radius: float
+    start_angle: float  # degrees, CCW from +x
+    end_angle: float
+
+
 class LineDetectionResult(BaseModel):
     lines: list[LineSegment]
     horizontal: list[LineSegment] = []
     vertical: list[LineSegment] = []
     diagonal: list[LineSegment] = []
     grouped_lines: list[LineSegment] = []
+    arcs: list[Arc] = []
     intersections: list[Intersection] = []
     image_width: int = 0
     image_height: int = 0

@@ -199,6 +199,7 @@ async def get_detection(
         "walls": walls,
         "doors": doors,
         "windows": windows,
+        "arcs": [a.model_dump(mode="json") for a in lines_result.arcs],
         "ocr_texts": payload.get("ocr_texts", []),
         "ocr_measurements": payload.get("ocr_measurements", []),
         "image_width": payload.get("image_width", 0),
