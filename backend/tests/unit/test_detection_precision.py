@@ -57,6 +57,14 @@ def test_grid_removed_but_walls_kept(service: DetectionService) -> None:
     assert metrics["walls"] == (1.0, 1.0)
 
 
+def test_furniture_not_walls(service: DetectionService) -> None:
+    """Beds/tables must not become walls (AI plans have clutter everywhere)."""
+    plan = next(p for p in build_plans() if p.name == "furniture")
+    metrics = validate_plan(plan, service)
+    # Only the 4-wall shell is real geometry; furniture boxes must not add walls.
+    assert metrics["walls"] == (1.0, 1.0)
+
+
 def test_double_wall_plan_perfect(service: DetectionService) -> None:
     """CAD-style double-line walls must keep openings without phantoms.
 

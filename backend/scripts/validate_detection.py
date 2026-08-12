@@ -57,6 +57,9 @@ class Plan:
     grid: bool = False
     double_line: bool = False
     labels: list[tuple[str, tuple[int, int], float]] = field(default_factory=list)
+    # Furniture (closed boxes/circles) that must NOT be detected as walls.
+    furniture: list[tuple[int, int, int, int]] = field(default_factory=list)
+    circles: list[tuple[int, int, int]] = field(default_factory=list)  # (cx, cy, r)
 
     STROKE_GAP = 4   # half-distance from wall centre to each stroke line
     STROKE_W = 2
@@ -91,6 +94,11 @@ class Plan:
             self._draw_window(img, win)
         for d in self.doors:
             self._draw_door(img, d)
+        for fx1, fy1, fx2, fy2 in self.furniture:
+            cv2.rectangle(img, (int(fx1), int(fy1)),
+                          (int(fx2), int(fy2)), (0, 0, 0), 3)
+        for cx, cy, r in self.circles:
+            cv2.circle(img, (int(cx), int(cy)), int(r), (0, 0, 0), 3)
         for text, (tx, ty), scale in self.labels:
             cv2.putText(
                 img, text, (tx, ty), cv2.FONT_HERSHEY_SIMPLEX,
@@ -256,6 +264,25 @@ def build_plans() -> list[Plan]:
             windows=[
                 GTWindow(x=500, y=760, width=90, horizontal=False),
                 GTWindow(x=350, y=600, width=90, horizontal=True),
+            ],
+        ),
+        Plan(
+            name="furniture",
+            size=(s, s),
+            walls=[
+                GTWall(200, 200, 1000, 200),   # top
+                GTWall(200, 1000, 1000, 1000), # bottom
+                GTWall(200, 200, 200, 1000),   # left
+                GTWall(1000, 200, 1000, 1000), # right
+            ],
+            furniture=[
+                # bed (outer box + inner pillow lines)
+                (300, 650, 560, 900),
+                (320, 660, 400, 890),
+            ],
+            circles=[
+                # round table
+                (520, 430, 90),
             ],
         ),
         Plan(
