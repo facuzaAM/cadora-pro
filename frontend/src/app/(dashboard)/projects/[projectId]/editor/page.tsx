@@ -28,7 +28,7 @@ export default function EditorPage() {
   const [exporting, setExporting] = useState(false);
   const [attempt, setAttempt] = useState(0);
 
-  const imageUrl = detection ? editorService.previewUrl(projectId, token) : null;
+  const imageUrl = detection ? editorService.previewUrl(projectId) : null;
 
   const loadSaved = useCallback(
     async (loaded: EditorDetection) => {

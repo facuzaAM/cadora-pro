@@ -56,7 +56,22 @@ TEST_USERS = [
 PASSWORD = "Test1234!"
 
 
+def _assert_allowed() -> None:
+    """Refuse to seed paid test accounts against a production database.
+
+    This script creates accounts with paid plans and zero cost, so it must
+    never run against production. Require an explicit --force if the app is
+    configured for production.
+    """
+    if settings.ENVIRONMENT == "production" and "--force" not in sys.argv:
+        raise SystemExit(
+            "ERROR: No ejecutes scripts.seed_test_users contra una base de "
+            "producción. Si de verdad lo necesitás, pasá `--force`."
+        )
+
+
 async def main():
+    _assert_allowed()
     engine = create_async_engine(settings.DATABASE_URL)
     session_factory = async_sessionmaker(engine, expire_on_commit=False)
 

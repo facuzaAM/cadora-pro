@@ -19,11 +19,13 @@ async def get_current_user(
     credentials: HTTPAuthorizationCredentials | None = Security(security),
     db: AsyncSession = Depends(get_db),
 ):
+    # Auth only via Authorization header or the HttpOnly access cookie. The
+    # access token must never travel in a query string: it leaks into logs,
+    # the Referer header and browser history. The same-origin preview <img>
+    # already sends the HttpOnly cookie, so no endpoint needs ?token=...
     token = credentials.credentials if credentials else None
     if not token:
         token = request.cookies.get(ACCESS_TOKEN_COOKIE)
-    if not token:
-        token = request.query_params.get("token")
     if not token:
         raise HTTPException(
             status_code=HTTP_401_UNAUTHORIZED,
