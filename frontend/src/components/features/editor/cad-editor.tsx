@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { Move, Pencil, DoorClosed, AppWindow, RotateCw, FlipHorizontal2, Trash2, Image as ImageIcon } from "lucide-react";
+import { Move, Pencil, DoorClosed, AppWindow, RotateCw, FlipHorizontal2, Trash2, Image as ImageIcon, ZoomIn, ZoomOut, Maximize2 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -129,6 +129,22 @@ export function CadEditor({
   const [dirty, setDirty] = useState(false);
   const [coarse, setCoarse] = useState(false);
 
+  // Zoom / pan: the SVG viewBox defines the visible window.
+  const [view, setView] = useState<{ x: number; y: number; w: number; h: number }>(
+    () => ({ x: 0, y: 0, w: width, h: height }),
+  );
+  const resetView = useCallback(
+    () => setView({ x: 0, y: 0, w: width, h: height }),
+    [width, height],
+  );
+  const zoomBy = useCallback((factor: number) => {
+    setView((v) => {
+      const nw = clamp(v.w * factor, width / 40, width * 5);
+      const nh = nw * (v.h / v.w);
+      return { x: v.x + (v.w - nw) / 2, y: v.y + (v.h - nh) / 2, w: nw, h: nh };
+    });
+  }, [width]);
+
   useEffect(() => {
     const mq = window.matchMedia("(pointer: coarse)");
     const update = () => setCoarse(mq.matches);
@@ -140,7 +156,7 @@ export function CadEditor({
   const touchScale = coarse ? 1.7 : 1;
 
   const draftRef = useRef<{
-    kind: "draw-wall" | "draw-door" | "draw-window" | "move" | "resize";
+    kind: "draw-wall" | "draw-door" | "draw-window" | "move" | "resize" | "pan";
     startX: number;
     startY: number;
     id: string | null;
@@ -340,6 +356,14 @@ export function CadEditor({
           checkpoint();
           e.preventDefault();
         } else {
+          // Empty background with select tool → pan the canvas.
+          draftRef.current = {
+            kind: "pan",
+            startX: e.clientX,
+            startY: e.clientY,
+            id: null,
+            initial: view,
+          };
           setSelected(null);
         }
         return;
@@ -363,13 +387,27 @@ export function CadEditor({
         setSelected(null);
       }
     },
-    [tool, toUser, hitTest, walls, doors, windows, checkpoint],
+    [tool, toUser, hitTest, walls, doors, windows, checkpoint, view],
   );
 
   const handlePointerMove = useCallback(
     (e: React.PointerEvent) => {
       const draft = draftRef.current;
       if (!draft) return;
+
+      if (draft.kind === "pan") {
+        const ini = draft.initial as { x: number; y: number; w: number; h: number };
+        const dx = e.clientX - draft.startX;
+        const dy = e.clientY - draft.startY;
+        setView({
+          x: ini.x - (dx * ini.w) / width,
+          y: ini.y - (dy * ini.h) / height,
+          w: ini.w,
+          h: ini.h,
+        });
+        return;
+      }
+
       const pos = toUser(e.clientX, e.clientY);
 
       if (draft.kind === "draw-wall") {
@@ -547,7 +585,7 @@ export function CadEditor({
         }
       }
     },
-    [toUser, selected, walls, doors, windows],
+    [toUser, selected, walls, doors, windows, width, height],
   );
 
   const handlePointerUp = useCallback(() => {
@@ -700,6 +738,15 @@ export function CadEditor({
           <Badge variant="secondary">{walls.length} muros</Badge>
           <Badge variant="secondary">{doors.length} puertas</Badge>
           <Badge variant="secondary">{windows.length} ventanas</Badge>
+          <Button variant="ghost" size="sm" title="Alejar" onClick={() => zoomBy(0.8)}>
+            <ZoomOut className="h-4 w-4" />
+          </Button>
+          <Button variant="ghost" size="sm" title="Acercar" onClick={() => zoomBy(1.25)}>
+            <ZoomIn className="h-4 w-4" />
+          </Button>
+          <Button variant="ghost" size="sm" title="Restablecer vista" onClick={resetView}>
+            <Maximize2 className="h-4 w-4" />
+          </Button>
           <Button
             variant="outline"
             size="sm"
@@ -716,13 +763,27 @@ export function CadEditor({
       <div className="relative overflow-hidden rounded-xl border bg-grid-cad">
         <svg
           ref={svgRef}
-          viewBox={`0 0 ${width || 1} ${height || 1}`}
+          viewBox={`${view.x} ${view.y} ${view.w || 1} ${view.h || 1}`}
           preserveAspectRatio="xMidYMid meet"
           role="img"
           aria-label="Editor de plano: arrastrá para dibujar muros, puertas y ventanas. Usá la herramienta seleccionar para mover o redimensionar elementos."
           className="block w-full touch-none select-none"
-          style={{ maxHeight: "75vh", cursor: tool === "select" ? "default" : "crosshair" }}
+          style={{ maxHeight: "75vh", cursor: tool === "select" ? "default" : "crosshair", touchAction: "none" }}
           onPointerDown={handlePointerDown}
+          onWheel={(e) => {
+            e.preventDefault();
+            const rect = svgRef.current?.getBoundingClientRect();
+            const px = rect ? (e.clientX - rect.left) / rect.width : 0.5;
+            const py = rect ? (e.clientY - rect.top) / rect.height : 0.5;
+            const f = e.deltaY < 0 ? 1.12 : 0.9;
+            setView((v) => {
+              const nw = clamp(v.w * f, width / 40, width * 5);
+              const nh = nw * (v.h / v.w);
+              const wx = v.x + px * v.w;
+              const wy = v.y + py * v.h;
+              return { x: wx - px * nw, y: wy - py * nh, w: nw, h: nh };
+            });
+          }}
           onPointerMove={handlePointerMove}
           onPointerUp={handlePointerUp}
           onPointerCancel={handlePointerUp}
