@@ -57,6 +57,15 @@ def test_grid_removed_but_walls_kept(service: DetectionService) -> None:
     assert metrics["walls"] == (1.0, 1.0)
 
 
+def test_wall_iou_pixel(service: DetectionService) -> None:
+    """Walls must overlap the true geometry at pixel level (not just centres)."""
+    plan = next(p for p in build_plans() if p.name == "doors_windows")
+    metrics = validate_plan(plan, service)
+    # IoU rewards actual pixel coverage of the drawn walls (strict: a detector
+    # that misses or displaces walls drops well below this).
+    assert metrics["walls_iou"] >= 0.55, f"walls IoU {metrics['walls_iou']:.3f} < 0.55"
+
+
 def test_furniture_not_walls(service: DetectionService) -> None:
     """Beds/tables must not become walls (AI plans have clutter everywhere)."""
     plan = next(p for p in build_plans() if p.name == "furniture")

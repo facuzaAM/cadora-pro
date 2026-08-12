@@ -12,6 +12,7 @@ from __future__ import annotations
 import sys
 from dataclasses import dataclass, field
 from pathlib import Path
+from typing import TypedDict
 
 import cv2
 import numpy as np
@@ -347,7 +348,37 @@ def _report(name: str, tp: int, fp: int, fn: int) -> tuple[float, float]:
     return precision, recall
 
 
-def validate_plan(plan: Plan, service: DetectionService) -> dict[str, tuple[float, float]]:
+def _wall_iou(plan: Plan, grouped_lines: list[LineSegment]) -> float:
+    """Pixel-level IoU between GT walls and detected walls (thickened masks).
+
+    This measure is stricter than centre-of-line matching: it rewards how much
+    of the true wall ink is covered by detected strokes and penalises walls
+    that are displaced or that cover empty space.
+    """
+    h, w = plan.size[1], plan.size[0]
+    gt = np.zeros((h, w), dtype=np.uint8)
+    det = np.zeros((h, w), dtype=np.uint8)
+    lw = 6  # thickness for tolerant matching
+    for wall in plan.walls:
+        cv2.line(gt, (int(wall.x1), int(wall.y1)),
+                 (int(wall.x2), int(wall.y2)), 255, lw)
+    for d in grouped_lines:
+        cv2.line(det, (int(d.x1), int(d.y1)), (int(d.x2), int(d.y2)), 255, lw)
+    inter = int(np.logical_and(gt, det).sum())
+    union = int(np.logical_or(gt, det).sum())
+    if union == 0:
+        return 1.0 if not (gt.any() or det.any()) else 0.0
+    return inter / union
+
+
+class Metrics(TypedDict):
+    walls: tuple[float, float]
+    doors: tuple[float, float]
+    windows: tuple[float, float]
+    walls_iou: float
+
+
+def validate_plan(plan: Plan, service: DetectionService) -> Metrics:
     img = plan.render()
     line_result, doors, windows = service._process_image_all(img)
 
@@ -369,6 +400,8 @@ def validate_plan(plan: Plan, service: DetectionService) -> dict[str, tuple[floa
     print(f"  detected: {len(line_result.grouped_lines)} grouped lines, "
           f"{len(doors.doors)} doors, {len(windows.windows)} windows")
     w_prec, w_rec = _report("walls", walls_tp, walls_fp, walls_fn)
+    walls_iou = _wall_iou(plan, line_result.grouped_lines)
+    print(f"  walls IoU (pixel) = {walls_iou:.3f}")
 
     d_prec, d_rec = 0.0, 0.0
     if plan.doors:
@@ -386,7 +419,12 @@ def validate_plan(plan: Plan, service: DetectionService) -> dict[str, tuple[floa
                    if not any(_window_match(d, gt) for gt in plan.windows))
         win_prec, win_rec = _report("windows", w_tp, w_fp, len(plan.windows) - w_tp)
 
-    return {"walls": (w_prec, w_rec), "doors": (d_prec, d_rec), "windows": (win_prec, win_rec)}
+    return {
+        "walls": (w_prec, w_rec),
+        "doors": (d_prec, d_rec),
+        "windows": (win_prec, win_rec),
+        "walls_iou": walls_iou,
+    }
 
 
 def main() -> None:
