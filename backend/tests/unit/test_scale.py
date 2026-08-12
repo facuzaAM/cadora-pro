@@ -22,21 +22,21 @@ class TestParseScaleText:
         ppm = _parse_scale_text("1:100", 4000)
         assert ppm is not None
         assert ppm > 0
-        expected = (300 / 2.54) * 100 * (1 / 100)
+        expected = (200 / 2.54) * 100 * (1 / 100)
         assert abs(ppm - expected) < 1.0
 
     def test_slash_50(self):
         ppm = _parse_scale_text("1/50", 4000)
         assert ppm is not None
         assert ppm > 0
-        expected = (300 / 2.54) * 100 * (1 / 50)
+        expected = (200 / 2.54) * 100 * (1 / 50)
         assert abs(ppm - expected) < 1.0
 
     def test_esc_prefix(self):
         ppm = _parse_scale_text("ESC. 1:200", 4000)
         assert ppm is not None
         assert ppm > 0
-        expected = (300 / 2.54) * 100 * (1 / 200)
+        expected = (200 / 2.54) * 100 * (1 / 200)
         assert abs(ppm - expected) < 1.0
 
     def test_escala_prefix(self):
@@ -64,6 +64,13 @@ class TestParseScaleText:
         ppm = _parse_scale_text("1:1", 4000)
         assert ppm is not None
         assert ppm > 0
+
+    def test_scale_is_linear_with_dpi(self):
+        # The same 1:100 at higher DPI must yield proportionally more px/m.
+        low = _parse_scale_text("1:100", 4000, dpi=200)
+        high = _parse_scale_text("1:100", 4000, dpi=300)
+        assert low is not None and high is not None
+        assert abs(high / low - 1.5) < 1e-6
 
 
 class TestDetectScaleFactor:

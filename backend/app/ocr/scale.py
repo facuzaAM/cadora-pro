@@ -10,25 +10,36 @@ import re
 
 from app.ocr.schemas import OcrResult
 
+# DPI at which documents are rasterized for detection (see pdf2image in
+# DetectionService). Pixels-per-meter depends on this: using the wrong DPI
+# scales the exported CAD wrongly (e.g. 1.5x error if 300 assumed for a 200-DPI
+# rasterization). Floor-plan scans are typically >= 150 DPI; 200 matches the
+# PDF rasterization, the most common source.
+DEFAULT_DPI = 200
 
-def detect_scale_factor(ocr_result: OcrResult, image_width_px: int) -> float | None:
+
+def detect_scale_factor(
+    ocr_result: OcrResult, image_width_px: int, dpi: int = DEFAULT_DPI,
+) -> float | None:
     """Detect the scale from OCR results and return pixels-per-meter.
 
     Returns None if no scale is found.
 
     The conversion factor represents how many pixels correspond to one meter
-    in the real world. For example, at 1:100 on a 300 DPI scan, 1 meter
-    in reality = 118.11 pixels on paper (1 cm on paper at 1:100 = 1 real
-    meter, and 1 cm at 300 DPI = 300/2.54 = 118.11 px).
+    in the real world. For example, at 1:100 on a 200 DPI rasterization, 1 meter
+    in reality = 78.74 pixels on paper (1 cm on paper at 1:100 = 1 real meter,
+    and 1 cm at 200 DPI = 200/2.54 = 78.74 px).
     """
     for scale_text in ocr_result.scales:
-        ppm = _parse_scale_text(scale_text.text, image_width_px)
+        ppm = _parse_scale_text(scale_text.text, image_width_px, dpi)
         if ppm is not None:
             return ppm
     return None
 
 
-def _parse_scale_text(text: str, image_width_px: int) -> float | None:
+def _parse_scale_text(
+    text: str, image_width_px: int, dpi: int = DEFAULT_DPI,
+) -> float | None:
     """Parse a scale text like '1:100' and return pixels per meter."""
     cleaned = text.strip().lower()
     cleaned = re.sub(r"^esc(?:ala)?\.?\s*", "", cleaned)
@@ -45,8 +56,7 @@ def _parse_scale_text(text: str, image_width_px: int) -> float | None:
 
     scale_ratio = num / den
 
-    standard_dpi = 300
-    pixels_per_inch = standard_dpi
+    pixels_per_inch = dpi
     cm_per_inch = 2.54
     pixels_per_cm = pixels_per_inch / cm_per_inch
     pixels_per_meter = pixels_per_cm * 100
