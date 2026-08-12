@@ -38,6 +38,9 @@ async def _wait_for_db() -> None:
 
 
 async def _run() -> None:
+    from app.utils.logging import setup_logging
+
+    setup_logging()
     await _wait_for_db()
     logger.info("Dedicated detection worker started (polling every 2s)")
     task = await start_detection_worker()
