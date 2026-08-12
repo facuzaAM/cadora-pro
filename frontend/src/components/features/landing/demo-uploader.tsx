@@ -19,6 +19,7 @@ import { PLANS, APP_TAGLINE, APP_DESCRIPTION } from "@/lib/constants";
 import { CadCrosshair } from "@/components/features/landing/cad-crosshair";
 import { CadCursor } from "@/components/features/landing/cad-cursor";
 import { CadDimension } from "@/components/features/landing/cad-dimension";
+import { LandingMotionBG } from "@/components/features/landing/landing-motion-bg";
 import { api } from "@/services/api";
 import { projectsService } from "@/services/projects.service";
 import { documentsService } from "@/services/documents.service";
@@ -182,7 +183,8 @@ export function DemoUploader() {
   return (
     <>
       <section className="relative flex min-h-[85vh] items-center justify-center overflow-hidden isolate bg-gradient-to-b from-primary/[0.06] via-background to-background pt-14">
-        <div className="absolute inset-0 bg-grid-cad bg-grid-cad-fade -z-10 pointer-events-none" />
+        <div className="absolute inset-0 animate-grid-pan bg-grid-cad bg-grid-cad-fade -z-10 pointer-events-none" />
+        <LandingMotionBG />
         <CadCrosshair className="absolute right-[8%] top-1/2 hidden h-48 w-48 -translate-y-1/2 text-primary/30 lg:block -z-10 pointer-events-none" />
         <CadCrosshair className="absolute left-[6%] bottom-[12%] hidden h-32 w-32 text-primary/20 -z-10 pointer-events-none" />
         <CadDimension label="4.80 m" className="absolute left-[10%] top-[22%] hidden h-14 w-32 text-primary/50 lg:block -z-10" />

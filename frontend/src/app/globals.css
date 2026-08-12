@@ -130,6 +130,89 @@
     mask-image: radial-gradient(ellipse 85% 75% at 50% 35%, black 25%, transparent 78%);
   }
 
+  /* Ambient background motion — subtle thematic drift for the CAD blueprint
+     grid: each layer pans by exactly one tile so the loop is seamless. */
+  @keyframes grid-pan {
+    from {
+      background-position: 0 0, 0 0, 0 0, 0 0;
+    }
+    to {
+      background-position: 24px 24px, 24px 24px, 120px 120px, 120px 120px;
+    }
+  }
+
+  .animate-grid-pan {
+    animation: grid-pan 26s linear infinite;
+  }
+
+  /* Small blueprint coordinate markers drifting gently so the backdrop never
+     feels frozen. Varied by inline duration/delay/opacity per marker. */
+  @keyframes float-drift {
+    0%, 100% {
+      transform: translate3d(0, 0, 0);
+      opacity: var(--marker-opacity, 0.6);
+    }
+    50% {
+      transform: translate3d(var(--drift-x, 6px), -22px, 0);
+      opacity: 0.3;
+    }
+  }
+
+  .animate-float-drift {
+    animation: float-drift var(--float-duration, 7s) ease-in-out infinite;
+    animation-delay: var(--float-delay, 0s);
+  }
+
+  /* A thin horizontal "scanner" line sweeping down the hero, like a plotter
+     tracing the plan. */
+  @keyframes scan-sweep {
+    0% {
+      transform: translateY(-30px);
+      opacity: 0;
+    }
+    10% {
+      opacity: 0.6;
+    }
+    50% {
+      opacity: 0.35;
+    }
+    90% {
+      opacity: 0.5;
+    }
+    100% {
+      transform: translateY(78vh);
+      opacity: 0;
+    }
+  }
+
+  .animate-scan-sweep {
+    animation: scan-sweep 10s ease-in-out infinite;
+  }
+
+  /* Softly pulsing node so the crosshair markers draw the eye without noise. */
+  @keyframes marker-ring {
+    0%, 100% {
+      box-shadow: 0 0 0 0 hsl(var(--primary) / 0.25);
+    }
+    50% {
+      box-shadow: 0 0 0 6px hsl(var(--primary) / 0);
+    }
+  }
+
+  .animate-marker-ring {
+    animation: marker-ring var(--ring-duration, 5s) ease-out infinite;
+    animation-delay: var(--float-delay, 0s);
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .animate-grid-pan,
+    .animate-float-drift,
+    .animate-marker-ring,
+    .animate-scan-sweep {
+      animation: none;
+    }
+  }
+
   .cad-draw {
     stroke-dasharray: 10000;
     stroke-dashoffset: 10000;
