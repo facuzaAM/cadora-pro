@@ -61,9 +61,9 @@ def test_feature_iou_and_type(service: DetectionService) -> None:
     """Door/window position-IoU and type must be accurate, not just recalled."""
     plan = next(p for p in build_plans() if p.name == "doors_windows")
     metrics = validate_plan(plan, service)
-    assert metrics["feature_iou"] >= 0.35, f"feature IoU {metrics['feature_iou']:.3f}"
+    assert metrics["feature_iou"] >= 0.55, f"feature IoU {metrics['feature_iou']:.3f}"
     assert metrics["type_accuracy"] is not None
-    assert metrics["type_accuracy"] >= 0.5, (
+    assert metrics["type_accuracy"] >= 0.8, (
         f"type accuracy {metrics['type_accuracy']}"
     )
 
