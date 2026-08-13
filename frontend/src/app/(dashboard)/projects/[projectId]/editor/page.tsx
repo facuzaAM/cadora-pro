@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useState } from "react";
 import { useRouter, useParams } from "next/navigation";
-import { ArrowLeft, Loader2, AlertCircle } from "lucide-react";
+import { ArrowLeft, Loader2, AlertCircle, Check, AlertTriangle, Eye, Pencil } from "lucide-react";
 import { PageHeader } from "@/components/shared/page-header";
 import { CadEditor } from "@/components/features/editor/cad-editor";
 import { editorService } from "@/services/editor.service";
@@ -28,6 +28,7 @@ export default function EditorPage() {
   const [saving, setSaving] = useState(false);
   const [exporting, setExporting] = useState(false);
   const [attempt, setAttempt] = useState(0);
+  const [showReview, setShowReview] = useState(true);
 
   const imageUrl = detection ? editorService.previewUrl(projectId) : null;
 
@@ -215,7 +216,84 @@ export default function EditorPage() {
         </div>
       )}
 
-      {!loading && !error && initial && detection && (
+      {!loading && !error && initial && detection && showReview && (
+        <div className="rounded-xl border bg-card p-6">
+          <div className="flex items-center gap-3">
+            <Eye className="h-6 w-6 text-primary" />
+            <div>
+              <h2 className="text-lg font-semibold">Revisión de la detección</h2>
+              <p className="text-sm text-muted-foreground">
+                El motor detectó los siguientes elementos. Revisá la calidad antes de editar.
+              </p>
+            </div>
+          </div>
+
+          <div className="mt-4 grid grid-cols-3 gap-4">
+            <div className="rounded-lg border p-3 text-center">
+              <p className="text-2xl font-bold">{detection.walls.length}</p>
+              <p className="text-xs text-muted-foreground">Muros</p>
+            </div>
+            <div className="rounded-lg border p-3 text-center">
+              <p className="text-2xl font-bold">{detection.doors.length}</p>
+              <p className="text-xs text-muted-foreground">Puertas</p>
+            </div>
+            <div className="rounded-lg border p-3 text-center">
+              <p className="text-2xl font-bold">{detection.windows.length}</p>
+              <p className="text-xs text-muted-foreground">Ventanas</p>
+            </div>
+          </div>
+
+          {(() => {
+            const allConf = [
+              ...detection.doors.map((d) => d.confidence ?? 0),
+              ...detection.windows.map((w) => w.confidence ?? 0),
+            ];
+            const avg =
+              allConf.length > 0
+                ? allConf.reduce((s, c) => s + c, 0) / allConf.length
+                : 1;
+            const low = allConf.filter((c) => c < 0.65).length;
+            return (
+              <div className="mt-4 flex flex-wrap items-center gap-4 text-sm">
+                <span className="flex items-center gap-1.5">
+                  {avg >= 0.8 ? (
+                    <Check className="h-4 w-4 text-emerald-500" />
+                  ) : (
+                    <AlertTriangle className="h-4 w-4 text-amber-500" />
+                  )}
+                  Confianza media:{" "}
+                  <span className={avg >= 0.8 ? "text-emerald-600 font-medium" : "text-amber-600 font-medium"}>
+                    {Math.round(avg * 100)}%
+                  </span>
+                </span>
+                {low > 0 && (
+                  <span className="text-amber-600">
+                    {low} elemento{low !== 1 ? "s" : ""} con confianza baja (&lt;65%)
+                  </span>
+                )}
+              </div>
+            );
+          })()}
+
+          <div className="mt-6 flex flex-wrap gap-3">
+            <button
+              onClick={() => setShowReview(false)}
+              className="inline-flex items-center gap-2 rounded-lg bg-primary px-5 py-2.5 text-sm font-medium text-primary-foreground hover:bg-primary/90"
+            >
+              <Pencil className="h-4 w-4" />
+              Editar plano
+            </button>
+            <button
+              onClick={() => router.replace(`/projects/${projectId}/processing`)}
+              className="inline-flex items-center gap-2 rounded-lg border bg-background px-5 py-2.5 text-sm font-medium hover:bg-muted"
+            >
+              Re-procesar
+            </button>
+          </div>
+        </div>
+      )}
+
+      {!loading && !error && initial && detection && !showReview && (
         <CadEditor
           imageUrl={imageUrl ?? ""}
           width={detection.image_width || 1}
