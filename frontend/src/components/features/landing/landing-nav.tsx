@@ -7,7 +7,6 @@ import { Menu, X } from "lucide-react";
 import { Logo } from "@/components/shared/logo";
 import { ThemeToggle } from "@/components/shared/theme-toggle";
 import { UserButton } from "@/components/features/auth/user-button";
-import { CadCursor } from "@/components/features/landing/cad-cursor";
 
 const links = [
   { href: "/", label: "Inicio" },
@@ -82,13 +81,6 @@ export function LandingNav() {
         </nav>
       )}
     </header>
-      <CadCursor />
-      <style dangerouslySetInnerHTML={{
-        __html: `
-          body { cursor: none !important; }
-          a, button, input, textarea, select { cursor: none !important; }
-        `,
-      }} />
     </>
   );
 }
