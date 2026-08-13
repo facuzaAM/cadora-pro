@@ -35,6 +35,9 @@ migrate:
 migration:
 	alembic revision --autogenerate -m "$(message)"
 
+rollback-migration:
+	alembic downgrade -1
+
 up:
 	docker compose up --build -d
 

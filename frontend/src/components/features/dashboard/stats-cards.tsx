@@ -29,9 +29,10 @@ export function StatsCards() {
     const token = api.getAccessToken();
     Promise.all([
       projectsService.list(token).catch(() => []),
+      projectsService.getTotal(token).catch(() => ({ total: 0 })),
       billingService.getSubscription(token).catch(() => null),
-    ]).then(([projects, sub]) => {
-      const total = projects.length;
+    ]).then(([projects, totalRes, sub]) => {
+      const total = totalRes.total;  // real total, no truncado
       const processing = projects.filter(
         (p) =>
           p.status === "processing" ||

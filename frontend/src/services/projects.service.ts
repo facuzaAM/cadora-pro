@@ -5,6 +5,7 @@ export const projectsService = {
   // The backend caps this at 100; asking explicitly stops the list being
   // silently truncated to the default 20 for users with many projects.
   list: (token?: string) => api.get<Project[]>("/projects", token, { limit: 100 }),
+  getTotal: (token?: string) => api.get<{ total: number }>("/projects/total", token),
 
   getById: (id: string, token?: string) =>
     api.get<Project>(`/projects/${id}`, token),

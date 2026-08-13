@@ -22,7 +22,7 @@ FIT_TOLERANCE = 6.0
 # Circle radius bounds (px).
 MIN_RADIUS = 25.0
 MAX_RADIUS = 2500.0
-RANSAC_ITERATIONS = 300
+RANSAC_ITERATIONS = 500
 # Arcs narrower than this (deg) are rejected (too close to a straight line).
 MIN_ARC_SPAN = 15.0
 
@@ -113,7 +113,7 @@ def detect_arcs(lines: list[LineSegment]) -> tuple[list[Arc], list[LineSegment]]
     consumed: set[int] = set()
 
     # Avoid re-fitting the same points forever: cap the number of arcs.
-    for _ in range(6):
+    for _ in range(8):
         best = _best_circle(points)
         if best is None:
             break

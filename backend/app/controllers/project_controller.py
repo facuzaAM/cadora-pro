@@ -16,6 +16,16 @@ from app.utils.dependencies import get_current_user
 router = APIRouter()
 
 
+@router.get("/total")
+async def count_projects(
+    user=Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    service = ProjectService(db)
+    total = await service.count_by_user(user.id)
+    return {"total": total}
+
+
 @router.get("/", response_model=list[ProjectResponse])
 async def list_projects(
     skip: int = Query(0, ge=0),

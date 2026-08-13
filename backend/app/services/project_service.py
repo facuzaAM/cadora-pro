@@ -31,6 +31,9 @@ class ProjectService:
         response.document_count = doc_count
         return response
 
+    async def count_by_user(self, user_id: UUID) -> int:
+        return await self.repo.count_by_user(user_id)
+
     async def list_by_user(
         self, user_id: UUID, skip: int = 0, limit: int = 20
     ) -> list[ProjectResponse]:

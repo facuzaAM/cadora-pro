@@ -429,13 +429,15 @@ export function CadEditor({
         return;
       }
       if (tool === "door") {
-        draftRef.current = { kind: "draw-door", startX: pos.x, startY: pos.y, id: null };
+        const sp = snapToEndpoints(pos.x, pos.y, walls.flatMap(w => [[w.x1, w.y1], [w.x2, w.y2]] as Array<[number,number]>));
+        draftRef.current = { kind: "draw-door", startX: sp.x, startY: sp.y, id: null };
         checkpoint();
         setSelected(null);
         return;
       }
       if (tool === "window") {
-        draftRef.current = { kind: "draw-window", startX: pos.x, startY: pos.y, id: null };
+        const sp = snapToEndpoints(pos.x, pos.y, walls.flatMap(w => [[w.x1, w.y1], [w.x2, w.y2]] as Array<[number,number]>));
+        draftRef.current = { kind: "draw-window", startX: sp.x, startY: sp.y, id: null };
         checkpoint();
         setSelected(null);
       }
@@ -796,10 +798,10 @@ export function CadEditor({
           <Badge variant="secondary">{walls.length} muros</Badge>
           <Badge variant="secondary">{doors.length} puertas</Badge>
           <Badge variant="secondary">{windows.length} ventanas</Badge>
-          <Button variant="ghost" size="sm" title="Alejar" onClick={() => zoomBy(0.8)}>
+          <Button variant="ghost" size="sm" title="Alejar (rueda)" onClick={() => zoomBy(0.8)}>
             <ZoomOut className="h-4 w-4" />
           </Button>
-          <Button variant="ghost" size="sm" title="Acercar" onClick={() => zoomBy(1.25)}>
+          <Button variant="ghost" size="sm" title="Acercar (rueda)" onClick={() => zoomBy(1.25)}>
             <ZoomIn className="h-4 w-4" />
           </Button>
           <Button variant="ghost" size="sm" title="Restablecer vista" onClick={resetView}>
@@ -809,6 +811,7 @@ export function CadEditor({
             variant="outline"
             size="sm"
             disabled={exportingPng}
+            title="Exportar PNG"
             onClick={() => { setExportingPng(true); exportPng(); }}
           >
             <ImageIcon className="mr-1.5 h-4 w-4" />
@@ -818,6 +821,7 @@ export function CadEditor({
             variant="outline"
             size="sm"
             disabled={exportingPng}
+            title="Exportar PDF"
             onClick={exportPdf}
           >
             <FileText className="mr-1.5 h-4 w-4" />

@@ -18,6 +18,10 @@ class ProjectRepository(BaseRepository):
     async def get_by_id(self, project_id: UUID) -> Project | None:
         return await self._get_by_id(Project, project_id)
 
+    async def count_by_user(self, user_id: UUID) -> int:
+        stmt = select(func.count()).select_from(Project).where(Project.user_id == user_id)
+        return (await self.db.execute(stmt)).scalar_one()
+
     async def list_by_user(
         self, user_id: UUID, skip: int = 0, limit: int = 20
     ) -> list[Project]:
