@@ -117,7 +117,7 @@ class TestFindGapOnLine:
         gray = np.full((400, 400), 255, dtype=np.uint8)
         gray[200, 0:100] = 0
         gray[200, 160:400] = 0
-        gs, ge = DoorDetector._find_gap_on_line(
+        gs, ge = detector._find_gap_on_line(
             gray, fixed_coord=200, scan_start=0, scan_end=399,
             hinge_pos=120, is_horizontal=True, threshold=128.0,
         )
@@ -127,7 +127,7 @@ class TestFindGapOnLine:
 
     def test_no_gap_returns_none(self, detector: DoorDetector):
         gray = np.full((400, 400), 128, dtype=np.uint8)
-        gs, ge = DoorDetector._find_gap_on_line(
+        gs, ge = detector._find_gap_on_line(
             gray, fixed_coord=200, scan_start=100, scan_end=300,
             hinge_pos=200, is_horizontal=True, threshold=128.0,
         )
@@ -138,7 +138,7 @@ class TestFindGapOnLine:
         gray = np.full((400, 400), 255, dtype=np.uint8)
         gray[0:100, 200] = 0
         gray[160:400, 200] = 0
-        gs, ge = DoorDetector._find_gap_on_line(
+        gs, ge = detector._find_gap_on_line(
             gray, fixed_coord=200, scan_start=0, scan_end=399,
             hinge_pos=120, is_horizontal=False, threshold=128.0,
         )

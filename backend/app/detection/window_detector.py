@@ -48,6 +48,10 @@ class WindowDetector:
     ) -> WindowDetectionResult:
         gray = self._preprocess(image) if binary is None else binary
         h, w = image.shape[:2]
+        diag = math.hypot(w, h)
+        self._min_ww = max(MIN_WINDOW_W, int(diag * 0.025))
+        self._max_ww = min(MAX_WINDOW_W, max(MAX_WINDOW_W, int(diag * 0.25)))
+        self._max_wh = max(MIN_WINDOW_H, min(MAX_WINDOW_H, int(diag * 0.06)))
         threshold = self._compute_threshold(gray)
         excluded_gaps = excluded_gaps or []
 
@@ -140,15 +144,16 @@ class WindowDetector:
     ) -> list[Window]:
         h_img, w_img = gray.shape[:2]
 
+        mww = self._max_ww if hasattr(self, '_max_ww') else MAX_WINDOW_W
         if wall.category == LineCategory.HORIZONTAL:
             center = int(round((wall.y1 + wall.y2) / 2.0))
-            lo = max(0, int(min(wall.x1, wall.x2)) - MAX_WINDOW_W)
-            hi = min(w_img - 1, int(max(wall.x1, wall.x2)) + MAX_WINDOW_W)
+            lo = max(0, int(min(wall.x1, wall.x2)) - mww)
+            hi = min(w_img - 1, int(max(wall.x1, wall.x2)) + mww)
             is_horizontal = True
         else:
             center = int(round((wall.x1 + wall.x2) / 2.0))
-            lo = max(0, int(min(wall.y1, wall.y2)) - MAX_WINDOW_W)
-            hi = min(h_img - 1, int(max(wall.y1, wall.y2)) + MAX_WINDOW_W)
+            lo = max(0, int(min(wall.y1, wall.y2)) - mww)
+            hi = min(h_img - 1, int(max(wall.y1, wall.y2)) + mww)
             is_horizontal = False
 
         # The grouped wall may be the merged centreline of a double-line wall
@@ -178,7 +183,7 @@ class WindowDetector:
         result: list[Window] = []
         for gs, ge in merged:
             gap_w = ge - gs
-            if gap_w < MIN_WINDOW_W:
+            if gap_w < self._min_ww:
                 continue
             win = self._gap_to_window(
                 gray, gs, ge, is_horizontal, center, threshold,
@@ -357,9 +362,8 @@ class WindowDetector:
         # still require actual ink.
         return best >= max(1, core_len - 1)
 
-    @staticmethod
     def _find_gaps_at_offset(
-        gray: np.ndarray, center: int,
+        self, gray: np.ndarray, center: int,
         lo: int, hi: int, horizontal: bool,
         threshold: float = 128.0,
         thickness: int = 4,
@@ -393,7 +397,7 @@ class WindowDetector:
                 p += 1
             elif is_wall and in_gap:
                 wp = p - start
-                if wp >= MIN_WINDOW_W:
+                if wp >= self._min_ww:
                     left_ok = (start - 1) >= lo
                     right_ok = p <= hi
                     if left_ok and right_ok:
@@ -409,7 +413,7 @@ class WindowDetector:
             p += 1
         if in_gap:
             wp = hi - start + 1
-            if wp >= MIN_WINDOW_W:
+            if wp >= self._min_ww:
                 left_ok = (start - 1) >= lo
                 if left_ok:
                     left_wall = WindowDetector._column_is_solid(
@@ -519,8 +523,8 @@ class WindowDetector:
         if is_horizontal:
             scan_x = int(round((gs + ge) / 2.0))
             scan_y = center
-            up_lo = max(0, scan_y - MAX_WINDOW_H)
-            down_hi = min(h_img - 1, scan_y + MAX_WINDOW_H)
+            up_lo = max(0, scan_y - self._max_wh)
+            down_hi = min(h_img - 1, scan_y + self._max_wh)
 
             up_extent = scan_y
             for y in range(scan_y, up_lo - 1, -1):
@@ -538,8 +542,8 @@ class WindowDetector:
         else:
             scan_y = int(round((gs + ge) / 2.0))
             scan_x = center
-            left_lo = max(0, scan_x - MAX_WINDOW_H)
-            right_hi = min(w_img - 1, scan_x + MAX_WINDOW_H)
+            left_lo = max(0, scan_x - self._max_wh)
+            right_hi = min(w_img - 1, scan_x + self._max_wh)
 
             left_extent = scan_x
             for x in range(scan_x, left_lo - 1, -1):

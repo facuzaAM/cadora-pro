@@ -33,15 +33,22 @@ class DoorDetector:
     ) -> DoorDetectionResult:
         gray = self._preprocess(image) if binary is None else binary
         h, w = image.shape[:2]
+        diag = math.hypot(w, h)
+        # Scale door width bounds to image size so low-res AI plans work.
+        min_dw = max(MIN_DOOR_W, int(diag * 0.012))
+        max_dw = min(MAX_DOOR_W, max(MAX_DOOR_W + 100, int(diag * 0.18)))
         threshold = self._compute_threshold(gray)
 
         walls = [line for line in grouped_lines
                  if line.category in (LineCategory.HORIZONTAL, LineCategory.VERTICAL)
-                 and line.length > MIN_DOOR_W]
+                 and line.length > min_dw]
 
         leaf_candidates = [line for line in all_lines
-                           if MIN_DOOR_W <= line.length <= MAX_DOOR_W * 1.5
+                           if min_dw <= line.length <= max_dw * 1.5
                            and not self._is_wall_edge(line, gray, threshold)]
+
+        self._min_dw = min_dw
+        self._max_dw = max_dw
 
         doors: list[Door] = []
         used_leaf_ids: set[str] = set()
@@ -226,16 +233,16 @@ class DoorDetector:
             return False
         return bool(np.min(band) < threshold)
 
-    @staticmethod
     def _find_gap_on_line(
-        gray: np.ndarray, fixed_coord: int,
+        self, gray: np.ndarray, fixed_coord: int,
         scan_start: int, scan_end: int,
         hinge_pos: int, is_horizontal: bool = True,
         threshold: float = 128.0,
     ) -> tuple[int | None, int | None]:
+        mw = self._max_dw if hasattr(self, '_max_dw') else MAX_DOOR_W
         h, w = gray.shape[:2]
-        lo = max(0, scan_start - MAX_DOOR_W)
-        hi = min((w if is_horizontal else h) - 1, scan_end + MAX_DOOR_W)
+        lo = max(0, scan_start - mw)
+        hi = min((w if is_horizontal else h) - 1, scan_end + mw)
         runs: list[tuple[int, int]] = []
         in_gap = False
         start = lo
@@ -255,8 +262,9 @@ class DoorDetector:
         best: tuple[int, int] | None = None
         best_dist = float("inf")
         for s, e in runs:
+            mn = self._min_dw if hasattr(self, '_min_dw') else MIN_DOOR_W
             gap_width = e - s
-            if gap_width < MIN_DOOR_W or gap_width > MAX_DOOR_W:
+            if gap_width < mn or gap_width > mw:
                 continue
             # A real doorway is flanked by wall on both sides. Reject runs
             # that bleed into the background beyond the wall's own extent
