@@ -368,6 +368,7 @@ class WindowDetector:
         threshold: float = 128.0,
         thickness: int = 4,
     ) -> list[tuple[int, int]]:
+        mw = self._min_ww if hasattr(self, '_min_ww') else MIN_WINDOW_W
         candidates: dict[tuple[int, int], bool] = {}
 
         limit = gray.shape[1] if horizontal else gray.shape[0]
@@ -397,7 +398,7 @@ class WindowDetector:
                 p += 1
             elif is_wall and in_gap:
                 wp = p - start
-                if wp >= self._min_ww:
+                if wp >= mw:
                     left_ok = (start - 1) >= lo
                     right_ok = p <= hi
                     if left_ok and right_ok:
@@ -413,7 +414,7 @@ class WindowDetector:
             p += 1
         if in_gap:
             wp = hi - start + 1
-            if wp >= self._min_ww:
+            if wp >= mw:
                 left_ok = (start - 1) >= lo
                 if left_ok:
                     left_wall = WindowDetector._column_is_solid(
@@ -519,12 +520,13 @@ class WindowDetector:
         threshold: float = 128.0,
     ) -> float:
         h_img, w_img = gray.shape[:2]
+        mwh = self._max_wh if hasattr(self, '_max_wh') else MAX_WINDOW_H
 
         if is_horizontal:
             scan_x = int(round((gs + ge) / 2.0))
             scan_y = center
-            up_lo = max(0, scan_y - self._max_wh)
-            down_hi = min(h_img - 1, scan_y + self._max_wh)
+            up_lo = max(0, scan_y - mwh)
+            down_hi = min(h_img - 1, scan_y + mwh)
 
             up_extent = scan_y
             for y in range(scan_y, up_lo - 1, -1):
@@ -542,8 +544,8 @@ class WindowDetector:
         else:
             scan_y = int(round((gs + ge) / 2.0))
             scan_x = center
-            left_lo = max(0, scan_x - self._max_wh)
-            right_hi = min(w_img - 1, scan_x + self._max_wh)
+            left_lo = max(0, scan_x - mwh)
+            right_hi = min(w_img - 1, scan_x + mwh)
 
             left_extent = scan_x
             for x in range(scan_x, left_lo - 1, -1):
