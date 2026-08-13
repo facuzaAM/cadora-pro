@@ -58,6 +58,9 @@ export const metadata: Metadata = {
     index: true,
     follow: true,
   },
+  other: {
+    "google-site-verification": process.env.NEXT_PUBLIC_GSC_VERIFICATION ?? "",
+  },
 };
 
 export default function RootLayout({

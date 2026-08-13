@@ -9,6 +9,7 @@ import { projectsService } from "@/services/projects.service";
 import { api } from "@/services/api";
 
 const POLL_INTERVAL_MS = 2500;
+const MAX_WAIT_MS = 5 * 60 * 1000;
 
 export default function ProcessingPage() {
   const router = useRouter();
@@ -16,11 +17,18 @@ export default function ProcessingPage() {
   const projectId = params.projectId as string;
   const [processing, setProcessing] = useState(true);
   const [error, setError] = useState(false);
+  const [timedOut, setTimedOut] = useState(false);
   const [retryCount, setRetryCount] = useState(0);
   const finishedRef = useRef(false);
+  const startedRef = useRef(Date.now());
 
   const checkStatus = useCallback(async (): Promise<boolean> => {
     if (finishedRef.current) return true;
+    if (Date.now() - startedRef.current > MAX_WAIT_MS) {
+      finishedRef.current = true;
+      setTimedOut(true);
+      return true;
+    }
     const token = api.getAccessToken();
     try {
       const p = await projectsService.getById(projectId, token);
@@ -93,6 +101,34 @@ export default function ProcessingPage() {
             <RefreshCw className="mr-2 h-4 w-4" />
             Reintentar
           </Button>
+        </div>
+      </div>
+    );
+  }
+
+  if (timedOut) {
+    return (
+      <div className="space-y-6">
+        <PageHeader
+          title="Preparando plano"
+          description="Vas a poder revisar y ajustar el plano antes de exportar el archivo CAD."
+        />
+
+        <div className="flex flex-col items-center justify-center rounded-xl border border-dashed bg-muted/30 px-6 py-16 text-center">
+          <AlertCircle className="mb-4 h-8 w-8 text-amber-500" />
+          <h2 className="text-xl font-bold">El análisis está demorando más de lo esperado</h2>
+          <p className="mt-2 max-w-md text-sm text-muted-foreground">
+            El plano puede ser muy grande o la cola de procesamiento estar ocupada. Podés esperar e intentar de nuevo, o revisar el plano más tarde desde tu dashboard.
+          </p>
+          <div className="mt-6 flex gap-4">
+            <Button onClick={() => { setTimedOut(false); finishedRef.current = false; startedRef.current = Date.now(); setRetryCount((c) => c + 1); }}>
+              <RefreshCw className="mr-2 h-4 w-4" />
+              Reintentar
+            </Button>
+            <Button variant="outline" onClick={() => router.replace(`/projects/${projectId}/result`)}>
+              Ir al resultado
+            </Button>
+          </div>
         </div>
       </div>
     );
