@@ -23,6 +23,7 @@ export function LandingNav() {
   const pathname = usePathname();
 
   return (
+    <>
     <header className="sticky top-0 z-50 border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 animate-nav-bg">
       <div className="mx-auto flex h-14 max-w-6xl items-center justify-between px-4 sm:grid sm:grid-cols-3">
         <Link href="/" onClick={() => setOpen(false)}>
@@ -80,6 +81,7 @@ export function LandingNav() {
           </div>
         </nav>
       )}
+    </header>
       <CadCursor />
       <style dangerouslySetInnerHTML={{
         __html: `
@@ -87,6 +89,6 @@ export function LandingNav() {
           a, button, input, textarea, select { cursor: none !important; }
         `,
       }} />
-    </header>
+    </>
   );
 }

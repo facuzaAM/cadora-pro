@@ -63,14 +63,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       setUser(data.user);
       return true;
     } catch {
-      accessTokenRef.current = null;
-      api.setAccessToken(null);
-      setUser(null);
-      invalidateCache("billing");
-      clearRefreshTimer();
+      // No borramos al usuario si falla el refresh (ej. deploy). El
+      // usuario autenticado debe seguir viendo la app aunque pierda
+      // momentáneamente la conexión con el backend. El próximo refresh
+      // (14 min) lo reintentará.
       return false;
     }
-  }, [clearRefreshTimer]);
+  }, []);
 
   const scheduleRefresh = useCallback(() => {
     clearRefreshTimer();
@@ -84,15 +83,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     try {
       const data = await api.get<AuthUser>("/auth/me", accessTokenRef.current ?? undefined);
       setUser(data);
-      scheduleRefresh();
     } catch {
-      const refreshed = await tryRefreshToken();
-      if (!refreshed) {
-        setUser(null);
-      } else {
-        scheduleRefresh();
-      }
+      await tryRefreshToken();
     } finally {
+      scheduleRefresh(); // siempre programa refresco, incluso si falló
       setLoading(false);
     }
   }, [tryRefreshToken, scheduleRefresh]);
