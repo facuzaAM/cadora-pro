@@ -7,6 +7,7 @@ import { Upload, AlertCircle, Loader2, Download, ArrowRight, Check, Pencil } fro
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import {
   Dialog,
@@ -23,6 +24,7 @@ import { LandingMotionBG } from "@/components/features/landing/landing-motion-bg
 import { api } from "@/services/api";
 import { projectsService } from "@/services/projects.service";
 import { documentsService } from "@/services/documents.service";
+import { useAuth } from "@/hooks/useAuth";
 
 const DEMO_MAX_SIZE_MB = 10;
 const DEMO_ACCEPT = ".pdf,.png,.jpg,.jpeg,.tiff";
@@ -59,6 +61,11 @@ export function DemoUploader() {
   const [demoFile, setDemoFile] = useState<File | null>(null);
   const [step, setStep] = useState(0);
   const [showAuthModal, setShowAuthModal] = useState(false);
+  const [loginEmail, setLoginEmail] = useState("");
+  const [loginPassword, setLoginPassword] = useState("");
+  const [loginError, setLoginError] = useState<string | null>(null);
+  const [loginLoading, setLoginLoading] = useState(false);
+  const { signIn } = useAuth();
   const fileInputRef = useRef<HTMLInputElement>(null);
   const stepTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const demoSessionRef = useRef<string>(`demo_${crypto.randomUUID()}`);
@@ -378,13 +385,63 @@ export function DemoUploader() {
       <Dialog open={showAuthModal} onOpenChange={setShowAuthModal}>
         <DialogContent className="sm:max-w-2xl max-h-[90vh] overflow-y-auto">
           <DialogHeader>
-            <DialogTitle className="text-xl">Creá tu cuenta gratis</DialogTitle>
+            <DialogTitle className="text-xl">Iniciá sesión para continuar</DialogTitle>
             <DialogDescription>
-              Creá una cuenta gratuita para editar tu plano y descargar tu DXF, o elegí un plan premium para más conversiones.
+              Ingresá tu email y contraseña para editar el plano, o registrate abajo.
             </DialogDescription>
           </DialogHeader>
 
-          <div className="grid gap-3 mt-4 sm:grid-cols-2">
+          <form
+            onSubmit={async (e) => {
+              e.preventDefault();
+              setLoginLoading(true);
+              setLoginError(null);
+              try {
+                await signIn(loginEmail, loginPassword);
+                setShowAuthModal(false);
+                handleEdit();
+              } catch {
+                setLoginError("Email o contraseña incorrectos");
+              } finally {
+                setLoginLoading(false);
+              }
+            }}
+            className="mt-4 space-y-3"
+          >
+            <Input
+              type="email"
+              placeholder="tu@email.com"
+              value={loginEmail}
+              onChange={(e) => setLoginEmail(e.target.value)}
+              required
+              autoFocus
+              aria-label="Email"
+            />
+            <Input
+              type="password"
+              placeholder="Contraseña"
+              value={loginPassword}
+              onChange={(e) => setLoginPassword(e.target.value)}
+              required
+              minLength={8}
+              aria-label="Contraseña"
+            />
+            {loginError && <p className="text-sm text-destructive">{loginError}</p>}
+            <Button type="submit" className="w-full" disabled={loginLoading}>
+              {loginLoading ? "Ingresando…" : "Iniciar sesión"}
+            </Button>
+            <Link
+              href="/login"
+              className="block text-center text-sm text-muted-foreground underline-offset-4 hover:underline"
+              onClick={() => setShowAuthModal(false)}
+            >
+              ¿Olvidaste tu contraseña?
+            </Link>
+          </form>
+
+          <hr className="my-4" />
+          <p className="text-center text-sm text-muted-foreground mb-4">¿No tenés cuenta? Elegí un plan</p>
+          <div className="grid gap-3 sm:grid-cols-2">
             {PLANS.map((plan) => (
               <div
                 key={plan.id}
