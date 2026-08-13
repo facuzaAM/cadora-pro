@@ -214,6 +214,16 @@ export function DemoUploader() {
           <p className="mx-auto mt-4 max-w-2xl text-lg text-muted-foreground sm:text-xl">
             {APP_DESCRIPTION}
           </p>
+          <div className="mt-3 flex items-center justify-center gap-4 text-xs text-muted-foreground">
+            <span className="inline-flex items-center gap-1">
+              <span className="inline-block h-2 w-2 rounded-full bg-emerald-500" />
+              Plan gratis disponible
+            </span>
+            <span className="text-muted-foreground/40">·</span>
+            <span>Desde $15/mes</span>
+            <span className="text-muted-foreground/40">·</span>
+            <span>Sin instalación</span>
+          </div>
 
           <div className="mt-10">
             {state === "used" ? (

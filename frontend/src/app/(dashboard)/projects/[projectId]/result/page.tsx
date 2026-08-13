@@ -15,7 +15,9 @@ import { projectsService } from "@/services/projects.service";
 import { cadService, type CadFormat } from "@/services/cad.service";
 import { useAuth } from "@/hooks/useAuth";
 import { api, ApiError } from "@/services/api";
+import { editorService } from "@/services/editor.service";
 import { track } from "@/lib/analytics";
+import type { EditorDetection } from "@/types/editor";
 import { toast } from "sonner";
 
 const DWG_PLANS = new Set(["pro", "business"]);
@@ -41,15 +43,19 @@ function ResultContent() {
   const [retryCount, setRetryCount] = useState(0);
   const generatedRef = useRef(false);
   const readyRef = useRef(false);
+  const [detectionPreview, setDetectionPreview] = useState<EditorDetection | null>(null);
 
   const canExportDwg = user && DWG_PLANS.has(user.subscription_plan);
+  const token = api.getAccessToken();
 
   const markReady = useCallback(() => {
     if (readyRef.current) return;
     readyRef.current = true;
     setCadReady(true);
     track("cad_generated");
-  }, []);
+    // Cargar preview de detección para mostrarlo
+    editorService.getDetection(projectId, token).then(setDetectionPreview).catch(() => {});
+  }, [projectId, token]);
 
   const generateCad = useCallback(
     async (token?: string) => {
@@ -248,8 +254,40 @@ function ResultContent() {
         </div>
       )}
 
+      {cadReady && detectionPreview && (
+        <div className="rounded-xl border bg-card overflow-hidden shadow-sm">
+          <div className="relative aspect-[4/3] bg-muted/20 bg-grid-cad overflow-hidden">
+            {detectionPreview.image_width && (
+              <svg
+                className="absolute inset-0 h-full w-full"
+                viewBox={`0 0 ${detectionPreview.image_width || 1} ${detectionPreview.image_height || 1}`}
+                preserveAspectRatio="xMidYMid meet"
+              >
+                {detectionPreview.walls.map((wall, i) => (
+                  <line key={`w-${i}`} x1={wall.x1} y1={wall.y1} x2={wall.x2} y2={wall.y2}
+                    stroke="#1e293b" strokeWidth={2} strokeLinecap="round" opacity={0.8} />
+                ))}
+                {detectionPreview.doors.map((door, i) => (
+                  <rect key={`d-${i}`} x={door.x - door.width / 2} y={door.y - 2}
+                    width={door.width} height={4} fill="#2563eb" rx={1} opacity={0.8} />
+                ))}
+                {detectionPreview.windows.map((win, i) => (
+                  <rect key={`wi-${i}`} x={win.x - win.width / 2} y={win.y - win.height / 2}
+                    width={win.width} height={win.height} fill="none" stroke="#059669" strokeWidth={2} rx={1} opacity={0.8} />
+                ))}
+              </svg>
+            )}
+            <div className="absolute bottom-2 left-2 flex gap-2">
+              <span className="rounded bg-background/80 px-2 py-0.5 text-xs">{detectionPreview.walls.length} muros</span>
+              <span className="rounded bg-background/80 px-2 py-0.5 text-xs">{detectionPreview.doors.length} puertas</span>
+              <span className="rounded bg-background/80 px-2 py-0.5 text-xs">{detectionPreview.windows.length} ventanas</span>
+            </div>
+          </div>
+        </div>
+      )}
+
       {cadReady && (
-        <div className="flex flex-col items-center justify-center rounded-xl border border-dashed bg-muted/30 px-6 py-16 text-center">
+        <div className="flex flex-col items-center justify-center rounded-xl border border-dashed bg-muted/30 px-6 py-8 text-center">
           <Download className="mb-4 h-8 w-8 text-emerald-500" />
           <h2 className="text-xl font-bold">Plano listo para descargar</h2>
           <p className="mt-2 max-w-md text-sm text-muted-foreground">

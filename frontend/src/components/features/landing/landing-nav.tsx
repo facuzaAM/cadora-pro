@@ -12,6 +12,7 @@ const links = [
   { href: "/", label: "Inicio" },
   { href: "/como-funciona", label: "Cómo funciona" },
   { href: "/tecnologia", label: "Tecnología" },
+  { href: "/comparativa", label: "Comparativa" },
   { href: "/pricing", label: "Precios" },
   { href: "/contacto", label: "Contacto" },
 ];

@@ -1196,6 +1196,7 @@ export function CadEditor({
                     ? "text-emerald-600"
                     : "text-amber-500",
                 )}
+                title="Confianza del motor en que este elemento está correctamente detectado. ≥90% = muy seguro, ≥65% = aceptable, &lt;65% = revisar manualmente."
               >
                 {Math.round(((selected.kind === "door" ? selectedDoor?.confidence : selectedWindow?.confidence) ?? 0) * 100)}%
               </span>
