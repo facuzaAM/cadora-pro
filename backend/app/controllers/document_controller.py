@@ -9,8 +9,8 @@ from app.database import get_db
 from app.schemas.document import DocumentResponse, UploadResponse
 from app.services.document_service import DocumentService
 from app.services.plan_enforcer import check_storage_limit, enforce_conversion_limit
-from app.utils.dependencies import get_current_user
 from app.utils.activity import log_activity
+from app.utils.dependencies import get_current_user
 from app.utils.rate_limit import rate_limit
 from app.utils.uploads import read_upload_with_limit, validate_extension, validate_magic_bytes
 
@@ -41,9 +41,10 @@ async def upload_document(
 
     await check_storage_limit(user, len(content))
 
-    service = DocumentService(db)
     try:
-        await log_activity(db, user.id, project_id, "upload", file.filename)\n        return await service.upload(user.id, project_id, file.filename or "", content)
+        await log_activity(db, user.id, project_id, "upload", file.filename)
+        return await DocumentService(db).upload(
+            user.id, project_id, file.filename or "", content)
     except ValueError as e:
         raise HTTPException(status_code=HTTP_404_NOT_FOUND, detail=str(e))
 
