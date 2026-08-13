@@ -204,12 +204,71 @@
     animation-delay: var(--float-delay, 0s);
   }
 
+  /* ── Nav bar ────────────────────────────────────────────────────────────── */
+
+  @keyframes nav-bg {
+    0%, 100% { background-position: 0% 50%; }
+    50% { background-position: 100% 50%; }
+  }
+
+  .animate-nav-bg {
+    background: linear-gradient(120deg,
+      hsl(var(--background) / 0.97) 0%,
+      hsl(var(--primary) / 0.03) 25%,
+      hsl(var(--background) / 0.97) 50%,
+      hsl(var(--primary) / 0.02) 75%,
+      hsl(var(--background) / 0.97) 100%
+    );
+    background-size: 200% 100%;
+    animation: nav-bg 12s ease-in-out infinite;
+    backdrop-filter: blur(8px);
+  }
+
+  .nav-link {
+    position: relative;
+  }
+
+  .nav-link::after {
+    content: "";
+    position: absolute;
+    bottom: -2px;
+    left: 50%;
+    width: 100%;
+    height: 2px;
+    background: hsl(var(--primary));
+    transform: translateX(-50%) scaleX(0);
+    transition: transform 0.25s ease;
+    border-radius: 1px;
+  }
+
+  .nav-link:hover::after {
+    transform: translateX(-50%) scaleX(1);
+  }
+
+  .nav-link-active::after {
+    transform: translateX(-50%) scaleX(1);
+  }
+
+  .dark .animate-nav-bg {
+    background: linear-gradient(120deg,
+      hsl(222 47% 5% / 0.97) 0%,
+      hsl(var(--primary) / 0.05) 25%,
+      hsl(222 47% 5% / 0.97) 50%,
+      hsl(var(--primary) / 0.03) 75%,
+      hsl(222 47% 5% / 0.97) 100%
+    );
+    background-size: 200% 100%;
+  }
+
   @media (prefers-reduced-motion: reduce) {
     .animate-grid-pan,
     .animate-float-drift,
     .animate-marker-ring,
-    .animate-scan-sweep {
+    .animate-scan-sweep,
+    .animate-nav-bg,
+    .nav-link::after {
       animation: none;
+      transition: none;
     }
   }
 

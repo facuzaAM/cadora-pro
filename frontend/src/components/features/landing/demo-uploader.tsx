@@ -18,7 +18,6 @@ import {
 } from "@/components/ui/dialog";
 import { PLANS, APP_TAGLINE, APP_DESCRIPTION } from "@/lib/constants";
 import { CadCrosshair } from "@/components/features/landing/cad-crosshair";
-import { CadCursor } from "@/components/features/landing/cad-cursor";
 import { CadDimension } from "@/components/features/landing/cad-dimension";
 import { LandingMotionBG } from "@/components/features/landing/landing-motion-bg";
 import { api } from "@/services/api";

@@ -7,6 +7,7 @@ import { Menu, X } from "lucide-react";
 import { Logo } from "@/components/shared/logo";
 import { ThemeToggle } from "@/components/shared/theme-toggle";
 import { UserButton } from "@/components/features/auth/user-button";
+import { CadCursor } from "@/components/features/landing/cad-cursor";
 
 const links = [
   { href: "/", label: "Inicio" },
@@ -22,20 +23,20 @@ export function LandingNav() {
   const pathname = usePathname();
 
   return (
-    <header className="sticky top-0 z-50 border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
+    <header className="sticky top-0 z-50 border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 animate-nav-bg">
       <div className="mx-auto flex h-14 max-w-6xl items-center justify-between px-4 sm:grid sm:grid-cols-3">
         <Link href="/" onClick={() => setOpen(false)}>
           <Logo />
         </Link>
-        <nav className="hidden items-center justify-center gap-6 sm:flex">
+        <nav className="hidden items-center justify-center gap-4 sm:flex" style={{ minWidth: 0 }}>
           {links.map((link) => {
             const active = pathname === link.href;
             return (
               <Link
                 key={link.href}
                 href={link.href}
-                className={`text-sm font-medium transition-colors hover:text-foreground ${
-                  active ? "text-foreground" : "text-muted-foreground"
+                className={`nav-link whitespace-nowrap text-sm font-medium transition-colors hover:text-foreground ${
+                  active ? "text-foreground nav-link-active" : "text-muted-foreground"
                 }`}
               >
                 {link.label}
@@ -79,6 +80,13 @@ export function LandingNav() {
           </div>
         </nav>
       )}
+      <CadCursor />
+      <style dangerouslySetInnerHTML={{
+        __html: `
+          body { cursor: none !important; }
+          a, button, input, textarea, select { cursor: none !important; }
+        `,
+      }} />
     </header>
   );
 }
