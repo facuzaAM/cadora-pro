@@ -85,6 +85,16 @@ class DetectionService:
         # Detect confident circular arcs (curved walls) and replace their
         # chords with a single Arc primitive.
         arcs, grouped = detect_arcs(grouped)
+        # Drop short isolated lines that don't connect to any other line
+        # (decorative hatching, text fragments, noise).
+        isec = self.detector._find_intersections(grouped, image.shape)
+        connected_ids: set[str] = set()
+        for i in isec:
+            connected_ids.update(str(lid) for lid in i.lines)
+        grouped = [
+            ln for ln in grouped
+            if ln.length >= 100 or str(ln.id) in connected_ids
+        ]
         intersections = self.detector._find_intersections(grouped, image.shape)
 
         line_result = LineDetectionResult(
