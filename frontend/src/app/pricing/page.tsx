@@ -12,17 +12,8 @@ import { SiteFooter } from "@/components/layout/site-footer";
 import { PageHero } from "@/components/shared/page-hero";
 import { PLANS as DISPLAY_PLANS } from "@/lib/constants";
 import { billingService, type Plan } from "@/services/billing.service";
-import { api } from "@/services/api";
-import { decodeJwtPayload } from "@/lib/jwt";
 import { useAuth } from "@/hooks/useAuth";
 import { track } from "@/lib/analytics";
-
-function getUserIdFromToken(): string | undefined {
-  const token = api.getAccessToken();
-  if (!token) return undefined;
-  const payload = decodeJwtPayload(token);
-  return typeof payload?.sub === "string" ? payload.sub : undefined;
-}
 
 export default function PricingPage() {
   return (
@@ -39,7 +30,6 @@ function PricingContent() {
   const { refreshUser } = useAuth();
   const [plans, setPlans] = useState<Plan[]>([]);
   const [userPlan, setUserPlan] = useState<string | undefined>();
-  const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [paddleLoaded, setPaddleLoaded] = useState(false);
   const [paddleReady, setPaddleReady] = useState(false);
   const autoOpenedRef = useRef(false);
@@ -48,15 +38,16 @@ function PricingContent() {
     billingService.getPlans().then(setPlans).catch((err) => { Sentry.captureException(err); });
   }, []);
 
+  // Uses useAuth's user (fetched via GET /auth/me with HttpOnly cookie)
+  // to detect authentication and plan — NOT api.getAccessToken()
+  // (which fails because the cookie is HttpOnly and invisible to JS).
+  const { user } = useAuth();
+  const isAuthenticated = user !== null;
   useEffect(() => {
-    const token = api.getAccessToken();
-    if (token) {
-      setIsAuthenticated(true);
-      billingService.getSubscription(token).then((sub) => {
-        setUserPlan(sub.plan);
-      }).catch((err) => { Sentry.captureException(err); });
+    if (user?.subscription_plan) {
+      setUserPlan(user.subscription_plan);
     }
-  }, []);
+  }, [user]);
 
   const initPaddle = useCallback(async () => {
     if (typeof window === "undefined" || !window.Paddle) return;
@@ -99,7 +90,7 @@ function PricingContent() {
     if (!plan?.paddle_price_id) return;
 
     autoOpenedRef.current = true;
-    const userId = getUserIdFromToken();
+    const userId = user?.id;
     window.Paddle.Checkout.open({
       items: [{ priceId: plan.paddle_price_id, quantity: 1 }],
       customData: { plan: plan.id, user_id: userId },
@@ -109,14 +100,14 @@ function PricingContent() {
       },
       eventCallback,
     });
-  }, [paddleReady, isAuthenticated, requestedPlan, userPlan, plans, eventCallback]);
+  }, [paddleReady, isAuthenticated, requestedPlan, userPlan, plans, eventCallback, user?.id]);
 
   const handleSubscribe = useCallback(async (planId: string) => {
     if (!window.Paddle || !paddleReady) return;
     const plan = plans.find((p) => p.id === planId);
     if (!plan?.paddle_price_id) return;
 
-    const userId = getUserIdFromToken();
+    const userId = user?.id;
     window.Paddle.Checkout.open({
       items: [{ priceId: plan.paddle_price_id, quantity: 1 }],
       customData: { plan: planId, user_id: userId },
@@ -126,7 +117,7 @@ function PricingContent() {
       },
       eventCallback,
     });
-  }, [paddleReady, plans, eventCallback]);
+  }, [paddleReady, plans, eventCallback, user?.id]);
 
   return (
     <div className="flex min-h-screen flex-col">
