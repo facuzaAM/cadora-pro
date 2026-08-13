@@ -5,6 +5,7 @@ import { Move, Pencil, DoorClosed, AppWindow, RotateCw, FlipHorizontal2, Trash2,
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { jsPDF } from "jspdf";
+import { track } from "@/lib/analytics";
 import { Badge } from "@/components/ui/badge";
 import type {
   EditorArc,
@@ -267,6 +268,7 @@ export function CadEditor({
         a.href = canvas.toDataURL("image/png");
         a.download = "cadora-plano.png";
         a.click();
+        track("editor_export", { format: "png" });
       } finally {
         setExportingPng(false);
       }
@@ -281,6 +283,7 @@ export function CadEditor({
         const doc = new jsPDF({ orientation: width >= height ? "l" : "p", unit: "px", format: [canvas.width, canvas.height] });
         doc.addImage(canvas.toDataURL("image/png"), "PNG", 0, 0, canvas.width, canvas.height);
         doc.save("cadora-plano.pdf");
+        track("editor_export", { format: "pdf" });
       } finally {
         setExportingPng(false);
       }
@@ -1203,7 +1206,7 @@ export function CadEditor({
               variant="outline"
               size="sm"
               disabled={saving}
-              onClick={() => onSave(elements).then(() => setDirty(false))}
+              onClick={() => onSave(elements).then(() => { track("editor_save"); setDirty(false); })}
             >
               {saving ? "Guardando..." : "Guardar cambios"}
             </Button>
@@ -1230,7 +1233,7 @@ export function CadEditor({
               variant="outline"
               size="sm"
               disabled={saving}
-              onClick={() => onSave(elements).then(() => setDirty(false))}
+              onClick={() => onSave(elements).then(() => { track("editor_save"); setDirty(false); })}
             >
               {saving ? "Guardando..." : "Guardar cambios"}
             </Button>

@@ -15,6 +15,7 @@ import { billingService, type Plan } from "@/services/billing.service";
 import { api } from "@/services/api";
 import { decodeJwtPayload } from "@/lib/jwt";
 import { useAuth } from "@/hooks/useAuth";
+import { track } from "@/lib/analytics";
 
 function getUserIdFromToken(): string | undefined {
   const token = api.getAccessToken();
@@ -86,6 +87,7 @@ function PricingContent() {
 
   const eventCallback = useCallback((event: Paddle.CheckoutEvent) => {
     if (event.name === "checkout.completed") {
+      track("checkout_completed");
       void handleCheckoutCompleted();
     }
   }, [handleCheckoutCompleted]);

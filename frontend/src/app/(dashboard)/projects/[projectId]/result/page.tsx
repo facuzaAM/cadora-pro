@@ -15,6 +15,7 @@ import { projectsService } from "@/services/projects.service";
 import { cadService, type CadFormat } from "@/services/cad.service";
 import { useAuth } from "@/hooks/useAuth";
 import { api, ApiError } from "@/services/api";
+import { track } from "@/lib/analytics";
 import { toast } from "sonner";
 
 const DWG_PLANS = new Set(["pro", "business"]);
@@ -47,6 +48,7 @@ function ResultContent() {
     if (readyRef.current) return;
     readyRef.current = true;
     setCadReady(true);
+    track("cad_generated");
   }, []);
 
   const generateCad = useCallback(
@@ -131,6 +133,7 @@ function ResultContent() {
     try {
       const url = cadService.downloadUrl(projectId, format);
       window.open(url, "_blank");
+      track("cad_download", { format });
       toast.success(`Archivo ${format.toUpperCase()} en descarga`);
     } catch {
       toast.error("Error al descargar el archivo");

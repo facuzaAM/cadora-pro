@@ -8,6 +8,7 @@ import { CadEditor } from "@/components/features/editor/cad-editor";
 import { editorService } from "@/services/editor.service";
 import { cadService } from "@/services/cad.service";
 import { api, ApiError } from "@/services/api";
+import { track } from "@/lib/analytics";
 import type { EditorElements, EditorDetection } from "@/types/editor";
 import { toast } from "sonner";
 
@@ -69,6 +70,7 @@ export default function EditorPage() {
           return true;
         }
         if (res.status === "completed") {
+          track("detection_completed");
           await loadSaved(res);
           return true;
         }
