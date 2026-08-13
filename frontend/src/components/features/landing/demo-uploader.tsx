@@ -410,7 +410,7 @@ export function DemoUploader() {
           )}
         </div>
 
-        <CadCursor />
+        
       </section>
 
       <Dialog open={showAuthModal} onOpenChange={setShowAuthModal}>
