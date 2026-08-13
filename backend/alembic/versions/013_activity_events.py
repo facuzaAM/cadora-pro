@@ -8,7 +8,7 @@ import sqlalchemy as sa
 from alembic import op
 
 revision: str = "013_activity_events"
-down_revision: str = "012_project_conversion_charged"
+down_revision: str = "012"
 branch_labels: ClassVar[str | None] = None
 depends_on: ClassVar[str | None] = None
 
