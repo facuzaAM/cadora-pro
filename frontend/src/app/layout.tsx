@@ -58,8 +58,8 @@ export const metadata: Metadata = {
     index: true,
     follow: true,
   },
-  other: {
-    "google-site-verification": process.env.NEXT_PUBLIC_GSC_VERIFICATION ?? "",
+  verification: {
+    google: "Z9q4ZpBcmh46FqABObpCDy6Qt1SbLpk3OL1gF2tB0Eo",
   },
 };
 
