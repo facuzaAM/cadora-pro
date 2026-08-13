@@ -11,6 +11,7 @@ import { UserButton } from "@/components/features/auth/user-button";
 const links = [
   { href: "/", label: "Inicio" },
   { href: "/como-funciona", label: "Cómo funciona" },
+  { href: "/tecnologia", label: "Tecnología" },
   { href: "/pricing", label: "Precios" },
   { href: "/contacto", label: "Contacto" },
 ];

@@ -32,8 +32,8 @@ const SESSION_KEY = "cadora_demo_used";
 
 interface DemoResult {
   walls: Array<{ x1: number; y1: number; x2: number; y2: number; length: number }>;
-  doors: Array<{ x: number; y: number; width: number; rotation: number; swing: string }>;
-  windows: Array<{ x: number; y: number; width: number; height: number; rotation: number }>;
+  doors: Array<{ x: number; y: number; width: number; rotation: number; swing: string; confidence?: number }>;
+  windows: Array<{ x: number; y: number; width: number; height: number; rotation: number; confidence?: number }>;
   ocr_texts: Array<{ text: string; bbox: [number, number, number, number]; category: string }>;
   ocr_measurements: Array<{ text: string; bbox: [number, number, number, number] }>;
   image_width: number;
@@ -348,6 +348,28 @@ export function DemoUploader() {
                       <Badge variant="secondary">{wallCount} muros</Badge>
                       <Badge variant="secondary">{doorCount} puertas</Badge>
                       <Badge variant="secondary">{windowCount} ventanas</Badge>
+                      {result && (
+                        <Badge
+                          variant="outline"
+                          className={
+                            result.doors.some((d) => (d.confidence ?? 0) < 0.5) ||
+                            result.windows.some((w) => (w.confidence ?? 0) < 0.5)
+                              ? "text-amber-500 border-amber-200"
+                              : "text-emerald-600 border-emerald-200"
+                          }
+                        >
+                          Confianza{" "}
+                          {(() => {
+                            const all = [...result.doors, ...result.windows].filter(
+                              (x) => x.confidence != null,
+                            );
+                            if (!all.length) return "—";
+                            const avg =
+                              all.reduce((s, x) => s + (x.confidence ?? 0), 0) / all.length;
+                            return `${Math.round(avg * 100)}%`;
+                          })()}
+                        </Badge>
+                      )}
                     </div>
                     <div className="flex flex-wrap items-center gap-2">
                       <Button onClick={handleEdit}>
