@@ -1,3 +1,4 @@
+from app.models.activity_event import ActivityEvent
 from app.models.document import Document
 from app.models.paddle_event import PaddleWebhookEvent
 from app.models.password_reset import PasswordResetToken
