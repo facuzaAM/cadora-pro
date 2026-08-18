@@ -18,14 +18,17 @@ declare namespace Paddle {
     eventCallback?: (event: CheckoutEvent) => void;
   }
 
+  interface CustomerPortalOptions {
+    settings?: {
+      displayMode?: "overlay" | "inline";
+      theme?: "light" | "dark";
+    };
+  }
+
   interface PaddleInstance {
     Initialize(config: { token: string; environment?: string }): void;
-    Checkout: {
-      open(options: CheckoutOptions): void;
-    };
-    CustomerPortal: {
-      open(): void;
-    };
+    Checkout(options: CheckoutOptions): void;
+    CustomerPortal(options: CustomerPortalOptions): void;
   }
 }
 

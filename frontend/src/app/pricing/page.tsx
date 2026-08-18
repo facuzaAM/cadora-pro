@@ -90,33 +90,51 @@ function PricingContent() {
     if (!plan?.paddle_price_id) return;
 
     autoOpenedRef.current = true;
-    const userId = user?.id;
-    window.Paddle.Checkout.open({
-      items: [{ priceId: plan.paddle_price_id, quantity: 1 }],
-      customData: { plan: plan.id, user_id: userId },
-      settings: {
-        displayMode: "overlay",
-        theme: "light",
-      },
-      eventCallback,
-    });
+    if (!user?.id || !plan?.paddle_price_id) {
+      toast.error("No se pudo iniciar el checkout. Recargá la página e intentá de nuevo.");
+      return;
+    }
+    try {
+      window.Paddle.Checkout({
+        items: [{ priceId: plan.paddle_price_id, quantity: 1 }],
+        customData: { plan: plan.id, user_id: user.id },
+        settings: {
+          displayMode: "overlay",
+          theme: "light",
+        },
+        eventCallback,
+      });
+    } catch (err) {
+      Sentry.captureException(err);
+      toast.error("No se pudo abrir el checkout. Intentalo de nuevo.");
+    }
   }, [paddleReady, isAuthenticated, requestedPlan, userPlan, plans, eventCallback, user?.id]);
 
   const handleSubscribe = useCallback(async (planId: string) => {
-    if (!window.Paddle || !paddleReady) return;
+    if (!window.Paddle || !paddleReady) {
+      toast.error("El sistema de pago no está listo. Recargá la página e intentá de nuevo.");
+      return;
+    }
     const plan = plans.find((p) => p.id === planId);
-    if (!plan?.paddle_price_id) return;
+    if (!plan?.paddle_price_id || !user?.id) {
+      toast.error("No se pudo iniciar el checkout. Recargá la página e intentá de nuevo.");
+      return;
+    }
 
-    const userId = user?.id;
-    window.Paddle.Checkout.open({
-      items: [{ priceId: plan.paddle_price_id, quantity: 1 }],
-      customData: { plan: planId, user_id: userId },
-      settings: {
-        displayMode: "overlay",
-        theme: "light",
-      },
-      eventCallback,
-    });
+    try {
+      window.Paddle.Checkout({
+        items: [{ priceId: plan.paddle_price_id, quantity: 1 }],
+        customData: { plan: planId, user_id: user.id },
+        settings: {
+          displayMode: "overlay",
+          theme: "light",
+        },
+        eventCallback,
+      });
+    } catch (err) {
+      Sentry.captureException(err);
+      toast.error("No se pudo abrir el checkout. Intentalo de nuevo.");
+    }
   }, [paddleReady, plans, eventCallback, user?.id]);
 
   return (
