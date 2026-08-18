@@ -27,8 +27,15 @@ declare namespace Paddle {
 
   interface PaddleInstance {
     Initialize(config: { token: string; environment?: string }): void;
-    Checkout(options: CheckoutOptions): void;
-    CustomerPortal(options: CustomerPortalOptions): void;
+    Checkout: {
+      open(options: CheckoutOptions): void;
+      close(): void;
+      updateItems(options: boolean): void;
+      updateCheckout(options: boolean): void;
+    };
+    CustomerPortal: {
+      open(options: CustomerPortalOptions): void;
+    };
   }
 }
 

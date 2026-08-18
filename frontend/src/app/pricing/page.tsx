@@ -115,7 +115,7 @@ function PricingContent() {
       return;
     }
     try {
-      window.Paddle.Checkout({
+      window.Paddle.Checkout.open({
         items: [{ priceId: plan.paddle_price_id, quantity: 1 }],
         customData: { plan: plan.id, user_id: user.id },
         settings: {
@@ -142,7 +142,7 @@ function PricingContent() {
     }
 
     try {
-      window.Paddle.Checkout({
+      window.Paddle.Checkout.open({
         items: [{ priceId: plan.paddle_price_id, quantity: 1 }],
         customData: { plan: planId, user_id: user.id },
         settings: {
