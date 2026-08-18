@@ -49,23 +49,43 @@ function PricingContent() {
     }
   }, [user]);
 
+  const paddleInitRef = useRef(false);
+
   const initPaddle = useCallback(async () => {
-    if (typeof window === "undefined" || !window.Paddle) return;
+    if (typeof window === "undefined") return;
+    if (paddleInitRef.current) return;
+    if (!window.Paddle) return;
     try {
       const config = await billingService.getConfig();
       window.Paddle.Initialize({
         token: config.client_token,
         environment: config.environment === "sandbox" ? "sandbox" : "production",
       });
+      paddleInitRef.current = true;
       setPaddleReady(true);
     } catch (err) {
       Sentry.captureException(err);
+      toast.error("No se pudo inicializar el sistema de pago. Recargá la página e intentá de nuevo.");
     }
   }, []);
 
   useEffect(() => {
     if (paddleLoaded) initPaddle();
   }, [paddleLoaded, initPaddle]);
+
+  // Cobertura para navegación client-side: si el script de Paddle ya se cargó
+  // (onLoad ya disparado antes de montar la página), inicializar igualmente.
+  useEffect(() => {
+    if (!paddleLoaded && typeof window !== "undefined" && window.Paddle) {
+      initPaddle();
+      return;
+    }
+    if (paddleReady) return;
+    const timer = setTimeout(() => {
+      if (typeof window !== "undefined" && window.Paddle) initPaddle();
+    }, 1500);
+    return () => clearTimeout(timer);
+  }, [paddleLoaded, paddleReady, initPaddle]);
 
   const handleCheckoutCompleted = useCallback(async () => {
     toast.success("Suscripción activada. ¡Bienvenido a Cadora!");

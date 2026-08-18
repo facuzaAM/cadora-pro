@@ -32,9 +32,9 @@ const nextConfig = {
             value: [
               "default-src 'self'",
               "script-src 'self' 'unsafe-inline' https://*.paddle.com https://*.googletagmanager.com https://*.google-analytics.com",
-              "style-src 'self' 'unsafe-inline'",
-              "img-src 'self' data: blob: https://lh3.googleusercontent.com https://*.google-analytics.com https://*.googletagmanager.com",
-              "font-src 'self'",
+              "style-src 'self' 'unsafe-inline' https://*.paddle.com",
+              "img-src 'self' data: blob: https://lh3.googleusercontent.com https://*.paddle.com https://*.google-analytics.com https://*.googletagmanager.com",
+              "font-src 'self' https://*.paddle.com",
               "connect-src 'self' https://*.paddle.com https://*.google-analytics.com https://*.googletagmanager.com",
               "frame-src https://*.paddle.com",
               "base-uri 'self'",
