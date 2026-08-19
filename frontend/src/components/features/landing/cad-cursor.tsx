@@ -17,8 +17,8 @@ export function CadCursor() {
     // Smooth follow
     const cursor = cursorRef.current;
     const target = targetRef.current;
-    cursor.x += (target.x - cursor.x) * 0.15;
-    cursor.y += (target.y - cursor.y) * 0.15;
+    cursor.x += (target.x - cursor.x) * 0.9;
+    cursor.y += (target.y - cursor.y) * 0.9;
 
     const { x, y } = cursor;
     const s = 16; // half-size
